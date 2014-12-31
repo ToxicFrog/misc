@@ -1,0 +1,70 @@
+#!/bin/bash
+
+MUSIC_DIR="$HOME/Music"
+MP3_DIR="$HOME/Music/mp3"
+LINK="ln"
+
+function find_match_for_mp3() {
+  mp3="$1"
+  pattern="${mp3/$MP3_DIR/$MUSIC_DIR}"
+  pattern="${pattern%.*}"
+  if [[ $(echo "$pattern"*) == "$pattern*" ]]; then
+    return 1;
+  fi
+  return 0
+}
+
+# Clean up empty directories in source.
+echo "Cleaning up empty directories in origin dir..."
+find "$MUSIC_DIR" -depth \( -type d -empty \) -print -delete
+
+# Clean up all non-symlink files that no longer correspond to files in MUSIC_DIR.
+echo "Cleaning up stale converted files..."
+find "$MP3_DIR" -type f | while read -r file; do
+  if ! find_match_for_mp3 "$file"; then
+    rm -fv "$file"
+  fi
+done
+
+# Clean up all broken symlinks
+echo "Cleaning up broken symlinks..."
+find "$MP3_DIR" -depth \( -type l -xtype l \) -print -delete
+
+echo "Creating mp3s..."
+find "$MUSIC_DIR" -path "$MP3_DIR" -prune -o -print | while read -r path; do
+  # Create directories
+  mp3="${path/$MUSIC_DIR/$MP3_DIR}"
+  if [[ -d $path ]]; then
+    [[ -e $mp3 ]] || mkdir -vp "$mp3"
+    continue
+  fi
+
+  # Handle files.
+  mp3="${mp3%.*}.mp3"
+
+  # Skip things that don't need to be updated
+  if [[ -e $mp3 && ! $path -nt $mp3 ]]; then
+    continue
+  fi
+
+  case "$path" in
+    *.mp3)
+      $LINK "$path" "$mp3"
+      ;;
+    *.flac|*.ogg|*.m4a|*.mpc)
+      echo "$mp3"
+      </dev/null ffmpeg -y -i "$path" -v error -stats -map 0:0 -q:a 0 -codec:a libmp3lame "$mp3"
+      ;;
+    *.txt|*.m3u)
+      # skip
+      ;;
+    *)
+      echo "WARNING: unknown file type: $path"
+      ;;
+  esac
+done
+
+echo "Cleaning up empty directories in destination dir..."
+find "$MP3_DIR" -depth \( -type d -empty \) -print -delete
+
+echo "Done!"
