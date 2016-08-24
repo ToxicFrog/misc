@@ -1,0 +1,266 @@
+#!/usr/bin/env luajit
+
+-- An interface for managing my booklog.
+-- Usage:
+
+--   books -l [-v] [date]
+-- Display the log for the specified date (year or month). With no arguments,
+-- shows the log for the current month. With -v, shows additional details.
+
+--   books -s [date]
+-- Display high-level stats: # books read and # books per tag.
+
+--   books -b -<l|s> [date]
+-- Modifies the behaviour of books -s and -l to emit a BBcode report rather than
+-- a textual one.
+
+--   books -a [date]
+-- Add a book to the log. If date is specified, append to the log for that
+-- month (date must have a month component); otherwise append to the log for
+-- the current month. Opens an editor.
+
+require 'util.flags'
+require 'util.io'
+require 'util.misc'
+require 'util.string'
+require 'util.table'
+
+--
+-- Flags common to all modes
+--
+flags.register('help', 'h', '?') {
+  help = 'This text.';
+}
+flags.register ('verbose', 'v') {
+  help = 'Enable more verbose output in list.';
+}
+flags.register ('bbcode', 'b') {
+  help = 'Output in bbcode format rather than plain text.';
+}
+flags.register ('db-path') {
+  help = 'File to store booklog in.';
+  type = flags.string;
+  default = os.getenv('HOME') .. '/Sync/books.lt';
+}
+flags.register ('date', 'd') {
+  help = "Date-prefix to operate on, in YYYY or YYYY-MM format.";
+  type = flags.string;
+  default = os.date('%Y-%m');
+}
+
+--
+-- Flags for book editing modes (edit and add)
+--
+flags.register ('title') { type = flags.string }
+flags.register ('author') { type = flags.string }
+flags.register ('tags') { type = flags.list }
+
+local function books(db, date)
+  return coroutine.wrap(function()
+    for _,book in ipairs(db) do
+      if string.find(book.date, date, 1, true) == 1 then
+        coroutine.yield(book)
+      end
+    end
+  end)
+end
+
+-- A book data model is actually harder than it looks.
+-- mandatory fields: title, date, author
+-- tags is mandatory, but may be {}
+-- notes and alias are optional
+local function newbook(db)
+  local book = {
+    title=''; author=''; date='';
+    tags={};
+    notes = false;
+    alias = false;
+  }
+  table.insert(db, book)
+  book.id = #db
+  return book.id
+end
+
+local function prompt(text)
+  io.stderr:write(text..' ')
+  io.stderr:flush()
+  return io.read()
+end
+
+local function loadDB(path)
+  local fn,err = loadfile(path)
+  if not fn then
+    eprintf('Error loading database: %s\n', err)
+    if prompt('Continue with new blank database [y/n]?') == 'y' then
+      return {}
+    else
+      error 'No database available.'
+    end
+  end
+  return assert(fn(), "Error deserializing database")
+end
+
+local function saveDB(path, db)
+  return io.writefile(path, table.dump(db))
+end
+
+-- Given a book record, emit a user-editable text representation.
+local function book2txt(book)
+  local txt = {}
+  for _,field in ipairs { 'title', 'author', 'alias', 'date', 'tags' } do
+    if type(book[field]) == 'table' then
+      table.insert(txt, '%s: %s' % {field,table.concat(book[field], ',')})
+    else --type(book[field]) == 'string' then
+      table.insert(txt, '%s: %s' % {field, book[field] or ''})
+    end
+  end
+  table.insert(txt, '')
+  table.insert(txt, book.notes or nil)
+  return table.concat(txt, '\n')
+end
+
+-- Given a text representation of a book produced by book2txt, return the
+-- book record it describes.
+local function txt2book(txt)
+  book = { tags = {} }
+  local notes = {}
+  local lines = txt:gmatch('([^\n]*)\n?')
+
+  for line in lines do
+    local k,v = line:match('^(%w+): (.*)')
+    if type(book[k]) == 'table' then
+      book[k] = {v:split(',')}
+    elseif k then
+      book[k] = #v > 0 and v or false
+    else break end
+  end
+  for line in lines do
+    table.insert(notes, line)
+  end
+  book.notes = table.concat(notes, '\n'):trim()
+  if book.notes == '' then book.notes = false end
+
+  return book
+end
+
+local function header(book)
+  return string.format(
+    "%d. \\b{%s} %s%s%s",
+    book.id,
+    book.title,
+    (book.author:sub(1,3) == 'tr.' or book.author:sub(1,3) == 'ed.') and '' or 'by ',
+    book.author,
+    book.alias and ' (as '..book.alias..')' or '')
+end
+
+local function bbcode(tag, content)
+  return '[%s]%s[/%s]' % { tag, content:sub(2,-2), tag }
+end
+local function strip(tag, content)
+  return content:sub(2,-2)
+end
+
+local function output(text)
+  if flags 'bbcode' then
+    print((text:gsub('\\(%w+)(%b{})', bbcode)))
+  else
+    print((text:gsub('\\(%w+)(%b{})', strip)))
+  end
+end
+
+local commands = {}
+function commands.help()
+  eprintf [[
+
+  Usage:
+books [-bv] <add|edit|list|stats> [date] [other options]
+
+]]
+  eprintf('%s\n', flags.help())
+end
+
+function commands.list(db)
+  for book in books(db, flags 'date') do
+    output(header(book))
+    if flags 'bbcode' and book.notes then
+      output('\n'..book.notes .. '\n')
+    end
+    if flags 'verbose' then
+      print(book2txt(book):trim())
+      print('')
+    end
+  end
+end
+
+function commands.add(db)
+  commands.edit(db, newbook(db))
+end
+
+function commands.edit(db, id)
+  local book = db[tonumber(id)]
+  table.merge(book, {
+    title = flags 'title';
+    author = flags 'author';
+    tags = flags 'tags';
+    date = flags 'date';
+  })
+
+  local path = os.tmpname()
+  io.writefile(path, book2txt(book))
+  os.execute('rnano -w "-$" %s' % path)
+
+  table.merge(book, txt2book(io.readfile(path)))
+end
+
+function commands.stats(db)
+  -- Map of tag => # of books that have that tag attached
+  local book_tags = {}
+  -- Map of tag => # of authors who have written at least one book with that tag
+  local author_tags = {}
+  local seen_author_tags = {}
+
+  local nbooks,nauthors = 0,0
+  for book in books(db, flags 'date') do
+    nbooks = nbooks + 1
+    for _,tag in ipairs(book.tags) do
+      book_tags[tag] = (book_tags[tag] or 0) + 1
+      if not seen_author_tags[book.author] then
+        seen_author_tags[book.author] = {}
+        nauthors = nauthors + 1
+      end
+      if not seen_author_tags[book.author][tag] then
+        seen_author_tags[book.author][tag] = true
+        author_tags[tag] = (author_tags[tag] or 0) + 1
+      end
+    end
+  end
+  print("Books:", nbooks, "Authors:", nauthors)
+  print('')
+  print("# of books by tag:")
+  for tag,n in pairs(book_tags) do
+    print('', tag, n, (n/nbooks*100)..'%')
+  end
+  print('')
+  print('# of authors by tag:')
+  for tag,n in pairs(author_tags) do
+    print('', tag, n, (n/nauthors*100)..'%')
+  end
+end
+
+local function main(...)
+  flags.parse {...}
+  if flags 'help' then
+    modes.help()
+  end
+
+  local db = loadDB(flags 'db-path')
+  local cmd = flags.parsed[1] or 'help'
+  if commands[cmd] then
+    commands[cmd](db, unpack(flags.parsed, 2))
+    saveDB(flags 'db-path', db)
+  else
+    error('No such command: %s', cmd)
+  end
+end
+
+return main(...)
