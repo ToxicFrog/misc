@@ -42,10 +42,13 @@ flags.register ('db-path') {
   type = flags.string;
   default = os.getenv('HOME') .. '/Sync/books.lt';
 }
-flags.register ('date', 'd') {
-  help = "Date-prefix to operate on, in YYYY or YYYY-MM format.";
-  type = flags.string;
-  default = os.date('%Y-%m');
+flags.register ('match', 'm') {
+  help = "key=value fields to match on, e.g. date=2016 or author=Cherryh; blank = everything";
+  type = flags.mapOf(flags.string, flags.listOf(flags.string, '/'), ',', '=');
+  default = {};
+}
+flags.register ('by-count', 'c') {
+  help = "For stats, order tags by count rather than by name."
 }
 
 --
@@ -53,12 +56,50 @@ flags.register ('date', 'd') {
 --
 flags.register ('title') { type = flags.string }
 flags.register ('author') { type = flags.string }
-flags.register ('tags') { type = flags.list }
+flags.register ('alias') { type = flags.string }
+flags.register ('date') { type = flags.string }
+flags.register ('tags') {
+  help = "For add/edit, the tags to assign to the book. For list/stats, only show these tags.";
+  type = flags.list;
+}
 
-local function books(db, date)
+local function globMatch(str, pattern)
+  return str:match((pattern:gsub('%*', '.*')))
+end
+
+local function matchField(matcher, value)
+  if type(value) == 'string' then
+    return globMatch(value, matcher)
+  elseif type(value) == 'table' then
+    for _,v in ipairs(value) do
+      if matchField(matcher, v) then return true end
+    end
+  else
+    return false
+  end
+end
+
+-- Returns true if, for each k=v,w,x clause in the matcher, book[k] matches at
+-- least one of v, w, or x
+local function matchBook(matcher, book)
+  -- The empty matcher {} matches everything.
+  if next(matcher) == nil then return true end
+  for k,vs in pairs(matcher) do
+    for _,v in ipairs(vs) do
+      if matchField(v, book[k]) then
+        goto continue
+      end
+    end
+    do return false end
+    ::continue::
+  end
+  return true
+end
+
+local function books(db)
   return coroutine.wrap(function()
     for _,book in ipairs(db) do
-      if string.find(book.date, date, 1, true) == 1 then
+      if matchBook(flags 'match', book) then
         coroutine.yield(book)
       end
     end
@@ -129,7 +170,7 @@ local function txt2book(txt)
   for line in lines do
     local k,v = line:match('^(%w+): (.*)')
     if type(book[k]) == 'table' then
-      book[k] = {v:split(',')}
+      book[k] = {v:split('%s*,%s*')}
     elseif k then
       book[k] = #v > 0 and v or false
     else break end
@@ -143,10 +184,12 @@ local function txt2book(txt)
   return book
 end
 
+local header_index = 0
 local function header(book)
+  header_index = header_index + 1
   return string.format(
     "%d. \\b{%s} %s%s%s",
-    book.id,
+    flags 'bbcode' and header_index or book.id,
     book.title,
     (book.author:sub(1,3) == 'tr.' or book.author:sub(1,3) == 'ed.') and '' or 'by ',
     book.author,
@@ -159,12 +202,18 @@ end
 local function strip(tag, content)
   return content:sub(2,-2)
 end
+local function untex(fn, str, count)
+  if count == 0 then
+    return str
+  end
+  return untex(fn, str:gsub('\\(%w+)(%b{})', fn))
+end
 
 local function output(text)
   if flags 'bbcode' then
-    print((text:gsub('\\(%w+)(%b{})', bbcode)))
+    print(untex(bbcode, text, 1))
   else
-    print((text:gsub('\\(%w+)(%b{})', strip)))
+    print(untex(strip, text, 1))
   end
 end
 
@@ -180,14 +229,15 @@ books [-bv] <add|edit|list|stats> [date] [other options]
 end
 
 function commands.list(db)
-  for book in books(db, flags 'date') do
+  for book in books(db) do
     output(header(book))
     if flags 'bbcode' and book.notes then
       output('\n'..book.notes .. '\n')
     end
     if flags 'verbose' then
-      print(book2txt(book):trim())
-      print('')
+      --print(book2txt(book):trim())
+      --print('')
+      print('', book.date, table.concat(book.tags, ', '))
     end
   end
 end
@@ -196,13 +246,29 @@ function commands.add(db)
   commands.edit(db, newbook(db))
 end
 
+function mergeTags(old, new)
+  local tagset = {}
+  for _,tag in ipairs(old) do
+    tagset[tag] = true
+  end
+  for _,tag in ipairs(new) do
+    tagset[tag] = true
+  end
+  local taglist = {}
+  for k in pairs(tagset) do
+    table.insert(taglist, k)
+  end
+  return taglist
+end
+
 function commands.edit(db, id)
   local book = db[tonumber(id)]
   table.merge(book, {
     title = flags 'title';
     author = flags 'author';
-    tags = flags 'tags';
+    alias = flags 'alias';
     date = flags 'date';
+    tags = mergeTags(book.tags, flags 'tags' or {});
   })
 
   local path = os.tmpname()
@@ -212,15 +278,37 @@ function commands.edit(db, id)
   table.merge(book, txt2book(io.readfile(path)))
 end
 
+local function shouldShowTag(tag)
+  if not flags 'tags' then return true end
+  for _,v in ipairs(flags 'tags') do
+    if matchField(v, tag) then return true end
+  end
+  return false
+end
+
+local function tagsToList(tags)
+  local list = {}
+  for k,v in pairs(tags) do
+    table.insert(list, {k, v})
+  end
+  if flags 'by-count' then
+    table.sort(list, f'x,y => x[2] > y[2]')
+  else
+    table.sort(list, f'x,y => x[1] < y[1]')
+  end
+  return list
+end
+
 function commands.stats(db)
   -- Map of tag => # of books that have that tag attached
   local book_tags = {}
   -- Map of tag => # of authors who have written at least one book with that tag
   local author_tags = {}
+  -- Map of author => tags we've already attributed to this author
   local seen_author_tags = {}
 
   local nbooks,nauthors = 0,0
-  for book in books(db, flags 'date') do
+  for book in books(db) do
     nbooks = nbooks + 1
     for _,tag in ipairs(book.tags) do
       book_tags[tag] = (book_tags[tag] or 0) + 1
@@ -237,14 +325,31 @@ function commands.stats(db)
   print("Books:", nbooks, "Authors:", nauthors)
   print('')
   print("# of books by tag:")
-  for tag,n in pairs(book_tags) do
-    print('', tag, n, (n/nbooks*100)..'%')
+  for _,tag in ipairs(tagsToList(book_tags)) do
+    if shouldShowTag(tag[1]) then
+      printf('    %20s  %-3d (%6.2f%%)\n', tag[1], tag[2], tag[2]/nbooks*100)
+    end
   end
   print('')
   print('# of authors by tag:')
-  for tag,n in pairs(author_tags) do
-    print('', tag, n, (n/nauthors*100)..'%')
+  for _,tag in ipairs(tagsToList(author_tags)) do
+    if shouldShowTag(tag[1]) then
+      printf('    %20s %-3d (%.2f%%)\n', tag[1], tag[2], tag[2]/nauthors*100)
+    end
   end
+end
+
+function commands.editall(db, id, ...)
+  if not id then return end
+  local book = db[tonumber(id)]
+  table.merge(book, {
+    title = flags 'title';
+    author = flags 'author';
+    alias = flags 'alias';
+    date = flags 'date';
+    tags = mergeTags(book.tags, flags 'tags' or {});
+  })
+  return commands.editall(db, ...)
 end
 
 local function main(...)
