@@ -1,8 +1,23 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Usage: mp3tree <source directory> <destination directory>
+# Mirrors <source> to <destination>, symlinking MP3s into place and converting
+# other music formats to MP3. Non-music files and unrecognized files are ignored.
+# Requires ffmpeg for the conversion.
+# Files that haven't changed since last time will be skipped, and in any case
+# the original files will be left unaltered.
 
-MUSIC_DIR="$HOME/Music"
-MP3_DIR="$HOME/Music/mp3"
-LINK="ln"
+set -e
+
+if (($# < 2)); then
+  exec sed -nE '/^# / { s/^# //; p }; /^$/ q' < $0 >&2
+fi
+
+MUSIC_DIR="$1"
+MP3_DIR="$2"
+NTHREADS=$(($(cat /proc/cpuinfo | egrep '^processor' | wc -l) - 2))
+if ((NTHREADS < 1)); then
+  NTHREADS=1
+fi
 
 function find_match_for_mp3() {
   mp3="$1"
@@ -14,9 +29,18 @@ function find_match_for_mp3() {
   return 0
 }
 
-# Clean up empty directories in source.
-echo "Cleaning up empty directories in origin dir..."
-find "$MUSIC_DIR" -depth \( -type d -empty \) -print -delete
+function ffmpeg_convert() {
+  </dev/null ffmpeg -y -i "$1" -v error -nostats -map 0:0 -q:a 0 -codec:a libmp3lame "$2" || echo "[ERR] $1"
+}
+
+NTHREADS=4
+# Spawn a background job iff the number of background jobs is <= NTHREADS.
+function spawn() {
+  while [[ $(jobs | wc -l) -ge $NTHREADS ]]; do
+    sleep 1
+  done
+  "$@" &
+}
 
 # Clean up all non-symlink files that no longer correspond to files in MUSIC_DIR.
 echo "Cleaning up stale converted files..."
@@ -28,13 +52,13 @@ done
 
 # Clean up all broken symlinks
 echo "Cleaning up broken symlinks..."
-find "$MP3_DIR" -depth \( -type l -xtype l \) -print -delete
+find "$MP3_DIR" -depth \( \( -type l -xtype l \) -or \( -type d -empty \) \) -print -delete
 
 echo "Creating mp3s..."
-find "$MUSIC_DIR" -path "$MP3_DIR" -prune -o -print | while read -r path; do
+find "$MUSIC_DIR" -path "${MP3_DIR%/}" -prune -o -print | while read -r path; do
   # Create directories
   mp3="${path/$MUSIC_DIR/$MP3_DIR}"
-  if [[ -d $path ]]; then
+  if [[ -d $path ]] && [[ $(ls -A "$path") ]]; then
     [[ -e $mp3 ]] || mkdir -vp "$mp3"
     continue
   fi
@@ -47,24 +71,35 @@ find "$MUSIC_DIR" -path "$MP3_DIR" -prune -o -print | while read -r path; do
     continue
   fi
 
-  case "$path" in
+  case "$(echo "$path" | tr '[:upper:]' '[:lower:]')" in
     *.mp3)
-      $LINK "$path" "$mp3"
+      ln -s "$path" "$mp3"
+      echo "[MP3] $path"
       ;;
-    *.flac|*.ogg|*.m4a|*.mpc)
-      echo "$mp3"
-      </dev/null ffmpeg -y -i "$path" -v error -stats -map 0:0 -q:a 0 -codec:a libmp3lame "$mp3"
+    *.flac|*.ogg|*.m4a|*.mpc|*.wav|*.aif|*.opus)
+      spawn ffmpeg_convert "$path" "$mp3"
+      echo "[PCM] $path"
       ;;
-    *.txt|*.m3u)
+    *.xm|*.mod|*.s3m)
+      spawn ffmpeg_convert "$path" "$mp3"
+      echo "[MOD] $path"
+      ;;
+    *.vgm|*.vgz)
+      spawn ffmpeg_convert "$path" "$mp3"
+      echo "[VGM] $path"
+      ;;
+    *.mid|*.midi)
+      # File is recognized but we don't have a converter for it.
+      echo "[!!!] $path"
+      ;;
+    *.txt|*.m3u|*.png|*.jpg)
       # skip
       ;;
     *)
-      echo "WARNING: unknown file type: $path"
+      # File is not recognized.
+      echo "[???] $path"
       ;;
   esac
 done
-
-echo "Cleaning up empty directories in destination dir..."
-find "$MP3_DIR" -depth \( -type d -empty \) -print -delete
 
 echo "Done!"
