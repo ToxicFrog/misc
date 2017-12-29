@@ -47,8 +47,8 @@ flags.register ('match', 'm') {
   type = flags.mapOf(flags.string, flags.listOf(flags.string, '/'), ',', '=');
   default = {};
 }
-flags.register ('by-count', 'c') {
-  help = "For stats, order tags by count rather than by name."
+flags.register ('dry-run', 'n') {
+  help = "Don't actually save the resulting database."
 }
 
 --
@@ -61,6 +61,21 @@ flags.register ('date') { type = flags.string }
 flags.register ('tags') {
   help = "For add/edit, the tags to assign to the book. For list/stats, only show these tags.";
   type = flags.list;
+}
+
+--
+-- Flags for stats mode
+--
+flags.register ('by-count', 'c') {
+  help = "For stats, order tags by count rather than by name."
+}
+flags.register ('book-stats') {
+  help = "For stats, display stats counted per book.";
+  default = true;
+}
+flags.register ('author-stats') {
+  help = "For stats, display stats counted per author.";
+  default = false;
 }
 
 local function globMatch(str, pattern)
@@ -142,6 +157,14 @@ local function loadDB(path)
 end
 
 local function saveDB(path, db)
+  if flags 'dry-run' then
+    print("Not saving database since --dry-run is set.")
+    return true
+  end
+  -- normalize IDs
+  for id,book in ipairs(db) do
+    book.id = id
+  end
   return io.writefile(path, table.dump(db))
 end
 
@@ -322,19 +345,23 @@ function commands.stats(db)
       end
     end
   end
-  print("Books:", nbooks, "Authors:", nauthors)
-  print('')
-  print("# of books by tag:")
-  for _,tag in ipairs(tagsToList(book_tags)) do
-    if shouldShowTag(tag[1]) then
-      printf('    %20s  %-3d (%6.2f%%)\n', tag[1], tag[2], tag[2]/nbooks*100)
+  if flags 'book-stats' then
+    print("Books:", nbooks, "Authors:", nauthors)
+    print('')
+    print("# of books by tag:")
+    for _,tag in ipairs(tagsToList(book_tags)) do
+      if shouldShowTag(tag[1]) then
+        printf('    %20s  %-3d (%6.2f%%)\n', tag[1], tag[2], tag[2]/nbooks*100)
+      end
     end
+    print('')
   end
-  print('')
-  print('# of authors by tag:')
-  for _,tag in ipairs(tagsToList(author_tags)) do
-    if shouldShowTag(tag[1]) then
-      printf('    %20s %-3d (%.2f%%)\n', tag[1], tag[2], tag[2]/nauthors*100)
+  if flags 'author-stats' then
+    print('# of authors by tag:')
+    for _,tag in ipairs(tagsToList(author_tags)) do
+      if shouldShowTag(tag[1]) then
+        printf('    %20s %-3d (%.2f%%)\n', tag[1], tag[2], tag[2]/nauthors*100)
+      end
     end
   end
 end
@@ -350,6 +377,17 @@ function commands.editall(db, id, ...)
     tags = mergeTags(book.tags, flags 'tags' or {});
   })
   return commands.editall(db, ...)
+end
+
+function commands.delete(db, ...)
+  local ids = table.map({...}, tonumber)
+  table.sort(ids, f'x,y => x > y')
+
+  for _,id in ipairs(ids) do
+    local book = db[tonumber(id)]
+    printf('Deleting %s by %s\n', book.title, book.author)
+    table.remove(db, id)
+  end
 end
 
 local function main(...)
