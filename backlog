@@ -1,0 +1,86 @@
+#!/usr/bin/env zsh
+
+# Wrapper around `task` to use it as a game backlog management script.
+# Like Backloggery but for the terminal, pretty much.
+#
+# We map completion status, genre, and platform to tags?
+# We can filter by tags or by project, but can only get progress bars per-project
+# So, matching current BL behaviour, we probably want to use project as an alias
+# for platform
+# So: project == platform, use tags for status
+# (unplayed/unfinished/finished/completed/null) and for anything else we want
+# (genre?)
+# Description is title
+# Oh, tags can also be series, e.g. +series:thief
+
+export TASKRC=$HOME/.backlogrc
+
+if [[ ! -e $TASKRC ]]; then
+  cat >$TASKRC <<EOF
+data.location=~/.backlog
+verbose=off
+reserved.lines=3
+nag=
+confirmation=no
+bulk=0
+
+# Games we are currently playing have highest priority.
+# Age/order of addition doesn't affect sort order.
+urgency.active.coefficient=1024
+urgency.age.coefficient=0
+urgency.project.coefficient=0
+urgency.tags.coefficient=0
+
+# Aliases
+alias.percent=summary -null
+default.command=next
+
+# Report configuration
+report.list.columns=id,start.age,project,tags,description
+report.list.labels=ID,Playing,Platform,Status,Title
+report.list.sort=start-,urgency-,description+
+
+report.next.columns=id,start.age,project,tags,description
+report.next.labels=ID,Playing,Platform,Status,Title
+report.next.sort=urgency-,description+
+
+report.all.columns=id,uuid.short,project,tags,description
+report.all.description=All tasks
+report.all.labels=ID,UUID,Platform,Status,Title
+
+EOF
+fi
+
+if [[ $1 == grep ]]; then
+  shift
+  \task all | head -n3
+  \task all | egrep -i "$@"
+  exit 0
+elif [[ $1 == add ]]; then
+  \task "${@/#p*:/project:}"
+  exit 0
+fi
+
+local command="${argv[-1]}"
+set -- "${argv[1,-2]}"
+case "$command" in
+  unplayed|unfinished)
+    \task "$@" modify status:pending -unfinished -finished -completed -mastered -unplayed -null "+$command"
+    ;;
+  finished|completed|mastered|null)
+    \task "$@" modify status:completed -unfinished -finished -completed -mastered -unplayed -null "+$command"
+    ;;
+  start)
+    \task "$@" modify status:pending +unfinished -finished -completed -mastered -unplayed
+    \task "$@" start
+    ;;
+  done)
+    echo "Use `backlog <games> (finished|completed|mastered|null)` instead."
+    ;;
+  raw)
+    \task "$@"
+    ;;
+  *)
+    \task ${@/#pl*:/project:} $command
+    ;;
+esac
