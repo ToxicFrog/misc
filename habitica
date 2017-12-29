@@ -1,0 +1,175 @@
+#!/usr/bin/env zsh
+
+setopt no_function_argzero
+
+function habitica/help {
+    if [[ $1 ]]; then
+        # Display help for specific command.
+        cat $0 | sed -nE "
+            /^##/ { s/^## //; H }
+            /^function habitica.$1/ { x; p; q; }
+            /^$/ h
+        "
+    else
+        # Display list of commands.
+        echo "habitica -- a simple command line interface to habitica.com"
+        echo ""
+        echo "Available commands:"
+        typeset +f -m 'habitica/*' | tr '/' ' ' | sort | sed -E 's;^;  ;'
+        echo "Use 'habitica help <command>' for details."
+    fi
+}
+
+function tojson {
+    if [[ $# == 1 ]]; then
+        printf '%s' "$1"
+        return 0
+    fi
+    printf '{ '
+    while [[ $1 ]]; do
+        local key="$1"; local value="$2"; shift 2
+        if [[ $1 ]]; then
+            local sep=","
+        else
+            local sep=""
+        fi
+        printf '"%s": "%s"%s ' "$key" "$value" "$sep"
+    done
+    printf ' }'
+    return 0
+}
+
+# Call a Habitica API function.
+# Usage: habitica/call METHOD path/to/function [payload...]
+# Payload can either be a single JSON string, or a series of key-value pairs,
+# e.g. habitica/call POST tasks/user type todo text "foo bar"
+function habitica/http {
+    method="$1"; call="$2"; shift 2
+    if [[ $1 ]]; then
+        set -- -H "Content-Type: application/json" -d "$(tojson "$@")"
+    fi
+    curl -s -X "$method" \
+        -H "x-api-key: $HABITICA_TOKEN" \
+        -H "x-api-user: $HABITICA_UUID" \
+        "$@" https://habitica.com/api/v3/"$call"
+    echo ''
+}
+
+## habitica list
+## List all active tasks as tab separated fields.
+## By default lists completion status, type, UUID, and description.
+## Additional arguments are taken as the list of fields to display.
+function habitica/list {
+    if [[ ! $1 ]]; then
+        set -- completed type id text
+    fi
+    habitica/http GET tasks/user \
+        | jshon -C -Q -e data -a -e ${(j: -u -p -e :s: :)argv} -u \
+        | if ((# > 1)); then
+            paste -s -d $(printf '\\t%.0s' {1..$((#-1))})'\n'
+          else
+            paste -s -d '\n'
+          fi
+}
+
+## habitica task-id <regex>
+## List the UUIDs of all tasks with a description that matches <regex>.
+function habitica/task-id {
+    habitica/list | egrep "$*$$" | cut -f2
+}
+
+## habitica up <task-id>
+## Increment a habit, or mark a todo or daily complete.
+function habitica/up {
+    while [[ $1 ]]; do
+        habitica/call POST tasks/"$1"/score/up '{}'
+        shift
+    done
+}
+
+## habitica down <task-id>
+## Decrement a habit, or mark a todo or daily incomplete.
+function habitica/down {
+    while [[ $1 ]]; do
+        habitica/call POST tasks/"$1"/score/down '{}'
+        shift
+    done
+}
+
+## habitica add <type> <description> [key value ...]
+## Add a new todo, daily, or habit.
+function habitica/add {
+    habitica/call POST tasks/user "$@"
+}
+
+function habitica/add-todo {
+    habitica/add type todo text "$@"
+}
+
+function habitica/add-daily {
+    habitica/add type todo text "$@"
+}
+
+## habitica delete <task-id>
+## Delete a todo, daily, or habit.
+function habitica/delete {
+    while [[ $1 ]]; do
+        habitica/call DELETE tasks/"$1"
+        shift
+    done
+}
+
+function habitica/cron {
+    habitica/call POST cron '{}'
+}
+
+## habitica call <method> <path> [payload]
+## Wrapper around the lower-level `habitica/call` function.
+## Unlike that, this prettyprints the results.
+## Make a call to the habitica API and print the JSON response.
+## PUT and POST can include a payload in JSON format.
+function habitica/call {
+    habitica/http "$@" | habitica/pprint "${@[2,-1]}"
+}
+
+function -ifeq {
+    read val
+    if [[ $val == $1 ]]; then
+        echo "$2"
+    else
+        echo "$3"
+    fi
+}
+
+## ... | habitica pprint <text>
+## Prettyprint the result from a habitica call, as [STATUS] <text>
+## If there are any notifications, print those as well.
+function habitica/pprint {
+    local JSON="$(cat)"
+    # .success is true/false
+    # .message contains the top-level message, if any
+    # .notifications is an array of notifications with .type and .data
+    # somtimes .data contains .message
+    local success="$(echo "$JSON" | jshon -e success | -ifeq true "[ OK ]" "[FAIL]")"
+    local message="$(echo "$JSON" | jshon -C -Q -e message)"
+    echo "$success $@"
+    [[ $message != null ]] && echo "       $message"
+    # .notifications is going to be an array of objects
+    # each one has a .type field, which is a string, and a .data field, which is
+    # an object; the contents of .data depend on the type.
+    echo "$JSON" \
+        | jshon -C -Q -e notifications -a -e type -u -p -e data \
+        | sed -nE ':start; N; /\}/ b end; b start; :end; s,[\n\t ]+, ,g; s,^ *,       ,; p'
+}
+
+action="help"
+if [[ $1 ]]; then
+    action="$1"; shift
+fi
+
+if ! typeset +f -m 'habitica/*' | egrep -q "^habitica/$action"; then
+    >&2 echo "habitica: unrecognized command: $action"
+    action="help"
+fi
+
+habitica/${action} "$@"
