@@ -50,8 +50,6 @@ function task/pre-add-daily {
   local id="$(task/-get-daily-id)"
   habitica add type daily frequency daily alias "$id" text "$*"
   echo
-  habitica list alias text | egrep "^$id[[:space:]]"
-  exit $?
 }
 
 #### Hook functions ####
