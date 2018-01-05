@@ -1,0 +1,185 @@
+#!/usr/bin/env zsh
+#
+# Wrapper around `task` to use it as a book diary management script.
+#
+# Uses UDFs for author, gender, genre.
+# Task description == title, and annotations are used for notes.
+#
+# Intended usage is:
+#   books add author:"C.J. Cherryh" genre:sf gender:f +reread Foreigner
+#   ...go off and read it...
+#   books 1 done
+#   books annote "I really enjoyed this."
+#   books bookstats genre
+#
+### New filters:
+# year:XXXX
+#   must be the first argument! equivalent to:
+#   end.after:XXXX-01-01 end.before:(XXXX+1)-01-01
+#
+### New commands:
+# books reset-config
+# books grep <genre, author, or title regex>
+# books <filter> bookstats <list of fields>
+#   displays counted stats of the different field values, e.g.
+#   `books year:2017 genre` shows you what % of books you read in 2017 were
+#   what genre.
+# books annote <text>
+#   annotates the most recently finished book.
+#
+# TODO:
+# - figure out if series tracking is useful, and if so, how (project field? UDA?)
+# - figure out a good way to track booklord challenge categories
+# - figure out how to normalize the genre tree
+
+export TASKRC=$HOME/Books/booklogrc
+
+if [[ ! -e $TASKRC ]]; then
+  cat >$TASKRC <<EOF
+data.location=~/Books/booklog
+verbose=off
+reserved.lines=3
+nag=
+confirmation=no
+bulk=0
+defaultwidth=10240
+
+# Books we are currently reading get listed first.
+# More recent books are listed earlier.
+urgency.active.coefficient=1024
+urgency.age.coefficient=-0.1
+urgency.project.coefficient=0
+urgency.tags.coefficient=0
+
+# Aliases
+default.command=next
+
+# UDAs
+uda.author.label=Author
+uda.author.type=string
+
+uda.gender.label=Gender
+uda.gender.type=string
+# WARNING: to put multiline values into a UDA, you have to have whitespace in the
+# value of the first line.
+#uda.gender.values=f,m,x,na
+
+uda.genre.label=Genre
+uda.genre.type=string
+
+# Report configuration -- books in progress
+report.list.columns=id,start.age,author,description
+report.list.labels=ID,Reading,Author,Title
+report.list.sort=urgency-,start+,author+,description+
+
+report.next.columns=id,start.age,author,description
+report.next.labels=ID,Reading,Author,Title
+report.next.sort=urgency-,start+,author+,description+
+
+# Report configuration -- completed books
+
+# "All" -- like the default except it also lists genre and author info
+report.all.description=All Books
+report.all.columns=end,uuid.short,genre,author,description.desc
+report.all.labels=Date,UUID,Genre,Author,Title
+report.all.sort=end+,author+,description+
+
+# "Full" -- completed books with date of completion, genre, author, tags,
+# description and full annotations.
+report.full.description=Completed books (with annotations)
+report.full.columns=end,uuid.short,tags,genre,author,description
+report.full.labels=Date,UUID,Tags,Genre,Author,Title
+report.full.sort=end+,author+,description+
+report.full.filter=status:completed
+
+# "Concise" -- like "full" but hides tags, genre, and annotations.
+report.concise.description=All Books (no annotations or genres)
+report.concise.columns=end,uuid.short,author,description.desc
+report.concise.labels=Date,UUID,Author,Title
+report.concise.sort=end+,author+,description+
+report.concise.filter=status:completed
+
+# Internal command for selecting one column from all matching books.
+# Used by the bookstats command.
+report.one_field.description=Internal report for bookstats command
+report.one_field.columns=uuid
+report.one_field.labels=Unused
+report.one_field.filter=status:completed
+
+EOF
+fi
+
+function bookstats {
+  local FILTER=()
+  while [[ $1 ]]; do
+    if [[ $1 == bookstats ]]; then
+      shift; break;
+    fi
+    FILTER+="$1"
+    shift
+  done
+
+  # Get number of books to use as a basis for the count.
+  NROF=$(\task "${FILTER[@]}" count)
+  NROF_AUTHORS=$(\task rc.verbose:nothing rc.report.one_field.columns:author "${FILTER[@]}" one_field | sort | uniq | wc -l)
+  printf '\n    Books: %d\n  Authors: %d\n\n' "$NROF" "$NROF_AUTHORS"
+
+  # Display prefix only if we have more than one field to collect stats for.
+  if (( $# > 1)); then
+    local FIELD_PREFIX=yes
+  fi
+
+  # Get number of occurrences of each value of each field.
+  # TODO: handle tags properly; in particular something like "ssc comic\nssc\n"
+  # needs to be handled the same as "ssc\ncomic\nssc\n", and we should probably
+  # prefix with "+" rather than with "tags:".
+  local SPLIT
+  for field in "$@"; do
+    if [[ $FIELD_PREFIX ]]; then
+      FIELD_PREFIX="$field:"
+    fi
+
+    if [[ $field == "tags" ]]; then
+      SPLIT=' '
+    else
+      SPLIT=' & '
+    fi
+
+    \task rc.verbose:nothing rc.report.one_field.columns:"$field" "${FILTER[@]}" one_field \
+      | sed -E "s,$SPLIT,\n,g" | sort | uniq -c | sed -E "s,( +[0-9]+ +),\1${FIELD_PREFIX},"
+  done | sort -r -g | while read count field; do
+    printf '%24s  %-3d  (%3.2f%%)\n' "$field" "$count" "$(\task calc "100.0*$count/$NROF")"
+  done
+}
+
+# support year:2017 as an alias for end.after:2017-01-01 end.before:2018-01-01
+# must appear as the first argument!
+if [[ $1 == year:* ]]; then
+  local year="${1/year:/}"
+  shift
+  set -- "end.after:$year-01-01" "end.before:$((year+1))-01-01" "$@"
+fi
+
+case "$*" in
+  grep*)
+    shift
+    \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
+    \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
+    ;;
+  *bookstats*)
+    # Usage: books <filter> bookstats <list of fields>
+    bookstats "$@"
+    ;;
+  annote*)
+    LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
+    \task $LAST annotate "$@"
+    ;;
+  reset-config)
+    rm -v "$TASKRC"
+    ;;
+  *)
+    \task "$@"
+    ;;
+esac
+
+exit $?
