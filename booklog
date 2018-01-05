@@ -390,6 +390,93 @@ function commands.delete(db, ...)
   end
 end
 
+local function export_tags(tags, args)
+  local genre = {}
+  local gender = {}
+  for _,tag in pairs(tags) do
+    local prefix,suffix = tag:match("(.*):(.*)")
+    if prefix == "genre" then
+      table.insert(genre, suffix)
+    elseif prefix == "author" then
+      table.insert(gender, suffix)
+    elseif prefix == "challenge" and suffix == "3" then
+      -- non-white authors challenge
+      table.insert(args, "+poc")
+    elseif prefix == "challenge" and suffix == "4" then
+      -- queer authors challenge
+      table.insert(args, "+lgbtq")
+    elseif prefix == "complete" or prefix == "deduplicate" or prefix == "challenge" then
+      -- do nothing
+    else
+      table.insert(args, "+"..tag)
+    end
+  end
+
+  if #genre > 0 then
+    table.insert(args, "genre:'%s'" % table.concat(genre, ' & '))
+  end
+  if #gender > 0 then
+    table.insert(args, "gender:'%s'" % table.concat(gender, ' & '))
+  end
+
+  return args
+end
+
+function mapargs(f, x, ...)
+  if x == nil then return end
+  return assert(f(x)),mapargs(f, ...)
+end
+
+function export_date(dates, date, args)
+  dates.m = dates.m or 1
+  dates.d = dates.d or 1
+  if date:match("%d%d%d%d%-%d%d%-%d%d") then
+    -- full date provided
+    dates.y, dates.m, dates.d = mapargs(tonumber, date:match('(%d%d%d%d)%-(%d%d)%-(%d%d)'))
+  elseif date:match('%d%d%d%d%-%d%d') then
+    -- month provided; infer day
+    local y,m = mapargs(tonumber, date:match('(%d%d%d%d)%-(%d%d)'))
+    if y == dates.y and m == dates.m then
+      dates.d = dates.d + 1
+    else
+      dates.y, dates.m, dates.d = y, m, 1
+    end
+  elseif date:match('%d%d%d%d') then
+    -- Only year provided
+    date = assert(tonumber(date))
+    if date == dates.y then
+      dates.d = dates.d + 1
+    else
+      dates.y, dates.m, dates.d = date, 1, 1
+    end
+  else
+    assert(false, "unrecognized date format " .. date)
+  end
+
+  table.insert(args, "entry:%04d-%02d-%02d" % {dates.y, dates.m, dates.d})
+  table.insert(args, "end:%04d-%02d-%02d" % {dates.y, dates.m, dates.d})
+  return args
+end
+
+-- export the contents of the db in a format suitable for ingestion by the
+-- `books` taskwarrior wrapper.
+-- Specifically, export a shell script that when run will import the contents
+-- of the db.
+function commands.export(db)
+  local dates = {}
+  for _,book in ipairs(db) do
+    local args = {}
+    export_date(dates, book.date, args)
+    table.insert(args, 'author:"%s"' % book.author)
+    export_tags(book.tags, args)
+    table.insert(args, '"%s"' % book.title)
+    printf("books log %s\n", table.concat(args, ' '))
+    if book.notes then
+      printf("books annote %s\n\n", ("%q" % book.notes):gsub("\\\n", "\n"))
+    end
+  end
+end
+
 local function main(...)
   flags.parse {...}
   if flags 'help' then
