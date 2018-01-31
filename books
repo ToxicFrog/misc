@@ -123,7 +123,7 @@ function bookstats {
   # Get number of books to use as a basis for the count.
   NROF=$(\task "${FILTER[@]}" count)
   NROF_AUTHORS=$(\task rc.verbose:nothing rc.report.one_field.columns:author "${FILTER[@]}" one_field | sort | uniq | wc -l)
-  printf '\n    Books: %d\n  Authors: %d\n\n' "$NROF" "$NROF_AUTHORS"
+  printf '\n\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF" "$NROF_AUTHORS"
 
   # Display prefix only if we have more than one field to collect stats for.
   if (( $# > 1)); then
@@ -149,7 +149,7 @@ function bookstats {
     \task rc.verbose:nothing rc.report.one_field.columns:"$field" "${FILTER[@]}" one_field \
       | sed -E "s,$SPLIT,\n,g" | sort | uniq -c | sed -E "s,( +[0-9]+ +),\1${FIELD_PREFIX},"
   done | sort -r -g | while read count field; do
-    printf '%24s  %-3d  (%3.2f%%)\n' "$field" "$count" "$(\task calc "100.0*$count/$NROF")"
+    printf '%24s  %-4d (%3.2f%%)\n' "$field" "$count" "$(\task calc "100.0*$count/$NROF")"
   done
 }
 
