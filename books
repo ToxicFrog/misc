@@ -38,8 +38,8 @@ export TASKRC=$HOME/Books/booklogrc
 
 function main {
   init-config books.defaults
-  process-year-filter "$@"; set -- "${TASK_ARGV[@]}"
-  dispatch "$@"
+  process-year-filter "$@"
+  dispatch "${TASK_ARGV[@]}"
 }
 
 function dispatch {

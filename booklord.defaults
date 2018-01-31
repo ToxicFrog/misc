@@ -21,10 +21,10 @@ default.command=challenges_next
 # Reports
 
 ## List completed challenges with annotations
-# report.challenges_done.columns=id,description
-# report.challenges_done.labels=ID,Challenge
-# report.challenges_done.sort=id+,entry+
-# report.challenges_done.filter=status:completed
+report.challenges_report.columns=id,description
+report.challenges_report.labels=ID,Challenge
+report.challenges_report.sort=id+,entry+
+report.challenges_report.filter=status:completed
 
 ## List pending challenges with annotations
 report.challenges_next.columns=id,description
