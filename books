@@ -44,6 +44,9 @@ confirmation=no
 bulk=0
 defaultwidth=10240
 
+# Stop colourizing books just because they have tags.
+color.tagged=
+
 # Books we are currently reading get listed first.
 # More recent books are listed earlier.
 urgency.active.coefficient=1024
@@ -55,14 +58,12 @@ urgency.tags.coefficient=0
 default.command=next
 
 # UDAs
+# To set multiple values (e.g. co-authored books), separate with ' & '.
 uda.author.label=Author
 uda.author.type=string
 
 uda.gender.label=Gender
 uda.gender.type=string
-# WARNING: to put multiline values into a UDA, you have to have whitespace in the
-# value of the first line.
-#uda.gender.values=f,m,x,na
 
 uda.genre.label=Genre
 uda.genre.type=string
