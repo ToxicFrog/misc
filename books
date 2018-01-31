@@ -153,7 +153,12 @@ function bookstats {
 # support year:2017 as an alias for end.after:2017-01-01 end.before:2018-01-01
 new_args=()
 while [[ $1 ]]; do
-  if [[ $1 == year:* ]]; then
+  if [[ $1 == year:all ]]; then
+    true
+  elif [[ $1 == year:now ]]; then
+    local year="$(date +%Y)"
+    new_args+="( end.after:$year-01-01 or end: )"
+  elif [[ $1 == year:* ]]; then
     local year="${1/year:/}"
     new_args+="end.after:$year-01-01"
     new_args+="end.before:$((year+1))-01-01"
