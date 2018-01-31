@@ -46,8 +46,8 @@ function dispatch {
   case "$*" in
     grep*)
       shift
-      \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
-      \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
+      \task rc.verbose:label,blank rc.regex:yes rc.search.case.sensitive:no \
+        "( author ~ '$*' or description ~ '$*' )" all
       ;;
     *bookstats*)
       # Usage: books <filter> bookstats <list of fields>
@@ -58,9 +58,6 @@ function dispatch {
       shift
       \task $LAST annotate "$@"
       ;;
-    reset-config)
-      rm -v "$TASKRC"
-      ;;
     challenges*|cc*)
       # `books cc all` == `booklord all`.
       # `cc` for Challenge Control? Mostly just because it's easy to type.
@@ -68,7 +65,7 @@ function dispatch {
       exec booklord "$@"
       ;;
     *)
-      \task "$@"
+      exec dispatch-default "$@"
       ;;
   esac
 }

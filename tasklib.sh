@@ -36,3 +36,14 @@ function process-year-filter {
     shift
   done
 }
+
+function dispatch-default {
+  case "$*" in
+    reset-config)
+      rm -v "$TASKRC"
+      ;;
+    *)
+      \task "$@"
+      ;;
+  esac
+}

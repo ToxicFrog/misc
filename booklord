@@ -34,16 +34,8 @@ function dispatch {
           booklord <ids> annotate|delete|done
 EOF
       ;;
-    reset-config)
-      rm -v "$TASKRC"
-      ;;
     next|all|report)
       \task "challenges_$@"
-      ;;
-    grep*)
-      shift
-      \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
-      \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
       ;;
     add-challenge*)
       shift
@@ -61,7 +53,7 @@ EOF
       false
       ;;
     *)
-      \task "$@"
+      exec dispatch-default "$@"
       ;;
   esac
 }
