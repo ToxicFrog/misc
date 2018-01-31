@@ -126,21 +126,18 @@ function bookstats {
   printf '\n\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF" "$NROF_AUTHORS"
 
   # Display prefix only if we have more than one field to collect stats for.
+  local FIELD_PREFIX=''
   if (( $# > 1)); then
-    local FIELD_PREFIX=yes
+    FIELD_PREFIX=yes
   fi
 
   # Get number of occurrences of each value of each field.
-  # TODO: handle tags properly; in particular something like "ssc comic\nssc\n"
-  # needs to be handled the same as "ssc\ncomic\nssc\n", and we should probably
-  # prefix with "+" rather than with "tags:".
   local SPLIT
   for field in "$@"; do
-    if [[ $FIELD_PREFIX ]]; then
-      FIELD_PREFIX="$field:"
-    fi
+    FIELD_PREFIX="${FIELD_PREFIX:+$field:}"
 
     if [[ $field == "tags" ]]; then
+      FIELD_PREFIX="${FIELD_PREFIX:++}"
       SPLIT=' '
     else
       SPLIT=' & '
