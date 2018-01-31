@@ -32,92 +32,46 @@
 # - figure out a good way to track booklord challenge categories
 # - figure out how to normalize the genre tree
 
+source $(dirname $(realpath $0))/tasklib.sh
+
 export TASKRC=$HOME/Books/booklogrc
 
-if [[ ! -e $TASKRC ]]; then
-  cat >$TASKRC <<EOF
-data.location=~/Books/booklog
-verbose=off
-reserved.lines=3
-nag=
-confirmation=no
-bulk=0
-defaultwidth=10240
+function main {
+  init-config books.defaults
+  process-year-filter "$@"; set -- "${TASK_ARGV[@]}"
+  dispatch "$@"
+}
 
-# Stop colourizing books just because they have tags.
-color.tagged=
-
-# Books we are currently reading get listed first.
-# More recent books are listed earlier.
-urgency.active.coefficient=1024
-urgency.age.coefficient=-0.1
-urgency.project.coefficient=0
-urgency.tags.coefficient=0
-
-# Aliases
-default.command=next
-
-# UDAs
-# To set multiple values (e.g. co-authored books), separate with ' & '.
-uda.author.label=Author
-uda.author.type=string
-
-uda.gender.label=Gender
-uda.gender.type=string
-
-uda.genre.label=Genre
-uda.genre.type=string
-
-# Reports
-
-## Next: books in progress & waiting to be read
-report.next.columns=id,start.age,tags,gender,author,description
-report.next.labels=ID,Reading,Tags,⚥,Author,Title
-report.next.sort=urgency-,start+,author+,description+
-
-## List: concise list of finished and in progress books.
-report.list.columns=end,author,description.desc
-report.list.labels=Finished,Author,Title
-report.list.sort=end+,author+,description+
-report.list.filter=(+COMPLETED or +ACTIVE)
-
-# "Notes" -- displays title and annotations only.
-report.notes.description=Book Notes
-report.notes.columns=author,description.combined
-report.notes.labels=Author,Title/Notes
-report.notes.sort=end+,author+,description+
-report.notes.filter=status:completed
-
-# "All" -- like the default except it also lists genre and author info
-report.all.description=All Books
-report.all.columns=end,uuid.short,genre,author,description.desc
-report.all.labels=Date,UUID,Genre,Author,Title
-report.all.sort=end+,author+,description+
-
-# "Full" -- completed books with date of completion, genre, author, tags,
-# description and full annotations.
-report.full.description=Completed books (with annotations)
-report.full.columns=end,uuid.short,tags,genre,author,description
-report.full.labels=Date,UUID,Tags,Genre,Author,Title
-report.full.sort=end+,author+,description+
-report.full.filter=status:completed
-
-# "Concise" -- like "full" but hides tags, genre, and annotations.
-report.concise.description=All Books (no annotations or genres)
-report.concise.columns=end,uuid.short,author,description.desc
-report.concise.labels=Date,UUID,Author,Title
-report.concise.sort=end+,author+,description+
-report.concise.filter=status:completed
-
-# Internal command for selecting one column from all matching books.
-# Used by the bookstats command.
-report.one_field.description=Internal report for bookstats command
-report.one_field.columns=uuid
-report.one_field.labels=Unused
-report.one_field.filter=status:completed
-
-EOF
-fi
+function dispatch {
+  case "$*" in
+    grep*)
+      shift
+      \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
+      \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
+      ;;
+    *bookstats*)
+      # Usage: books <filter> bookstats <list of fields>
+      bookstats "$@"
+      ;;
+    annote*)
+      LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
+      shift
+      \task $LAST annotate "$@"
+      ;;
+    reset-config)
+      rm -v "$TASKRC"
+      ;;
+    challenges*|cc*)
+      # `books cc all` == `booklord all`.
+      # `cc` for Challenge Control? Mostly just because it's easy to type.
+      shift
+      exec booklord "$@"
+      ;;
+    *)
+      \task "$@"
+      ;;
+  esac
+}
 
 function bookstats {
   local FILTER=()
@@ -159,52 +113,4 @@ function bookstats {
   done
 }
 
-# support year:2017 as an alias for end.after:2017-01-01 end.before:2018-01-01
-new_args=()
-while [[ $1 ]]; do
-  if [[ $1 == year:all ]]; then
-    true
-  elif [[ $1 == year:now ]]; then
-    local year="$(date +%Y)"
-    new_args+="( end.after:$year-01-01 or end: )"
-  elif [[ $1 == year:* ]]; then
-    local year="${1/year:/}"
-    new_args+="end.after:$year-01-01"
-    new_args+="end.before:$((year+1))-01-01"
-  else
-    new_args+="$1"
-  fi
-  shift
-done
-set -- "${new_args[@]}"
-
-case "$*" in
-  grep*)
-    shift
-    \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
-    \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
-    ;;
-  *bookstats*)
-    # Usage: books <filter> bookstats <list of fields>
-    bookstats "$@"
-    ;;
-  annote*)
-    LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
-    shift
-    \task $LAST annotate "$@"
-    ;;
-  reset-config)
-    rm -v "$TASKRC"
-    ;;
-  challenges*|cc*)
-    # `books cc all` == `booklord all`.
-    # `cc` for Challenge Control? Mostly just because it's easy to type.
-    shift
-    exec booklord "$@"
-    ;;
-  *)
-    \task "$@"
-    ;;
-esac
-
-exit $?
+exec main "$@"

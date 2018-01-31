@@ -13,53 +13,9 @@ export TASKRC=$HOME/Books/booklordrc
 YEAR=$(date +%Y)
 
 if [[ ! -e $TASKRC ]]; then
-  cat >$TASKRC <<EOF
-data.location=~/Books/booklord
-verbose=label,blank
-reserved.lines=3
-nag=
-confirmation=no
-bulk=0
-defaultwidth=10240
-dateformat.annotation= <> Y-M-D <>
-
-# Turn off garbage collection so that challenge IDs are static within a year.
-gc=off
-
-# Annotated challenges are dark green; completed ones are light green.
-color.tag.ANNOTATED=rgb030
-color.completed=rgb050
-color.tag.bonus=on rgb001
-
-# Aliases
-default.command=challenges_next
-
-# Context control
-context.ytd=project:challenge$YEAR
-context=ytd
-
-# Reports
-
-## List completed challenges with annotations
-# report.challenges_done.columns=id,description
-# report.challenges_done.labels=ID,Challenge
-# report.challenges_done.sort=id+,entry+
-# report.challenges_done.filter=status:completed
-
-## List pending challenges with annotations
-report.challenges_next.columns=id,description
-report.challenges_next.labels=ID,Challenge
-report.challenges_next.sort=id+,entry+
-report.challenges_next.filter=status:pending
-
-## List all challenges without annotations
-report.challenges_all.columns=id,description.desc
-report.challenges_all.labels=ID,Challenge
-report.challenges_all.sort=id+,entry+
-
-# TODO: view of previous years.
-
-EOF
+  echo "include $(dirname $(realpath $0))/booklord.defaults" > $TASKRC
+  booklord config context.$YEAR project:challenge$YEAR
+  booklord config context $YEAR
 fi
 
 # support year:2017 as an alias for end.after:2017-01-01 end.before:2018-01-01
