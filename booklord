@@ -1,0 +1,122 @@
+#!/usr/bin/env zsh
+#
+# Wrapper around `task` to use it as a challenge manager for the yearly
+# "Booklord Challenge" in TBB.
+#
+# Each year of challenges is represented as a project, "challenge$YEAR".
+# Individual tasks are challenges to be completed.
+# Annotate a challenge with information about how it was completed; mark it
+# "done" when finished.
+
+export TASKRC=$HOME/Books/booklordrc
+
+YEAR=$(date +%Y)
+
+if [[ ! -e $TASKRC ]]; then
+  cat >$TASKRC <<EOF
+data.location=~/Books/booklord
+verbose=label,blank
+reserved.lines=3
+nag=
+confirmation=no
+bulk=0
+defaultwidth=10240
+dateformat.annotation= <> Y-M-D <>
+
+# Turn off garbage collection so that challenge IDs are static within a year.
+gc=off
+
+# Annotated challenges are dark green; completed ones are light green.
+color.tag.ANNOTATED=rgb030
+color.completed=rgb050
+color.tag.bonus=on rgb001
+
+# Aliases
+default.command=challenges_next
+
+# Context control
+context.ytd=project:challenge$YEAR
+context=ytd
+
+# Reports
+
+## List completed challenges with annotations
+# report.challenges_done.columns=id,description
+# report.challenges_done.labels=ID,Challenge
+# report.challenges_done.sort=id+,entry+
+# report.challenges_done.filter=status:completed
+
+## List pending challenges with annotations
+report.challenges_next.columns=id,description
+report.challenges_next.labels=ID,Challenge
+report.challenges_next.sort=id+,entry+
+report.challenges_next.filter=status:pending
+
+## List all challenges without annotations
+report.challenges_all.columns=id,description.desc
+report.challenges_all.labels=ID,Challenge
+report.challenges_all.sort=id+,entry+
+
+# TODO: view of previous years.
+
+EOF
+fi
+
+# support year:2017 as an alias for end.after:2017-01-01 end.before:2018-01-01
+new_args=()
+while [[ $1 ]]; do
+  if [[ $1 == year:* ]]; then
+    local year="${1/year:/}"
+    new_args+="end.after:$year-01-01"
+    new_args+="end.before:$((year+1))-01-01"
+  else
+    new_args+="$1"
+  fi
+  shift
+done
+set -- "${new_args[@]}"
+
+case "$*" in
+  help)
+    cut -c6- <<EOF
+      Usage:
+        booklord reset-config
+        booklord next|all
+        booklord grep <text>
+        booklord add-challenge <description>
+        booklord nextyear [WIP]
+        booklord <ids> annotate|delete|done
+EOF
+    ;;
+  reset-config)
+    rm -v "$TASKRC"
+    ;;
+  next|all)
+    \task "challenges_$@"
+    ;;
+  grep*)
+    shift
+    \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
+    \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
+    ;;
+  add-challenge*)
+    shift
+    COUNT=$(\task count)
+    \task rc.dateformat:"Y-M-D H:N:S" add \
+      project:"challenge${YEAR}" entry:"${YEAR}-01-01 00:${COUNT}:00" "$@"
+    ;;
+  nextyear)
+    # TODO
+    # Need to:
+    # - mark all pending tasks for the current year deleted
+    # - run gc
+    # - task config context.ytd project:challenge${YEAR}
+    echo "Not yet implemented."
+    false
+    ;;
+  *)
+    \task "$@"
+    ;;
+esac
+
+exit $?
