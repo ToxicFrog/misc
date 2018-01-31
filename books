@@ -68,16 +68,25 @@ uda.gender.type=string
 uda.genre.label=Genre
 uda.genre.type=string
 
-# Report configuration -- books in progress
-report.list.columns=id,start.age,author,description
-report.list.labels=ID,Reading,Author,Title
-report.list.sort=urgency-,start+,author+,description+
+# Reports
 
-report.next.columns=id,start.age,author,description
-report.next.labels=ID,Reading,Author,Title
+## Next: books in progress & waiting to be read
+report.next.columns=id,start.age,tags,gender,author,description
+report.next.labels=ID,Reading,Tags,⚥,Author,Title
 report.next.sort=urgency-,start+,author+,description+
 
-# Report configuration -- completed books
+## List: concise list of finished and in progress books.
+report.list.columns=end,author,description.desc
+report.list.labels=Finished,Author,Title
+report.list.sort=end+,author+,description+
+report.list.filter=(+COMPLETED or +ACTIVE)
+
+# "Notes" -- displays title and annotations only.
+report.notes.description=Book Notes
+report.notes.columns=author,description.combined
+report.notes.labels=Author,Title/Notes
+report.notes.sort=end+,author+,description+
+report.notes.filter=status:completed
 
 # "All" -- like the default except it also lists genre and author info
 report.all.description=All Books
