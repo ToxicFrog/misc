@@ -179,6 +179,7 @@ case "$*" in
     ;;
   annote*)
     LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
+    shift
     \task $LAST annotate "$@"
     ;;
   reset-config)
