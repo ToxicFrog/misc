@@ -1,5 +1,5 @@
 data.location=~/Books/booklord
-verbose=label,blank
+verbose=label
 reserved.lines=3
 nag=
 confirmation=no
