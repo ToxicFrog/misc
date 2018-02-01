@@ -16,25 +16,25 @@ color.completed=rgb050
 color.tag.bonus=on rgb001
 
 # Aliases
-default.command=challenges_next
+default.command=next
 
 # Reports
 
 ## List completed challenges with annotations
-report.challenges_report.columns=id,description
-report.challenges_report.labels=ID,Challenge
-report.challenges_report.sort=id+,entry+
-report.challenges_report.filter=status:completed
+report.finished.columns=id,description
+report.finished.labels=ID,Challenge
+report.finished.sort=id+,entry+
+report.finished.filter=status:completed
 
 ## List pending challenges with annotations
-report.challenges_next.columns=id,description
-report.challenges_next.labels=ID,Challenge
-report.challenges_next.sort=id+,entry+
-report.challenges_next.filter=status:pending
+report.next.columns=id,description
+report.next.labels=ID,Challenge
+report.next.sort=id+,entry+
+report.next.filter=status:pending
 
 ## List all challenges without annotations
-report.challenges_all.columns=id,description.desc
-report.challenges_all.labels=ID,Challenge
-report.challenges_all.sort=id+,entry+
+report.all.columns=id,description.desc
+report.all.labels=ID,Challenge
+report.all.sort=id+,entry+
 
 # TODO: view of previous years.
