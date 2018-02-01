@@ -47,6 +47,25 @@ function main {
   task/dispatch "$@"
 }
 
+task/register new-year '^new-year$' books/new-year <<EOF
+
+  $NAME new-year
+
+Advance the book journal's internal year. It will not advance the current year
+automatically on the new year, to make it easy to generate end of year reports
+and the like; when you want to advance the year to the current year, use this
+command.
+
+(Note that books and annotations are always recorded with the correct date; the
+"current year" only affects what books are displayed by default.)
+EOF
+function books/new-year {
+  local isfinished="( +COMPLETED and end.after:$YEAR-01-01 and end.before:$((YEAR+1))-01-01 )"
+  local isreading="( +ACTIVE and start.before:$((YEAR+1))-01-01 )"
+  \task context define $YEAR "$isfinished or $isreading or (+PENDING and -ACTIVE)"
+  \task context $YEAR
+}
+
 task/register grep '^grep' books/grep <<EOF
 
   $NAME grep <pattern> [report]
