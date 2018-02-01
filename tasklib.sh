@@ -23,6 +23,21 @@ function task/init-config {
   done
 }
 
+# year-filter <year>
+# returns a taskwarrior filter clause that shows only tasks from the given year.
+# "from $YEAR", in practice, means:
+# - is finished, and was finished during $YEAR, OR
+# - is started, and was started during or before $YEAR, OR
+# - is pending, and was added during or before $YEAR.
+# In effect, this means "tasks that were finished during $YEAR, or were pending
+# or in-progress for at least part of $YEAR."
+function task/year-filter {
+  local isfinished="( +COMPLETED and end.after:$1-01-01 and end.before:$(($1+1))-01-01 )"
+  local isactive="( +ACTIVE and start.before:$(($1+1))-01-01 )"
+  local ispending="( +PENDING and -ACTIVE and entered.before:$(($1+1))-01-01 )"
+  echo -n "$isfinished or $isactive or $ispending"
+}
+
 # Process a taskwarrior command line to expand year:foo pseudo-filters into
 # end: filters that taskwarrior understands.
 # Returning arrays is hard, so it just drops it into $TASK_ARGV and expects
@@ -33,8 +48,6 @@ function task/init-config {
 # year:all -- disable context, do nothing else
 # year:now -- entries ending after the most recent new year, or not ended yet
 # year:XXXX -- entries ending in year XXXX
-# TODO: year:XXXX should match the behaviour of the default context in `books`,
-# i.e. include active tasks started in the given year and tasks not started yet.
 function task/-parse-argv {
   while [[ $1 ]]; do
     case "$1" in
@@ -42,12 +55,11 @@ function task/-parse-argv {
         TASK_ARGV+="rc.context:none"
         ;;
       year:now)
-        TASK_ARGV+="( end.after:$(date +%Y)-01-01 or end: )"
+        TASK_ARGV+="$(task/year-filter $YEAR)"
         TASK_ARGV+="rc.context:none"
         ;;
       year:*)
-        local year="${1/year:/}"
-        TASK_ARGV+="( end.after:$year-01-01 and end.before:$((year+1))-01-01 )"
+        TASK_ARGV+="$(task/year-filter ${1/year:/})"
         TASK_ARGV+="rc.context:none"
         ;;
       *) TASK_ARGV+="$1" ;;

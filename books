@@ -42,7 +42,7 @@ function main {
   local isfinished="( +COMPLETED and end.after:$YEAR-01-01 and end.before:$((YEAR+1))-01-01 )"
   local isreading="( +ACTIVE and start.before:$((YEAR+1))-01-01 )"
   task/init-config books.defaults \
-    "context.$YEAR=$isfinished or $isreading or (+PENDING and -ACTIVE)" \
+    "context.$YEAR=$(task/year-filter $YEAR)" \
     "context=$YEAR"
   task/dispatch "$@"
 }
@@ -60,9 +60,7 @@ command.
 "current year" only affects what books are displayed by default.)
 EOF
 function books/new-year {
-  local isfinished="( +COMPLETED and end.after:$YEAR-01-01 and end.before:$((YEAR+1))-01-01 )"
-  local isreading="( +ACTIVE and start.before:$((YEAR+1))-01-01 )"
-  \task context define $YEAR "$isfinished or $isreading or (+PENDING and -ACTIVE)"
+  \task context define $YEAR "$(task/year-filter $YEAR)"
   \task context $YEAR
 }
 
