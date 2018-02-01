@@ -27,6 +27,14 @@ function task/init-config {
 # end: filters that taskwarrior understands.
 # Returning arrays is hard, so it just drops it into $TASK_ARGV and expects
 # the caller to use it.
+# It assumes that the default context is some kind of year-scoping, so if the
+# user specifies a year: filter it also disables the context.
+# Filters understood:
+# year:all -- disable context, do nothing else
+# year:now -- entries ending after the most recent new year, or not ended yet
+# year:XXXX -- entries ending in year XXXX
+# TODO: year:XXXX should match the behaviour of the default context in `books`,
+# i.e. include active tasks started in the given year and tasks not started yet.
 function task/-parse-argv {
   while [[ $1 ]]; do
     case "$1" in
