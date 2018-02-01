@@ -33,10 +33,14 @@ function task/-parse-argv {
       year:all)
         TASK_ARGV+="rc.context:none"
         ;;
-      year:now) TASK_ARGV+="( end.after:$(date +%Y)-01-01 or end: )" ;;
+      year:now)
+        TASK_ARGV+="( end.after:$(date +%Y)-01-01 or end: )"
+        TASK_ARGV+="rc.context:none"
+        ;;
       year:*)
         local year="${1/year:/}"
         TASK_ARGV+="( end.after:$year-01-01 and end.before:$((year+1))-01-01 )"
+        TASK_ARGV+="rc.context:none"
         ;;
       *) TASK_ARGV+="$1" ;;
     esac

@@ -36,9 +36,14 @@ set -e
 source $(dirname $(realpath $0))/tasklib.sh
 
 export TASKRC=$HOME/Books/booklogrc
+export YEAR=$(date +%Y)
 
 function main {
-  task/init-config books.defaults
+  local isfinished="( +COMPLETED and end.after:$YEAR-01-01 and end.before:$((YEAR+1))-01-01 )"
+  local isreading="( +ACTIVE and start.before:$((YEAR+1))-01-01 )"
+  task/init-config books.defaults \
+    "context.$YEAR=$isfinished or $isreading or (+PENDING and -ACTIVE)" \
+    "context=$YEAR"
   task/dispatch "$@"
 }
 
@@ -69,13 +74,13 @@ function books/annote {
   \task $LAST annotate "$@"
 }
 
-task/register cc '^cc' books/-cc <<EOF
+task/register cc '^cc' books/cc <<EOF
 
   $NAME cc ...
 
 Alias for \`booklord ...\`.
 EOF
-function books/-cc {
+function books/cc {
   shift
   exec booklord "$@"
 }

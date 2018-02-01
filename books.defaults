@@ -48,7 +48,7 @@ report.notes.description=Book Notes
 report.notes.columns=author,description.combined
 report.notes.labels=Author,Title/Notes
 report.notes.sort=end+,author+,description+
-report.notes.filter=status:completed
+report.notes.filter=+COMPLETED
 
 # "All" -- like the default except it also lists genre and author info
 report.all.description=All Books
