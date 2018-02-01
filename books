@@ -32,45 +32,68 @@
 # - figure out a good way to track booklord challenge categories
 # - figure out how to normalize the genre tree
 
+set -e
 source $(dirname $(realpath $0))/tasklib.sh
 
 export TASKRC=$HOME/Books/booklogrc
 
 function main {
-  init-config books.defaults
-  process-year-filter "$@"
-  dispatch "${TASK_ARGV[@]}"
+  task/init-config books.defaults
+  task/dispatch "$@"
 }
 
-function dispatch {
-  case "$*" in
-    grep*)
-      shift
-      \task rc.verbose:label,blank rc.regex:yes rc.search.case.sensitive:no \
-        "( author ~ '$*' or description ~ '$*' )" all
-      ;;
-    *bookstats*)
-      # Usage: books <filter> bookstats <list of fields>
-      bookstats "$@"
-      ;;
-    annote*)
-      LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
-      shift
-      \task $LAST annotate "$@"
-      ;;
-    challenges*|cc*)
-      # `books cc all` == `booklord all`.
-      # `cc` for Challenge Control? Mostly just because it's easy to type.
-      shift
-      exec booklord "$@"
-      ;;
-    *)
-      exec dispatch-default "$@"
-      ;;
-  esac
+task/register grep '^grep' books/grep <<EOF
+
+  $NAME grep <pattern> [report]
+
+Display books where the author or description match the given pattern (as a
+case-insensitive regex) in the given report format; if not specified, the report
+defaults to "all".
+EOF
+function books/grep {
+  shift
+  \task rc.verbose:label,blank rc.regex:yes rc.search.case.sensitive:no \
+    "( author ~ '$1' or description ~ '$1' )" "${2:=all}"
 }
 
-function bookstats {
+task/register annote '^annote' books/annote <<EOF
+
+  $NAME annote <text>
+
+Annotate the most recently finished book with the given text and the current
+timestamp.
+EOF
+function books/annote {
+  LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
+  shift
+  \task $LAST annotate "$@"
+}
+
+task/register cc '^cc' books/-cc <<EOF
+
+  $NAME cc ...
+
+Alias for \`booklord ...\`.
+EOF
+function books/-cc {
+  shift
+  exec booklord "$@"
+}
+
+task/register bookstats 'bookstats' books/bookstats <<EOF
+
+  $NAME [filter] bookstats <field ...>
+
+For all books that match the filter, report:
+- the total number of books
+- the number of unique authors
+- all values of all listed fields, sorted by frequency, along with their counts
+  and what % of all books in the filter have that value
+Multivalued fields (e.g. books with multiple genres separated by &) will be
+counted once for each value, so the total count for a given field may exceed
+the number of books matched by the filter.
+EOF
+function books/bookstats {
   local FILTER=()
   while [[ $1 ]]; do
     if [[ $1 == bookstats ]]; then

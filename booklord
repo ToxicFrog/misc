@@ -14,48 +14,25 @@ export TASKRC=$HOME/Books/booklordrc
 export YEAR=$(date +%Y)
 
 function main {
-  init-config booklord.defaults \
+  task/init-config booklord.defaults \
     "context.$YEAR=project:challenge$YEAR" \
     "context=$YEAR"
-  process-year-filter "$@"
-  dispatch "${TASK_ARGV[@]}"
+  task/dispatch "$@"
 }
 
-function dispatch {
-  case "$*" in
-    help)
-      cut -c6- <<EOF
-        Usage:
-          booklord reset-config
-          booklord next|all
-          booklord grep <text>
-          booklord add-challenge <description>
-          booklord nextyear [WIP]
-          booklord <ids> annotate|delete|done
+task/register add-challenge '^add-challenge' booklord/-add-challenge <<EOF
 EOF
-      ;;
-    next|all|report)
-      \task "challenges_$@"
-      ;;
-    add-challenge*)
-      shift
-      COUNT=$(\task count)
-      \task rc.dateformat:"Y-M-D H:N:S" add \
-        project:"challenge${YEAR}" entry:"${YEAR}-01-01 00:${COUNT}:00" "$@"
-      ;;
-    nextyear)
-      # TODO
-      # Need to:
-      # - mark all pending tasks for the current year deleted
-      # - run gc
-      # - task config context.ytd project:challenge${YEAR}
-      echo "Not yet implemented."
-      false
-      ;;
-    *)
-      exec dispatch-default "$@"
-      ;;
-  esac
+function booklord/-add-challenge {
+  shift
+  COUNT=$(\task count)
+  \task rc.dateformat:"Y-M-D H:N:S" add \
+    project:"challenge${YEAR}" entry:"${YEAR}-01-01 00:${COUNT}:00" "$@"
 }
+
+# TODO: advance the year
+# Need to:
+# - mark all pending tasks for the current year deleted
+# - run gc
+# - task config context.ytd project:challenge${YEAR}
 
 exec main "$@"
