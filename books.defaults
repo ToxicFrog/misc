@@ -16,6 +16,8 @@ urgency.age.coefficient=-0.1
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
 
+dateformat.annotation=<>
+
 # Aliases
 default.command=next
 
@@ -38,8 +40,8 @@ report.next.labels=ID,Reading,Tags,⚥,Author,Title,Genre
 report.next.sort=urgency-,start+,author+,description+
 
 ## List: concise list of finished and in progress books.
-report.list.columns=end,author,description.desc
-report.list.labels=Finished,Author,Title
+report.list.columns=end,gender,author,description.desc
+report.list.labels=Finished,⚥,Author,Title
 report.list.sort=end+,author+,description+
 report.list.filter=(+COMPLETED or +ACTIVE)
 

@@ -29,8 +29,8 @@
 #
 # TODO:
 # - figure out if series tracking is useful, and if so, how (project field? UDA?)
-# - figure out a good way to track booklord challenge categories
 # - figure out how to normalize the genre tree
+# - convert & fields into multiline fields.
 
 set -e
 source $(dirname $(realpath $0))/tasklib.sh
@@ -128,7 +128,7 @@ function books/bookstats {
   # Get number of books to use as a basis for the count.
   NROF=$(\task "${FILTER[@]}" count)
   NROF_AUTHORS=$(\task rc.verbose:nothing rc.report.one_field.columns:author "${FILTER[@]}" one_field | sort | uniq | wc -l)
-  printf '\n\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF" "$NROF_AUTHORS"
+  printf '\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF" "$NROF_AUTHORS"
 
   # Display prefix only if we have more than one field to collect stats for.
   local FIELD_PREFIX=''
