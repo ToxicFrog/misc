@@ -13,97 +13,47 @@
 # Description is title
 # Oh, tags can also be series, e.g. +series:thief
 
+set -e
+source $(dirname $(realpath $0))/tasklib.sh
+
 export TASKRC=$HOME/.backlogrc
 
-if [[ ! -e $TASKRC ]]; then
-  cat >$TASKRC <<EOF
-data.location=~/.backlog
-verbose=off
-reserved.lines=3
-nag=
-confirmation=no
-bulk=0
-defaultwidth=0
+function main {
+  task/init-config games.defaults
+  task/dispatch "$@"
+}
 
-# Games we are currently playing have highest priority.
-# Age/order of addition doesn't affect sort order.
-urgency.active.coefficient=1024
-urgency.age.coefficient=0
-urgency.project.coefficient=0
-urgency.tags.coefficient=0
+task/register start 'start$' games/start <<EOF
 
-# UDAs
-uda.gamestate.label=Play Status
-uda.gamestate.type=string
-uda.gamestate.values=unplayed,unfinished,finished,completed,mastered,null
+  $NAME <filter> start
 
-# Aliases
-alias.unplayed=modify status:pending start: gamestate:unplayed
-alias.unfinished=modify status:pending start:now gamestate:unfinished
-alias.finished=modify status:completed end:now gamestate:finished
-alias.completed=modify status:completed end:now gamestate:completed
-alias.mastered=modify status:completed end:now gamestate:mastered
-alias.null=modify status:completed end:now gamestate:null
-alias.percent=summary
-alias.platforms=summary
-default.command=next
-
-# Report configuration
-report.list.columns=id,start.age,project,gamestate,tags,description
-report.list.labels=ID,Playing,Platform,Status,Tags,Title
-report.list.sort=start-,urgency-,description+
-
-report.next.columns=id,start.age,project,gamestate,tags,description
-report.next.labels=ID,Playing,Platform,Status,Tags,Title
-report.next.sort=urgency-,description+
-
-report.all.columns=id,uuid.short,project,gamestate,tags,description
-report.all.description=All games
-report.all.labels=ID,UUID,Platform,Status,Tags,Title
-
+Mark a game as currently being played and set its status to "unfinished".
 EOF
-fi
+function games/start { shift -p; \task "$@" unfinished; }
 
-# support year:2017 as an alias for end.after:2017-01-01 end.before:2018-01-01
-# also support platform: as an alias for project:
-new_args=()
-while [[ $1 ]]; do
-  if [[ $1 == year:* ]]; then
-    local year="${1/year:/}"
-    new_args+="end.after:$year-01-01"
-    new_args+="end.before:$((year+1))-01-01"
-  elif [[ $1 == pl*:* ]]; then
-    new_args+="project:${1#pl*:}"
-  else
-    new_args+="$1"
-  fi
+task/register done 'done$' games/done </dev/null
+function games/done { echo "Use \`$NAME <filter> (finished|completed|mastered|null)\` instead."; }
+
+task/register grep '^grep' games/grep <<EOF
+
+  $NAME grep <pattern> [report]
+
+Display games where the title matches the given pattern (as a case-insensitive
+regex) using the specified report. If no report is specified, uses "all".
+EOF
+function games/grep {
   shift
-done
-set -- "${new_args[@]}"
+  \task rc.verbose:label,blank rc.regex:yes rc.search.case.sensitive:no \
+    "( description ~ '$1' )" "${2:=all}"
+}
 
-case "$*" in
-  grep*)
-    shift
-    \task rc.verbose:label,blank rc._forcecolor:on rc.detection:off all | head -n2
-    \task rc.verbose:nothing rc.detection:off all | egrep -i "$@"
-    ;;
-  annote*)
-    # Annotate the last completed game.
-    LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
-    \task $LAST annotate "$@"
-    ;;
-  reset-config)
-    rm -v "$TASKRC"
-    ;;
-  *start)
-    \task "${argv[1,-2]}" unfinished
-    ;;
-  *done)
-    echo 'Use `backlog <games> (finished|completed|mastered|null)` instead.'
-    ;;
-  *)
-    \task "$@"
-    ;;
-esac
+function task/map-arg {
+  echo "${1/platform:/project:}"
+}
 
-exit $?
+exec main "$@"
+
+  # elif [[ $1 == pl*:* ]]; then
+  #   new_args+="project:${1#pl*:}"
+  # else
+  #   new_args+="$1"

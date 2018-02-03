@@ -51,6 +51,10 @@ function task/year-filter {
   echo -n "$isfinished or $isactive or $ispending"
 }
 
+# Placeholder for argument mapping function.
+# Programs can override this for argument preprocessing.
+function task/map-arg { echo -E "$@" }
+
 # Process a taskwarrior command line to expand year:foo pseudo-filters into
 # end: filters that taskwarrior understands.
 # Returning arrays is hard, so it just drops it into $TASK_ARGV and expects
@@ -60,6 +64,7 @@ function task/year-filter {
 # See task/year-filter for details on the filter meaning.
 function task/-parse-argv {
   while [[ $1 ]]; do
+    local arg="$(task/map-arg "$1")"
     case "$1" in
       year:all)
         TASK_ARGV+="rc.context:none"
@@ -69,10 +74,10 @@ function task/-parse-argv {
         TASK_ARGV+="rc.context:none"
         ;;
       year:*)
-        TASK_ARGV+="$(task/year-filter ${1/year:/})"
+        TASK_ARGV+="$(task/year-filter ${arg/year:/})"
         TASK_ARGV+="rc.context:none"
         ;;
-      *) TASK_ARGV+="$1" ;;
+      *) TASK_ARGV+="$arg" ;;
     esac
     shift
   done

@@ -1,0 +1,43 @@
+data.location=~/.backlog
+verbose=off
+reserved.lines=3
+nag=
+confirmation=no
+bulk=0
+defaultwidth=0
+
+# Games we are currently playing have highest priority.
+# Age/order of addition doesn't affect sort order.
+urgency.active.coefficient=1024
+urgency.age.coefficient=0
+urgency.project.coefficient=0
+urgency.tags.coefficient=0
+
+# UDAs
+uda.gamestate.label=Play Status
+uda.gamestate.type=string
+uda.gamestate.values=unplayed,unfinished,finished,completed,mastered,null
+
+# Aliases
+alias.unplayed=modify status:pending start: gamestate:unplayed
+alias.unfinished=modify status:pending start:now gamestate:unfinished
+alias.finished=modify status:completed end:now gamestate:finished
+alias.completed=modify status:completed end:now gamestate:completed
+alias.mastered=modify status:completed end:now gamestate:mastered
+alias.null=modify status:completed end:now gamestate:null
+alias.percent=summary
+alias.platforms=summary
+default.command=next
+
+# Report configuration
+report.list.columns=id,start.age,project,gamestate,tags,description
+report.list.labels=ID,Playing,Platform,Status,Tags,Title
+report.list.sort=start-,urgency-,description+
+
+report.next.columns=id,start.age,project,gamestate,tags,description
+report.next.labels=ID,Playing,Platform,Status,Tags,Title
+report.next.sort=urgency-,description+
+
+report.all.columns=id,uuid.short,project,gamestate,tags,description
+report.all.description=All games
+report.all.labels=ID,UUID,Platform,Status,Tags,Title
