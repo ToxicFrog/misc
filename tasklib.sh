@@ -23,6 +23,19 @@ function task/init-config {
   done
 }
 
+# select <field> <order> <filters...>
+# Return all values of field, including duplicates, sorted in the specified order.
+# e.g. `select uuid end+ +programming` returns all the values of 'end', in ascending order,
+# but only for tasks that have the `programming` tag set.
+function task/select {
+  local field="$1"
+  local sort="$2"
+  shift 2
+  \task rc.verbose:nothing rc.report.list.filter: rc.report.list.labels:_ \
+    rc.report.list.columns:"$field" rc.report.list.sort:"$sort" \
+    "$@" list
+}
+
 # year-filter <year>
 # returns a taskwarrior filter clause that shows only tasks from the given year.
 # "from $YEAR", in practice, means:
@@ -44,10 +57,7 @@ function task/year-filter {
 # the caller to use it.
 # It assumes that the default context is some kind of year-scoping, so if the
 # user specifies a year: filter it also disables the context.
-# Filters understood:
-# year:all -- disable context, do nothing else
-# year:now -- entries ending after the most recent new year, or not ended yet
-# year:XXXX -- entries ending in year XXXX
+# See task/year-filter for details on the filter meaning.
 function task/-parse-argv {
   while [[ $1 ]]; do
     case "$1" in
@@ -127,4 +137,17 @@ function task/-help {
     printf "  %s\\n" ${TASK_COMMANDS[@]} | cut -d: -f1 | sort
     echo "For detailed help, use \`$0 help <command>\`."
   fi
+}
+
+task/register annote '^annote' task/-annote <<EOF
+
+  $NAME annote <text>
+
+Annotate the most recently finished entry with the given text and the current
+timestamp.
+EOF
+function task/-annote {
+  LAST=$(task/select uuid end+ | tail -n1)
+  shift
+  \task $LAST annotate "$@"
 }

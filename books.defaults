@@ -19,7 +19,7 @@ urgency.tags.coefficient=0
 dateformat.annotation=<>
 
 # Aliases
-default.command=next
+default.command=list
 
 # UDAs
 # To set multiple values (e.g. co-authored books), separate with ' & '.
@@ -72,10 +72,3 @@ report.concise.columns=end,uuid.short,author,description.desc
 report.concise.labels=Date,UUID,Author,Title
 report.concise.sort=end+,author+,description+
 report.concise.filter=status:completed
-
-# Internal command for selecting one column from all matching books.
-# Used by the bookstats command.
-report.one_field.description=Internal report for bookstats command
-report.one_field.columns=uuid
-report.one_field.labels=Unused
-report.one_field.filter=status:completed

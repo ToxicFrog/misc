@@ -78,19 +78,6 @@ function books/grep {
     "( author ~ '$1' or description ~ '$1' )" "${2:=all}"
 }
 
-task/register annote '^annote' books/annote <<EOF
-
-  $NAME annote <text>
-
-Annotate the most recently finished book with the given text and the current
-timestamp.
-EOF
-function books/annote {
-  LAST=$(\task rc.verbose:nothing rc.report.one_field.sort:end+ one_field | tail -n1)
-  shift
-  \task $LAST annotate "$@"
-}
-
 task/register cc '^cc' books/cc <<EOF
 
   $NAME cc ...
@@ -114,9 +101,12 @@ For all books that match the filter, report:
 Multivalued fields (e.g. books with multiple genres separated by &) will be
 counted once for each value, so the total count for a given field may exceed
 the number of books matched by the filter.
+
+Note that the filter has an implicit +COMPLETED on it, i.e. only books that are
+finished will be counted no matter what the filter is.
 EOF
 function books/bookstats {
-  local FILTER=()
+  local FILTER=(+COMPLETED)
   while [[ $1 ]]; do
     if [[ $1 == bookstats ]]; then
       shift; break;
@@ -125,10 +115,12 @@ function books/bookstats {
     shift
   done
 
-  # Get number of books to use as a basis for the count.
-  NROF=$(\task "${FILTER[@]}" count)
-  NROF_AUTHORS=$(\task rc.verbose:nothing rc.report.one_field.columns:author "${FILTER[@]}" one_field | sort | uniq | wc -l)
-  printf '\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF" "$NROF_AUTHORS"
+  # Get number of books and authors to use as a basis for the count.
+  # This is somewhat complicated by the fact that _unique does not respect context.
+  # So instead we use task/select, which does, and run it through uniq.
+  local NROF_BOOKS=$(\task "${FILTER[@]}" count)
+  local NROF_AUTHORS=$(task/select author author+ "${FILTER[@]}" | uniq | wc -l)
+  printf '\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF_BOOKS" "$NROF_AUTHORS"
 
   # Display prefix only if we have more than one field to collect stats for.
   local FIELD_PREFIX=''
@@ -148,10 +140,10 @@ function books/bookstats {
       SPLIT=' & '
     fi
 
-    \task rc.verbose:nothing rc.report.one_field.columns:"$field" "${FILTER[@]}" one_field \
+    task/select "$field" "$field+" "${FILTER[@]}" \
       | sed -E "s,$SPLIT,\n,g" | sort | uniq -c | sed -E "s,( +[0-9]+ +),\1${FIELD_PREFIX},"
   done | sort -r -g | while read count field; do
-    printf '%24s  %-4d (%3.2f%%)\n' "$field" "$count" "$(\task calc "100.0*$count/$NROF")"
+    printf '%24s  %-4d (%3.2f%%)\n' "$field" "$count" "$(\task calc "100.0*$count/$NROF_BOOKS")"
   done
 }
 
