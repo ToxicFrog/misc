@@ -74,7 +74,7 @@ defaults to "all".
 EOF
 function books/grep {
   shift
-  \task rc.verbose:label,blank rc.regex:yes rc.search.case.sensitive:no \
+  \task rc.regex:yes rc.search.case.sensitive:no \
     "( author ~ '$1' or description ~ '$1' )" "${2:=all}"
 }
 

@@ -43,7 +43,7 @@ regex) using the specified report. If no report is specified, uses "all".
 EOF
 function games/grep {
   shift
-  \task rc.verbose:label,blank rc.regex:yes rc.search.case.sensitive:no \
+  \task rc.regex:yes rc.search.case.sensitive:no \
     "( description ~ '$1' )" "${2:=all}"
 }
 

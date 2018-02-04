@@ -94,7 +94,6 @@ function task/dispatch {
   local TASK_ARGV=()
   task/-parse-argv "$@"
   set -- "${TASK_ARGV[@]}"
-  echo
 
   for cmd in ${TASK_COMMANDS[@]}; do
     local name=$(echo $cmd | cut -d: -f1)
