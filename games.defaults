@@ -1,10 +1,10 @@
 data.location=~/.backlog
-verbose=off
+verbose=label
 reserved.lines=3
 nag=
 confirmation=no
-bulk=0
-defaultwidth=0
+#bulk=0
+#defaultwidth=0
 
 # Games we are currently playing have highest priority.
 # Age/order of addition doesn't affect sort order.

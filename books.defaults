@@ -3,7 +3,7 @@ verbose=label
 reserved.lines=3
 nag=
 confirmation=no
-bulk=0
+#bulk=0
 defaultwidth=10240
 
 # Stop colourizing books just because they have tags.
