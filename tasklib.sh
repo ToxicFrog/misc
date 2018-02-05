@@ -31,7 +31,7 @@ function task/select {
   local field="$1"
   local sort="$2"
   shift 2
-  \task rc.verbose:nothing rc.report.list.filter: rc.report.list.labels:_ \
+  \task rc.context: rc.verbose:nothing rc.report.list.filter: rc.report.list.labels:_ \
     rc.report.list.columns:"$field" rc.report.list.sort:"$sort" \
     "$@" list
 }
@@ -48,7 +48,7 @@ function task/year-filter {
   local isfinished="( +COMPLETED and end.after:$1-01-01 and end.before:$(($1+1))-01-01 )"
   local isactive="( +ACTIVE and start.before:$(($1+1))-01-01 )"
   local ispending="( +PENDING and -ACTIVE and entered.before:$(($1+1))-01-01 )"
-  echo -n "$isfinished or $isactive or $ispending"
+  echo -n "( $isfinished or $isactive or $ispending )"
 }
 
 # Placeholder for argument mapping function.
@@ -67,15 +67,15 @@ function task/-parse-argv {
     local arg="$(task/map-arg "$1")"
     case "$1" in
       year:all)
-        TASK_ARGV+="rc.context:none"
+        TASK_ARGV+="rc.context:"
         ;;
       year:now)
         TASK_ARGV+="$(task/year-filter $YEAR)"
-        TASK_ARGV+="rc.context:none"
+        TASK_ARGV+="rc.context:"
         ;;
       year:*)
         TASK_ARGV+="$(task/year-filter ${arg/year:/})"
-        TASK_ARGV+="rc.context:none"
+        TASK_ARGV+="rc.context:"
         ;;
       *) TASK_ARGV+="$arg" ;;
     esac
