@@ -13,6 +13,12 @@ urgency.age.coefficient=0
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
 
+context.default=-DELETED
+context=default
+
+color.tag.ANNOTATED=rgb252
+color.tagged=
+
 # UDAs
 uda.gamestate.label=Play Status
 uda.gamestate.type=string
@@ -29,14 +35,16 @@ alias.percent=summary
 alias.platforms=summary
 default.command=next
 
-# Report configuration
-report.list.columns=id,start.age,project,gamestate,tags,description
-report.list.labels=ID,Playing,Platform,Status,Tags,Title
-report.list.sort=start-,urgency-,description+
+## List: concise list of finished and in progress games.
+report.list.columns=uuid.short,end,project,gamestate,tags,description.desc
+report.list.labels=UUID,Finished,Plt,Status,Tags,Title
+report.list.sort=end+,start+,description+
+report.list.filter=(+COMPLETED or +ACTIVE)
 
+## Next: games in progress & waiting to be played
 report.next.columns=id,start.age,project,gamestate,tags,description
-report.next.labels=ID,Playing,Platform,Status,Tags,Title
-report.next.sort=urgency-,description+
+report.next.labels=ID,Playing,Plt,Status,Tags,Title
+report.next.sort=urgency-,start+
 
 report.all.columns=id,uuid.short,project,gamestate,tags,description
 report.all.description=All games
