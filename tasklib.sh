@@ -155,3 +155,61 @@ function task/-annote {
   shift
   \task $LAST annotate "$@"
 }
+
+# task/get-field uuid field
+# Wrapper around task/select and \task get to extract individual fields.
+# Outputs the field on stdout, NULL TERMINATED for use with xargs -0.
+# It is currently very simple:
+# - if the field is "annotations", it outputs all annotations
+# - if the field starts with ., it is assumed to be a DOM node and _get is used
+# - otherwise it is assumed to be a formatted field and task/select is used.
+function task/get-field {
+  case "$2" in
+    annotations)
+      local n=1
+      while true; do
+        local annotation="$(\task _get "$1.annotations.$n.description")"
+        if [[ ! $annotation ]]; then break; fi
+        if (( n > 1 )); then printf '\n'; fi
+        printf '%s\n' "$annotation"
+        ((++n))
+      done
+      ;;
+    .*)
+      printf '%s' "$(\task _get "$1$2")"
+      ;;
+    *)
+      printf '%s' "$(task/select "$2" "uuid+" "uuid:$1")"
+      ;;
+  esac
+}
+
+# Utility function: task/printf <format>
+# Reads task UUIDs from stdin and outputs each one in the given format.
+# The format should have sequences of the form %fieldname%s for each field.
+# Notes on fieldname:
+# - %.foo.bar% is a DOM node
+# - %foo.bar% is column foo with format bar
+# - %foo|bar% is column foo piped through function bar
+function task/printf {
+  fields="$(echo -E "$1" | egrep -o '%[a-z_.|/-]+%.' | cut -d% -f2)"
+  format="$(echo -E "$1" | sed -E 's,%[a-z_.|/-]+(%.),\1,g')"
+
+  xargs -n1 printf '%s\n' | while read uuid; do
+    printf '\r\x1B[0K%s' "$(task/get-field $uuid .description)" >&2
+    echo -E "$fields" \
+    | while read field; do
+      # If field has the format 'field|formatter', pipe it through the latter
+      if [[ $field == *\|* ]]; then
+        local formatter="$(echo -E "$field" | cut -d\| -f2)"
+        field="$(echo -E "$field" | cut -d\| -f1)"
+        task/get-field "$uuid" "$field" | "$formatter"
+      else
+        task/get-field "$uuid" "$field"
+      fi
+      printf '\0'
+    done \
+    | xargs -0 printf "$format"
+    printf '\n'
+  done
+}

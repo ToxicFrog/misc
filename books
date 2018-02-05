@@ -147,4 +147,39 @@ function books/bookstats {
   done
 }
 
+function task/as-html {
+  sed -E 's,$,<br>,'
+}
+
+task/register export 'export$' books/export <<EOF
+
+  $NAME [...filters...] export
+
+Export the selected entries in HTML format.
+EOF
+function books/export {
+  shift -p
+  printf '
+    <style>
+      td:empty {
+        display: none;
+      }
+      tr:empty {
+        display: none;
+      }
+    </style>
+    <table border=4><tr><th>Finished</th><th>Title</th><th>Author</th></tr>
+  '
+  task/select uuid end+,entry+ "$@" \
+  | task/printf '
+    <tr bgcolor="#DDDDDD">
+      <td style="width:fit-content;">%end.formatted%s</td>
+      <td><b>%description.desc%s</b></td>
+      <td style="width:fit-content;">%author%s</td>
+    </tr>
+    <tr><td colspan=4>%annotations|task/as-html%s</td></tr>
+  '
+  printf '</table>\n'
+}
+
 exec main "$@"
