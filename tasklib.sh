@@ -8,8 +8,17 @@ declare -a TASK_COMMANDS
 declare -A TASK_COMMAND_HANDLERS
 declare -A TASK_COMMAND_HELP
 
-# init-config <defaults name>
-# creates a default configuration file that just includes the defaults file.
+# task/register <name> <pattern> <handler> <<EOF ..help text.. EOF
+function task/register {
+  TASK_COMMANDS+="$1:$2"
+  TASK_COMMAND_HANDLERS[$1]="$3"
+  TASK_COMMAND_HELP[$1]="$(cat)"
+}
+
+# init-config <defaults name> [additional file contents...]
+# creates a default configuration file that just includes the defaults file,
+# plus any additional settings listed.
+# Clients should call this after setting TASKRC and before doing anything else.
 function task/init-config {
   if [[ -e $TASKRC ]]; then
     return 0
@@ -21,34 +30,6 @@ function task/init-config {
     echo "$1" >> $TASKRC
     shift
   done
-}
-
-# select <field> <order> <filters...>
-# Return all values of field, including duplicates, sorted in the specified order.
-# e.g. `select uuid end+ +programming` returns all the values of 'end', in ascending order,
-# but only for tasks that have the `programming` tag set.
-function task/select {
-  local field="$1"
-  local sort="$2"
-  shift 2
-  \task rc.context: rc.verbose:nothing rc.report.list.filter: rc.report.list.labels:_ \
-    rc.report.list.columns:"$field" rc.report.list.sort:"$sort" \
-    "$@" list
-}
-
-# year-filter <year>
-# returns a taskwarrior filter clause that shows only tasks from the given year.
-# "from $YEAR", in practice, means:
-# - is finished, and was finished during $YEAR, OR
-# - is started, and was started during or before $YEAR, OR
-# - is pending, and was added during or before $YEAR.
-# In effect, this means "tasks that were finished during $YEAR, or were pending
-# or in-progress for at least part of $YEAR."
-function task/year-filter {
-  local isfinished="( +COMPLETED and end.after:$1-01-01 and end.before:$(($1+1))-01-01 )"
-  local isactive="( +ACTIVE and start.before:$(($1+1))-01-01 )"
-  local ispending="( +PENDING and -ACTIVE and entered.before:$(($1+1))-01-01 )"
-  echo -n "( $isfinished or $isactive or $ispending )"
 }
 
 # Placeholder for argument mapping function.
@@ -83,13 +64,8 @@ function task/-parse-argv {
   done
 }
 
-# task/register <name> <pattern> <handler> <<EOF ..help text.. EOF
-function task/register {
-  TASK_COMMANDS+="$1:$2"
-  TASK_COMMAND_HANDLERS[$1]="$3"
-  TASK_COMMAND_HELP[$1]="$(cat)"
-}
-
+# task/dispatch $@
+# Main entry point to the command dispatcher.
 function task/dispatch {
   local TASK_ARGV=()
   task/-parse-argv "$@"
@@ -105,6 +81,43 @@ function task/dispatch {
   done
   # No matching command; pass it through to taskwarrior unaltered.
   \task "$@"
+}
+
+# select <field> <order> <filters...>
+# Return all values of field, including duplicates, sorted in the specified order.
+# e.g. `select uuid end+ +programming` returns all the values of 'end', in ascending order,
+# but only for tasks that have the `programming` tag set.
+task/register select '^select' task/select-cmd <<EOF
+
+  $NAME select <field1>[,field2,...] <sort> [filter...]
+
+For each task matching filter, output the listed fields, separated by an
+UNSPECIFIED type and quantity of whitespace. Handle with care.
+EOF
+function task/select-cmd { shift; task/select "$@"; }
+function task/select {
+  local fields="$1"
+  local sort="$2"
+  shift 2
+  \task rc.context: rc.verbose:nothing rc.report.list.filter: \
+    rc.report.list.labels:"$fields" rc.report.list.columns:"$fields" \
+    rc.report.list.sort:"$sort" \
+    "$@" list
+}
+
+# year-filter <year>
+# returns a taskwarrior filter clause that shows only tasks from the given year.
+# "from $YEAR", in practice, means:
+# - is finished, and was finished during $YEAR, OR
+# - is started, and was started during or before $YEAR, OR
+# - is pending, and was added during or before $YEAR.
+# In effect, this means "tasks that were finished during $YEAR, or were pending
+# or in-progress for at least part of $YEAR."
+function task/year-filter {
+  local isfinished="( +COMPLETED and end.after:$1-01-01 and end.before:$(($1+1))-01-01 )"
+  local isactive="( +ACTIVE and start.before:$(($1+1))-01-01 )"
+  local ispending="( +PENDING and -ACTIVE and entered.before:$(($1+1))-01-01 )"
+  echo -n "( $isfinished or $isactive or $ispending )"
 }
 
 task/register reset-config '^reset-config$' task/-reset-config <<EOF
@@ -151,7 +164,7 @@ Annotate the most recently finished entry with the given text and the current
 timestamp.
 EOF
 function task/-annote {
-  LAST=$(task/select uuid end+ | tail -n1)
+  LAST=$(task/select uuid end+ +COMPLETED | tail -n1)
   shift
   \task $LAST annotate "$@"
 }
