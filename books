@@ -118,8 +118,11 @@ function books/bookstats {
   # Get number of books and authors to use as a basis for the count.
   # This is somewhat complicated by the fact that _unique does not respect context.
   # So instead we use task/select, which does, and run it through uniq.
+  # We also strip off "(tr)" and "(ed)" suffixes, so someone who is credited as
+  # both an author and an editor is only counted once.
   local NROF_BOOKS=$(\task "${FILTER[@]}" count)
-  local NROF_AUTHORS=$(task/select author author+ "${FILTER[@]}" | uniq | wc -l)
+  local NROF_AUTHORS=$(task/select author author+ "${FILTER[@]}" \
+    | sed -E 's, \(ed\),,g; s, \(tr\),,g' | sort | uniq | wc -l)
   printf '\x1B[1m%24s  %-4d (by %d authors)\x1B[0m\n' "BOOKS" "$NROF_BOOKS" "$NROF_AUTHORS"
 
   # Display prefix only if we have more than one field to collect stats for.
@@ -140,6 +143,7 @@ function books/bookstats {
       SPLIT=' & '
     fi
 
+    # FIXME: when processing authors, we should strip out (tr) and (ed) here too.
     task/select "$field" "$field+" "${FILTER[@]}" \
       | sed -E "s,$SPLIT,\n,g" | sort | uniq -c | sed -E "s,( +[0-9]+ +),\1${FIELD_PREFIX},"
   done | sort -r -g | while read count field; do
