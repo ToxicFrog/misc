@@ -5,9 +5,11 @@ nag=
 confirmation=no
 #bulk=0
 defaultwidth=10240
+gc=off
 
 # Stop colourizing books just because they have tags.
 color.tagged=
+color.tag.ANNOTATED=rgb243
 
 # Books we are currently reading get listed first.
 # More recent books are listed earlier.
@@ -40,8 +42,8 @@ report.next.labels=ID,Reading,Tags,⚥,Author,Title,Genre
 report.next.sort=urgency-,start+,author+,description+
 
 ## List: concise list of finished and in progress books.
-report.list.columns=end,gender,author,description.desc
-report.list.labels=Finished,⚥,Author,Title
+report.list.columns=id,end,gender,author,description.desc
+report.list.labels=ID,Finished,⚥,Author,Title
 report.list.sort=end+,author+,description+
 report.list.filter=(+COMPLETED or +ACTIVE)
 
