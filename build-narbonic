@@ -1,0 +1,214 @@
+#!/usr/bin/env zsh
+#
+# Run to automatically download all of Narbonic and generate CBZs of it.
+# CBZs are left in cbz.png/ for the PNG versions and cbz.jpeg/ for the JPEG
+# versions. The PNG versions are ever so slightly higher quality but about
+# 7x the size; it's usually not worth it, so they're disabled by default
+# to speed up the build.
+
+BUILD_JPEG='yes'
+BUILD_PNG=''
+
+# Read chapters.tsv and download and emit HTML
+# process HTML to normalize links:
+# - replace .JPG with .jpg
+# - strip leading http://narbonic.com and http://www.narbonic.com
+# - generate image list
+# - strip /wordpress/wp-content/uploads/ and replace with ../../img/
+# download all images
+# copy html/"Narbonic Volume"* to html-no-commentary and strip commentary
+# copy html/* to html-with-commentary and expand commentary
+# rename 'Narbonic Volume' 'Narbonic+ Volume' html-with-commentary/*
+# run narbonic-compiler
+
+function main() {
+  <chapters.tsv download-html html/orig
+  normalize-image-paths html/orig
+  download-images html/orig html/img
+  copy-and-transform-all-html
+  build-cbzs
+}
+
+#### Downloading the HTML for each individual page. ####
+
+CHAPTER_TEMPLATE='
+<!-- %s %s -->
+<div align="center">
+  <img src="../../img/chapter_splash.jpeg"><br>
+  <h1>%s</h1>
+</div>'
+
+# cat index | download-html outdir
+function download-html {
+  local outdir="$1"
+  local volume=''
+  local page=0
+
+  mkdir -p "$outdir"
+  while read id title; do
+    if [[ $id == "#" ]]; then
+      # Start new volume
+      echo "Downloading HTML for: $title"
+      volume="$title"
+      mkdir -p "$outdir/$volume"
+      page=0
+
+    elif [[ $id == "##" ]]; then
+      # Start new chapter
+      ((++page))
+      echo "  p.$page - Chapter $title"
+      printf "$CHAPTER_TEMPLATE" CHAPTER "$title" "$title" \
+        > "$(printf "%s/%s/%03d CHAPTER %s.html" "$outdir" "$volume" "$page" "$title")"
+
+    elif [[ $id == "###" ]]; then
+      # Boundary between frontmatter and backmatter
+      ((++page))
+      echo "  p.$page - Extras"
+      printf "$CHAPTER_TEMPLATE" BACKMATTER "" "Extras" \
+        > "$(printf "%s/%s/%03d BACKMATTER.html" "$outdir" "$volume" "$page")"
+
+    elif [[ $title ]]; then
+      # Individual page
+      ((++page))
+      echo -n "."
+      local outpage="$(printf "%s/%s/%03d PAGE %s.html" "$outdir" "$volume" "$page" "$title")"
+      [[ -f $outpage ]] && continue
+      echo "<!-- PAGE $title -->" > "$outpage"
+      try-wring html "http://www.narbonic.com/comic/$id/" .comic-strip-container >> "$outpage"
+    fi
+  done
+}
+
+# Like `wring`, but retries up to five times. Use for wring calls that need to
+# hit the network and thus can fail.
+function try-wring {
+  for i in {1..5}; do
+    wring "$@" || continue
+    return 0
+  done
+  return $?
+}
+
+#### HTML image normalization ####
+
+function normalize-image-paths {
+  find "$1" -name '*.html' -print0 | xargs -0 sed -E -i '
+    s,src="http://(www\.)?narbonic.com/,src="/,g;
+    s,src="/wordpress/wp-content/uploads/,src="../../img/,g;
+    s,\.JPG",.jpg",g;'
+}
+
+#### HTML image downloading ####
+
+function download-images {
+  echo "Downloading all images"
+
+  egrep -rho 'src="../../img/[^"]+"' "$1" | cut -d\" -f2 \
+  | sed -E 's,../../img/,,' \
+  | while read image; do
+    echo -n "."
+    [[ -f "$2/$image" ]] && continue
+    wget -nv -O "$2/$image" "http://www.narbonic.com/wordpress/wp-content/uploads/$image"
+  done
+}
+
+#### Converting the raw HTML into with and without-commentary versions ####
+
+function copy-and-transform-all-html {
+  for vol in html/orig/"Narbonic Volume"*; do
+    copy-and-transform-html "$vol" "html/no-commentary/${vol#html/orig/}"
+  done
+  for vol in html/orig/*; do
+    copy-and-transform-html "$vol" "html/with-commentary/${vol#html/orig/}" keep_commentary
+  done
+  rename 'Narbonic Volume' 'Narbonic+ Volume' html/with-commentary/*
+}
+
+# copy-and-transform-html indir outdir keep_commentary
+# Copy the master HTML tree into another directory, transforming it (by stripping
+# or expanding commentary) in the process.
+function copy-and-transform-html {
+  local indir="$1"
+  local outdir="$2"
+  local keep_commentary="$3"
+  local backmatter=''
+
+  find "$indir" -type f | sort | while read infile; do
+    case "$file" in
+      *BACKMATTER*) backmatter=true; continue;;
+      *CHAPTER*) backmatter=''; continue;;
+    esac
+
+    local outfile="outdir/${file#$indir}"
+    if [[ $keep_commentary || $backmatter ]]; then
+      # File needs expansion into individual images with commentary.
+      extract-commentary "$file" "$outfile"
+    else
+      # File needs commentary stripped out.
+      wring html "$infile" .comic-strip-image > "$outfile"
+    fi
+  done
+}
+
+# extract-commentary infile outfile
+# Given an infile and a template outfile, generate a series of outfiles with
+# names based on the template, one for each comic-strip-container in the
+# infile, with full commentary included.
+function extract-commentary {
+  local index=1
+
+  cat "$1" | egrep -o "comic-strip-container-[0-9]+" | while read id; do
+    subpage="${2/ PAGE/.$index PAGE}"
+    ((++index))
+    wring html "$1" "#$id" > "$subpage"
+  done
+}
+
+
+#### Building the CBZ files ####
+
+# build-cbzs
+# Convert all html-{with,no}-commentary directories into CBZs.
+# Leaves the JPEG versions in cbz.jpeg/ and the PNG versions in cbz.png/.
+function build-cbzs {
+  for dir in html/*-commentary/*; do
+    BUILD_JPEG && build-cbz jpeg "$dir" "${dir/html\/*-commentary/cbz.jpeg}.cbz"
+    BUILD_PNG && build-cbz png "$dir" "${dir/html\/*-commentary/cbz.png}.cbz"
+  done
+  # ln -f cbz.jpeg/*.cbz ../../Narbonic/
+  # ln -f 'cbz.png/A Brief Moment of Culture.cbz' ../../Narbonic
+}
+
+# build-cbz format indir outfile
+# Builds a CBZ from a single input directory.
+function build-cbz {
+  local format="$1"
+  local input="$2"
+  local output="$3"
+  local backmatter=""
+
+  mkdir -p "$output.d"
+  ls "$input" | sort | while read file; do
+    local outfile="$output.d/${file/.html/.$IMAGE_FORMAT}"
+
+    printf '\x1B[2K\r%s' "$outfile"
+    if [[ -f "$outfile" ]]; then
+      # File already exists, don't rebuild.
+      continue
+    else
+      html-to-image "$input/$file" "$outfile"
+    fi
+  done
+  printf '\x1B[2K\r%s' "$output"
+  rm -f "$output"
+  zip -q -r -0 "$output" "$output.d"
+  printf '\n'
+}
+
+# html-to-image format infile outfile
+# Converts a single HTML page to an image.
+function html-to-image {
+  wkhtmltoimage -q --width 400 --format $1 --quality 100 "$2" "$3"
+}
+
+exec main "$@"
