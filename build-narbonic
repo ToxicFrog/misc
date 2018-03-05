@@ -1,32 +1,42 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 #
 # Run to automatically download all of Narbonic and generate CBZs of it.
+# This downloads about 400MB of data from narbonic.com, and requires 4GB of
+# disk space (23GB if you build the PNG version, and 26GB for both).
+# The generated files are about 1.6GB (JPEG) or 13GB (PNG); the rest of the
+# space is used for temporary files and can be reclaimed afterwards.
+
 # CBZs are left in cbz.png/ for the PNG versions and cbz.jpeg/ for the JPEG
 # versions. The PNG versions are ever so slightly higher quality but about
 # 7x the size; it's usually not worth it, so they're disabled by default
 # to speed up the build.
 
 BUILD_JPEG='yes'
-BUILD_PNG=''
+BUILD_PNG='no'
 
-# Read chapters.tsv and download and emit HTML
-# process HTML to normalize links:
-# - replace .JPG with .jpg
-# - strip leading http://narbonic.com and http://www.narbonic.com
-# - generate image list
-# - strip /wordpress/wp-content/uploads/ and replace with ../../img/
-# download all images
-# copy html/"Narbonic Volume"* to html-no-commentary and strip commentary
-# copy html/* to html-with-commentary and expand commentary
-# rename 'Narbonic Volume' 'Narbonic+ Volume' html-with-commentary/*
-# run narbonic-compiler
+# It also downloads the Narbonic music tracks and podcasts to music/.
 
-function main() {
+DOWNLOAD_MUSIC='yes'
+
+
+#### No user serviceable parts below this line. ####
+
+set -e
+
+function main {
+  # Download comic pages and extract relevant HTML.
   <chapters.tsv download-html html/orig
+  # Fix all <img> paths and then rewrite to relative paths.
   normalize-image-paths html/orig
+  # Download all missing images.
   download-images html/orig html/img
+  # Generate with- and without-commentary HTML from the HTML downloaded in the
+  # first step.
   copy-and-transform-all-html
+  # Combine the HTML and images into CBZs.
   build-cbzs
+  # Download music and podcasts.
+  [[ $DOWNLOAD_MUSIC == yes ]] && download-music
 }
 
 #### Downloading the HTML for each individual page. ####
@@ -45,10 +55,11 @@ function download-html {
   local page=0
 
   mkdir -p "$outdir"
+  echo -n "Downloading all HTML."
   while read id title; do
     if [[ $id == "#" ]]; then
       # Start new volume
-      echo "Downloading HTML for: $title"
+      printf "\n%s" "$title"
       volume="$title"
       mkdir -p "$outdir/$volume"
       page=0
@@ -56,27 +67,28 @@ function download-html {
     elif [[ $id == "##" ]]; then
       # Start new chapter
       ((++page))
-      echo "  p.$page - Chapter $title"
+      printf '\n  p.%03d - %s' "$page" "$title"
       printf "$CHAPTER_TEMPLATE" CHAPTER "$title" "$title" \
         > "$(printf "%s/%s/%03d CHAPTER %s.html" "$outdir" "$volume" "$page" "$title")"
 
     elif [[ $id == "###" ]]; then
       # Boundary between frontmatter and backmatter
       ((++page))
-      echo "  p.$page - Extras"
+      printf '\n  p.%03d - Extras' "$page"
       printf "$CHAPTER_TEMPLATE" BACKMATTER "" "Extras" \
         > "$(printf "%s/%s/%03d BACKMATTER.html" "$outdir" "$volume" "$page")"
 
     elif [[ $title ]]; then
       # Individual page
       ((++page))
-      echo -n "."
       local outpage="$(printf "%s/%s/%03d PAGE %s.html" "$outdir" "$volume" "$page" "$title")"
       [[ -f $outpage ]] && continue
       echo "<!-- PAGE $title -->" > "$outpage"
       try-wring html "http://www.narbonic.com/comic/$id/" .comic-strip-container >> "$outpage"
+      echo -n "."
     fi
   done
+  echo ''
 }
 
 # Like `wring`, but retries up to five times. Use for wring calls that need to
@@ -101,15 +113,20 @@ function normalize-image-paths {
 #### HTML image downloading ####
 
 function download-images {
-  echo "Downloading all images"
+  echo -n "Downloading all images"
+  [[ -f "$2/chapter_splash.jpeg" ]] || wget -nc -O "$2/chapter_splash.jpeg" \
+    "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
 
   egrep -rho 'src="../../img/[^"]+"' "$1" | cut -d\" -f2 \
+  | egrep -v '\.mp3$' \
   | sed -E 's,../../img/,,' \
   | while read image; do
-    echo -n "."
     [[ -f "$2/$image" ]] && continue
+    mkdir -p "$(dirname "$2/$image")"
     wget -nv -O "$2/$image" "http://www.narbonic.com/wordpress/wp-content/uploads/$image"
+    echo -n "."
   done
+  echo ''
 }
 
 #### Converting the raw HTML into with and without-commentary versions ####
@@ -119,9 +136,12 @@ function copy-and-transform-all-html {
     copy-and-transform-html "$vol" "html/no-commentary/${vol#html/orig/}"
   done
   for vol in html/orig/*; do
-    copy-and-transform-html "$vol" "html/with-commentary/${vol#html/orig/}" keep_commentary
+    local outvol="${vol/Narbonic Volume/Narbonic+ Volume}"
+    copy-and-transform-html \
+      "$vol" \
+      "html/with-commentary/${outvol#html/orig/}" \
+      keep_commentary
   done
-  rename 'Narbonic Volume' 'Narbonic+ Volume' html/with-commentary/*
 }
 
 # copy-and-transform-html indir outdir keep_commentary
@@ -133,21 +153,26 @@ function copy-and-transform-html {
   local keep_commentary="$3"
   local backmatter=''
 
+  echo -n "Generating $outdir"
+  mkdir -p "$outdir"
   find "$indir" -type f | sort | while read infile; do
-    case "$file" in
-      *BACKMATTER*) backmatter=true; continue;;
-      *CHAPTER*) backmatter=''; continue;;
+    local outfile="$outdir/${infile#$indir}"
+    case "$infile" in
+      *BACKMATTER*) backmatter=true; cp "$infile" "$outfile"; continue;;
+      *CHAPTER*) backmatter=''; cp "$infile" "$outfile"; continue;;
     esac
 
-    local outfile="outdir/${file#$indir}"
+    [[ -f "$outfile" ]] && continue
     if [[ $keep_commentary || $backmatter ]]; then
       # File needs expansion into individual images with commentary.
-      extract-commentary "$file" "$outfile"
+      extract-commentary "$infile" "$outfile"
     else
       # File needs commentary stripped out.
       wring html "$infile" .comic-strip-image > "$outfile"
+      echo -n '.'
     fi
   done
+  echo ''
 }
 
 # extract-commentary infile outfile
@@ -156,11 +181,12 @@ function copy-and-transform-html {
 # infile, with full commentary included.
 function extract-commentary {
   local index=1
-
   cat "$1" | egrep -o "comic-strip-container-[0-9]+" | while read id; do
     subpage="${2/ PAGE/.$index PAGE}"
     ((++index))
+    [[ -f "$subpage" ]] && continue
     wring html "$1" "#$id" > "$subpage"
+    echo -n '.'
   done
 }
 
@@ -171,9 +197,10 @@ function extract-commentary {
 # Convert all html-{with,no}-commentary directories into CBZs.
 # Leaves the JPEG versions in cbz.jpeg/ and the PNG versions in cbz.png/.
 function build-cbzs {
+  echo "Build CBZ files..."
   for dir in html/*-commentary/*; do
-    BUILD_JPEG && build-cbz jpeg "$dir" "${dir/html\/*-commentary/cbz.jpeg}.cbz"
-    BUILD_PNG && build-cbz png "$dir" "${dir/html\/*-commentary/cbz.png}.cbz"
+    [[ $BUILD_JPEG == yes ]] && build-cbz jpeg "$dir" "${dir/html\/*-commentary/cbz.jpeg}.cbz"
+    [[ $BUILD_PNG == yes ]] && build-cbz png "$dir" "${dir/html\/*-commentary/cbz.png}.cbz"
   done
   # ln -f cbz.jpeg/*.cbz ../../Narbonic/
   # ln -f 'cbz.png/A Brief Moment of Culture.cbz' ../../Narbonic
@@ -189,14 +216,15 @@ function build-cbz {
 
   mkdir -p "$output.d"
   ls "$input" | sort | while read file; do
-    local outfile="$output.d/${file/.html/.$IMAGE_FORMAT}"
+    printf '\x1B[2K\r%s:' "$output"
+    local outfile="$output.d/${file%.html}.$format"
 
-    printf '\x1B[2K\r%s' "$outfile"
     if [[ -f "$outfile" ]]; then
       # File already exists, don't rebuild.
       continue
     else
-      html-to-image "$input/$file" "$outfile"
+      printf '\x1B[2K\r%s:%s' "$output" "${outfile##*/}"
+      html-to-image "$format" "$input/$file" "$outfile"
     fi
   done
   printf '\x1B[2K\r%s' "$output"
@@ -208,7 +236,20 @@ function build-cbz {
 # html-to-image format infile outfile
 # Converts a single HTML page to an image.
 function html-to-image {
-  wkhtmltoimage -q --width 400 --format $1 --quality 100 "$2" "$3"
+  wkhtmltoimage -q --width 400 --format "$1" --quality 100 "$2" "$3"
 }
 
-exec main "$@"
+#### Music downloads ####
+
+function download-music {
+  echo "Downloading music and podcasts..."
+  mkdir -p music
+  wget -nv -nc -P music \
+    http://narbonic.com/wordpress/wp-content/uploads/2009/08/MadbloodBattleAnthem.mp3 \
+    http://narbonic.com/wordpress/wp-content/uploads/2011/08/Narbonic_Battle.mp3 \
+    http://narbonic.com/wordpress/wp-content/uploads/2013/05/epilogue.mp3 \
+    http://www.talkaboutcomics.com/podcast/mp3s/narbonic_commentary_1.mp3 \
+    http://www.talkaboutcomics.com/podcast/mp3s/narbonic_commentary_2.mp3
+}
+
+main "$@"
