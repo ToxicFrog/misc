@@ -18,6 +18,16 @@ BUILD_PNG='no'
 
 DOWNLOAD_MUSIC='yes'
 
+# Note: sometimes `wring` silently fails to download a page and emits a blank
+# file. To fix this, run:
+#   find html/orig/ -type f -name '*PAGE*' -print0 \
+#   | xargs -0 fgrep -L 'comic-strip-container' \
+#   | xargs -d\\n -r rm -v
+# Which will delete the broken files and force the builder to redownload them.
+# If you can run this with no output, there's nothing to fix.
+# The script *should* detect and handle this automatically, but this command
+# is included just in case.
+
 
 #### No user serviceable parts below this line. ####
 
@@ -91,14 +101,13 @@ function download-html {
   echo ''
 }
 
-# Like `wring`, but retries up to five times. Use for wring calls that need to
-# hit the network and thus can fail.
+# Like `wring`, but retries until it gets page content.
 function try-wring {
-  for i in {1..5}; do
-    wring "$@" || continue
-    return 0
+  > /tmp/$$
+  while ! fgrep -q comic-strip-container /tmp/$$; do
+    wring "$@" > /tmp/$$
   done
-  return $?
+  cat /tmp/$$
 }
 
 #### HTML image normalization ####
