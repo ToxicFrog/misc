@@ -18,234 +18,169 @@ BUILD_PNG='no'
 
 DOWNLOAD_MUSIC='yes'
 
-# Note: sometimes `wring` silently fails to download a page and emits a blank
-# file. To fix this, run:
-#   find html/orig/ -type f -name '*PAGE*' -print0 \
-#   | xargs -0 fgrep -L 'comic-strip-container' \
-#   | xargs -d\\n -r rm -v
-# Which will delete the broken files and force the builder to redownload them.
-# If you can run this with no output, there's nothing to fix.
-# The script *should* detect and handle this automatically, but this command
-# is included just in case.
-
-
 #### No user serviceable parts below this line. ####
 
 set -e
 
 function main {
-  # Download comic pages and extract relevant HTML.
-  <chapters.tsv download-html html/orig
-  # Fix all <img> paths and then rewrite to relative paths.
-  normalize-image-paths html/orig
-  # Download all missing images.
-  download-images html/orig html/img
-  # Generate with- and without-commentary HTML from the HTML downloaded in the
-  # first step.
-  copy-and-transform-all-html
-  # Combine the HTML and images into CBZs.
-  build-cbzs
+  mkdir -p cache html img pages cbz
+  # Download splash screen.
+  [[ -f "img/chapter_splash.jpeg" ]] || {
+    status "Downloading splash page...\n"
+    wget -q -nc -O "img/chapter_splash.jpeg" \
+      "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
+  }
+  # Generate the actual volumes.
+  source narbonic.index
   # Download music and podcasts.
   [[ $DOWNLOAD_MUSIC == yes ]] && download-music
 }
 
-#### Downloading the HTML for each individual page. ####
+function status {
+  local fmt="$1"; shift
+  printf '\x1B[2K\r'"$fmt" "$@"
+}
+
+#### Handlers for the index file. ####
 
 CHAPTER_TEMPLATE='
-<!-- %s %s -->
+<!-- CHAPTER %s -->
 <div align="center">
   <img src="../../img/chapter_splash.jpeg"><br>
   <h1>%s</h1>
 </div>'
 
-# cat index | download-html outdir
-function download-html {
-  local outdir="$1"
-  local volume=''
-  local page=0
+# State
+title=""
+outdir=""
+default_commentary=off
+commentary=off
+page=0
 
+function volume {
+  if [[ $title ]]; then
+    # Finalize the previous volume.
+    render-pages "$title"
+    status '  compile: %s\n' "cbz/$title.cbz"
+    (cd pages && zip -q -r -0 "../cbz/$title.cbz" "$title")
+  fi
+  status '%s\n' "$1"
+  title="$1"
+  outdir="html/$1"
+  commentary=$default_commentary
+  page=0
   mkdir -p "$outdir"
-  echo -n "Downloading all HTML."
-  while read id title; do
-    if [[ $id == "#" ]]; then
-      # Start new volume
-      printf "\n%s" "$title"
-      volume="$title"
-      mkdir -p "$outdir/$volume"
-      page=0
-
-    elif [[ $id == "##" ]]; then
-      # Start new chapter
-      ((++page))
-      printf '\n  p.%03d - %s' "$page" "$title"
-      printf "$CHAPTER_TEMPLATE" CHAPTER "$title" "$title" \
-        > "$(printf "%s/%s/%03d CHAPTER %s.html" "$outdir" "$volume" "$page" "$title")"
-
-    elif [[ $id == "###" ]]; then
-      # Boundary between frontmatter and backmatter
-      ((++page))
-      printf '\n  p.%03d - Extras' "$page"
-      printf "$CHAPTER_TEMPLATE" BACKMATTER "" "Extras" \
-        > "$(printf "%s/%s/%03d BACKMATTER.html" "$outdir" "$volume" "$page")"
-
-    elif [[ $title ]]; then
-      # Individual page
-      ((++page))
-      local outpage="$(printf "%s/%s/%03d PAGE %s.html" "$outdir" "$volume" "$page" "$title")"
-      [[ -f $outpage ]] && continue
-      echo "<!-- PAGE $title -->" > "$outpage"
-      try-wring html "http://www.narbonic.com/comic/$id/" .comic-strip-container >> "$outpage"
-      echo -n "."
-    fi
-  done
-  echo ''
 }
 
+function chapter {
+  ((++page))
+  commentary=$default_commentary
+  status '  p.%03d - %s\n' "$page" "$1"
+  local outfile="$(printf "%s/%03d CHAPTER %s.html" "$outdir" "$page" "$1")"
+  printf "$CHAPTER_TEMPLATE" "$1" "$1" > "$outfile"
+}
+
+# page <id> <title>
+function page {
+  ((++page))
+  fetch-page "$1"
+  prepare-page "$1" "$2"
+}
+
+#### Downloading the HTML for each individual page. ####
+
+# fetch-page <id>
+# If page does not exist in the cache, downloads it.
+# Then normalizes image paths and downloads all images not in cache.
+function fetch-page {
+  local outpage="cache/$1"
+  [[ -f $outpage ]] || {
+    status "    download: %s" "$1"
+    echo "<!-- PAGE $1 -->" > "$outpage.tmp"
+    try-wring html \
+      "http://www.narbonic.com/comic/$1/" .comic-strip-container \
+      "$outpage.tmp"
+
+    # Normalize image paths.
+    sed -E -i '
+      s,src="http://(www\.)?narbonic.com/,src="/,g;
+      s,src="/wordpress/wp-content/uploads/,src="../../img/,g;
+      s,\.JPG",.jpg",g;' "$outpage.tmp"
+
+    mv "$outpage.tmp" "$outpage"
+  }
+
+  # Fetch all missing images.
+  fetch-images "cache/$1"
+}
+
+# try-wring type url selector outfile
 # Like `wring`, but retries until it gets page content.
 function try-wring {
-  > /tmp/$$
-  while ! fgrep -q comic-strip-container /tmp/$$; do
-    wring "$@" > /tmp/$$
+  while ! fgrep -q comic-strip-container "$4"; do
+    wring "$1" "$2" "$3" >> "$4"
   done
-  cat /tmp/$$
 }
 
-#### HTML image normalization ####
-
-function normalize-image-paths {
-  find "$1" -name '*.html' -print0 | xargs -0 sed -E -i '
-    s,src="http://(www\.)?narbonic.com/,src="/,g;
-    s,src="/wordpress/wp-content/uploads/,src="../../img/,g;
-    s,\.JPG",.jpg",g;'
-}
-
-#### HTML image downloading ####
-
-function download-images {
-  echo -n "Downloading all images"
-  [[ -f "$2/chapter_splash.jpeg" ]] || wget -nc -O "$2/chapter_splash.jpeg" \
-    "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
-
+# fetch-images <id>
+# Fetch all images referenced in the given page that don't already exist locally.
+function fetch-images {
   egrep -rho 'src="../../img/[^"]+"' "$1" | cut -d\" -f2 \
   | egrep -v '\.mp3$' \
   | sed -E 's,../../img/,,' \
   | while read image; do
-    [[ -f "$2/$image" ]] && continue
-    mkdir -p "$(dirname "$2/$image")"
-    wget -nv -O "$2/$image" "http://www.narbonic.com/wordpress/wp-content/uploads/$image"
-    echo -n "."
+    [[ -f "img/$image" ]] && continue
+    status "    image: %s" "$image"
+    mkdir -p "$(dirname "img/$image")"
+    wget -q -O "img/$image" "http://www.narbonic.com/wordpress/wp-content/uploads/$image"
+    # echo -n "."
   done
-  echo ''
 }
 
 #### Converting the raw HTML into with and without-commentary versions ####
 
-function copy-and-transform-all-html {
-  for vol in html/orig/"Narbonic Volume"*; do
-    copy-and-transform-html "$vol" "html/no-commentary/${vol#html/orig/}"
-  done
-  for vol in html/orig/*; do
-    local outvol="${vol/Narbonic Volume/Narbonic+ Volume}"
-    copy-and-transform-html \
-      "$vol" \
-      "html/with-commentary/${outvol#html/orig/}" \
-      keep_commentary
-  done
+# prepare-page <id> <title>
+# Given a cache ID, generate one or more output pages in html/ based on the
+# contents of the cached file and whether commentary=on.
+# Emits the paths to all the generated files on stdout.
+function prepare-page {
+  if [[ $commentary = on ]]; then
+    extract-commentary "$1" "$2"
+  else
+    local outfile="$(printf "%s/%03d %s %s.html" "$outdir" "$page" "$1" "$2")"
+    [[ "cache/$1" -ot "$outfile" ]] && return 0
+    status "    prepare: %s" "$1"
+    wring html "cache/$1" .comic-strip-image >"$outfile"
+  fi
 }
 
-# copy-and-transform-html indir outdir keep_commentary
-# Copy the master HTML tree into another directory, transforming it (by stripping
-# or expanding commentary) in the process.
-function copy-and-transform-html {
-  local indir="$1"
-  local outdir="$2"
-  local keep_commentary="$3"
-  local backmatter=''
-
-  echo -n "Generating $outdir"
-  mkdir -p "$outdir"
-  find "$indir" -type f | sort | while read infile; do
-    local outfile="$outdir/${infile#$indir}"
-    case "$infile" in
-      *BACKMATTER*) backmatter=true; cp "$infile" "$outfile"; continue;;
-      *CHAPTER*) backmatter=''; cp "$infile" "$outfile"; continue;;
-    esac
-
-    [[ -f "$outfile" ]] && continue
-    if [[ $keep_commentary || $backmatter ]]; then
-      # File needs expansion into individual images with commentary.
-      extract-commentary "$infile" "$outfile"
-    else
-      # File needs commentary stripped out.
-      wring html "$infile" .comic-strip-image > "$outfile"
-      echo -n '.'
-    fi
-  done
-  echo ''
-}
-
-# extract-commentary infile outfile
-# Given an infile and a template outfile, generate a series of outfiles with
-# names based on the template, one for each comic-strip-container in the
-# infile, with full commentary included.
+# extract-commentary <id> <title>
+# Used by prepare-page to generate multiple subpages for pages with commentary.
 function extract-commentary {
-  local index=1
-  cat "$1" | egrep -o "comic-strip-container-[0-9]+" | while read id; do
-    subpage="${2/ PAGE/.$index PAGE}"
-    ((++index))
-    [[ -f "$subpage" ]] && continue
-    wring html "$1" "#$id" > "$subpage"
-    echo -n '.'
+  local subpage=1
+  cat "cache/$1" | egrep -o "comic-strip-container-[0-9]+" | while read id; do
+    local outfile="$(printf "%s/%03d.%02d %s %s.html" "$outdir" "$page" "$subpage" "$1" "$2")"
+    ((++subpage))
+    [[ "cache/$1" -ot "$outfile" ]] && continue
+    status "    prepare: %s/%02d" "$1" "$subpage"
+    wring html "cache/$1" "#$id" > "$outfile"
   done
 }
 
-
-#### Building the CBZ files ####
-
-# build-cbzs
-# Convert all html-{with,no}-commentary directories into CBZs.
-# Leaves the JPEG versions in cbz.jpeg/ and the PNG versions in cbz.png/.
-function build-cbzs {
-  echo "Build CBZ files..."
-  for dir in html/*-commentary/*; do
-    [[ $BUILD_JPEG == yes ]] && build-cbz jpeg "$dir" "${dir/html\/*-commentary/cbz.jpeg}.cbz"
-    [[ $BUILD_PNG == yes ]] && build-cbz png "$dir" "${dir/html\/*-commentary/cbz.png}.cbz"
+# render-pages <title>
+# render all HTML pages in html/<title>/ into pages/<title>
+# controlled by format=
+function render-pages {
+  mkdir -p "pages/$1"
+  ls "html/$1" | while read html; do
+    local outfile="pages/$1/${html%.html}.$format"
+    [[ "html/$1/$html" -ot "$outfile" ]] && continue
+    status "  render: %s" "${html%.html}"
+    wkhtmltoimage --quiet --width 400 --quality 100 \
+      --format "$format" \
+      "html/$1/$html" \
+      "$outfile"
   done
-  # ln -f cbz.jpeg/*.cbz ../../Narbonic/
-  # ln -f 'cbz.png/A Brief Moment of Culture.cbz' ../../Narbonic
-}
-
-# build-cbz format indir outfile
-# Builds a CBZ from a single input directory.
-function build-cbz {
-  local format="$1"
-  local input="$2"
-  local output="$3"
-  local backmatter=""
-
-  mkdir -p "$output.d"
-  ls "$input" | sort | while read file; do
-    printf '\x1B[2K\r%s:' "$output"
-    local outfile="$output.d/${file%.html}.$format"
-
-    if [[ -f "$outfile" ]]; then
-      # File already exists, don't rebuild.
-      continue
-    else
-      printf '\x1B[2K\r%s:%s' "$output" "${outfile##*/}"
-      html-to-image "$format" "$input/$file" "$outfile"
-    fi
-  done
-  printf '\x1B[2K\r%s' "$output"
-  rm -f "$output"
-  zip -q -r -0 "$output" "$output.d"
-  printf '\n'
-}
-
-# html-to-image format infile outfile
-# Converts a single HTML page to an image.
-function html-to-image {
-  wkhtmltoimage -q --width 400 --format "$1" --quality 100 "$2" "$3"
 }
 
 #### Music downloads ####
@@ -262,3 +197,13 @@ function download-music {
 }
 
 main "$@"
+
+# Note: sometimes `wring` silently fails to download a page and emits a blank
+# file. To fix this, run:
+#   find html/orig/ -type f -name '*PAGE*' -print0 \
+#   | xargs -0 fgrep -L 'comic-strip-container' \
+#   | xargs -d\\n -r rm -v
+# Which will delete the broken files and force the builder to redownload them.
+# If you can run this with no output, there's nothing to fix.
+# The script *should* detect and handle this automatically, but this command
+# is included just in case.
