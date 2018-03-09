@@ -75,7 +75,7 @@ EOF
 function books/grep {
   shift
   \task rc.regex:yes rc.search.case.sensitive:no \
-    "( author ~ '$1' or description ~ '$1' )" "${2:=all}"
+    "( author ~ '$1' or desc ~ '$1' )" "${2:=all}"
 }
 
 task/register cc '^cc' books/cc <<EOF

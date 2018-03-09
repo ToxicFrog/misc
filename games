@@ -44,7 +44,7 @@ EOF
 function games/grep {
   shift
   \task rc.regex:yes rc.search.case.sensitive:no \
-    "( description ~ '$1' )" "${2:=all}"
+    "( desc ~ '$1' )" "${2:=all}"
 }
 
 function task/map-arg {
