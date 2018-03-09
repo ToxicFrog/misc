@@ -171,6 +171,24 @@ function task/-annote {
   \task $LAST annotate "$@"
 }
 
+task/register annocat 'annocat$' task/-annocat <<EOF
+
+  $NAME [filter] annocat
+
+Annotate the selected entries with text entered on stdin. If no filter is specified,
+annotates the most recently completed entry.
+EOF
+function task/-annocat {
+  shift -p
+  if [[ ! $* ]]; then
+    set -- "$(task/select uuid end+ +COMPLETED | tail -n1)"
+  fi
+  echo "## About to annotate the following:"
+  task "$@" uuids | task/printf "  \x1B[4m%description.desc%s\x1B[0m by %author%s\n"
+  echo "## Enter the annotation, ^D when done."
+  \task "$@" annotate "$(cat)"
+}
+
 # task/get-field uuid field
 # Wrapper around task/select and \task get to extract individual fields.
 # Outputs the field on stdout, NULL TERMINATED for use with xargs -0.
@@ -211,7 +229,7 @@ function task/printf {
   format="$(echo -E "$1" | sed -E 's,%[a-z_.|/-]+(%.),\1,g')"
 
   xargs -n1 printf '%s\n' | while read uuid; do
-    printf '\r\x1B[0K%s' "$(task/get-field $uuid .description)" >&2
+    # printf '\r\x1B[0K%s' "$(task/get-field $uuid .description)" >&2
     echo -E "$fields" \
     | while read field; do
       # If field has the format 'field|formatter', pipe it through the latter
@@ -225,6 +243,6 @@ function task/printf {
       printf '\0'
     done \
     | xargs -0 printf "$format"
-    printf '\n'
+    # printf '\n'
   done
 }
