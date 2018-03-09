@@ -99,7 +99,7 @@ function task/select {
   local fields="$1"
   local sort="$2"
   shift 2
-  \task rc.context: rc.verbose:nothing rc.report.list.filter: \
+  \task rc.verbose:nothing rc.report.list.filter: \
     rc.report.list.labels:"$fields" rc.report.list.columns:"$fields" \
     rc.report.list.sort:"$sort" \
     "$@" list
@@ -192,7 +192,7 @@ function task/get-field {
       printf '%s' "$(\task _get "$1$2")"
       ;;
     *)
-      printf '%s' "$(task/select "$2" "uuid+" "uuid:$1")"
+      printf '%s' "$(task/select "$2" "uuid+" rc.context: "uuid:$1")"
       ;;
   esac
 }
