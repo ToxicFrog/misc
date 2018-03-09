@@ -19,8 +19,12 @@ urgency.tags.coefficient=0
 context.default=-DELETED
 context=default
 
-color.tag.ANNOTATED=rgb243
+color.uda.gamestate.finished=rgb041
+color.uda.gamestate.completed=rgb551
+color.uda.gamestate.mastered=rgb025
+color.uda.gamestate.null=rgb211
 color.tagged=
+
 
 # UDAs
 uda.gamestate.label=Play Status
