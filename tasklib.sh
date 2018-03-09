@@ -1,6 +1,8 @@
 # Support functions for taskwarrior wrappers like `books`.
 
-NAME=${NAME:=$(basename $ZSH_SCRIPT)}
+if [[ $ZSH_SCRIPT ]]; then
+  NAME=${NAME:=$(basename $ZSH_SCRIPT)}
+fi
 
 # List of (name:regex) pairs in order they should be checked.
 declare -a TASK_COMMANDS
