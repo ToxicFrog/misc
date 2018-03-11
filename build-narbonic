@@ -23,6 +23,7 @@ DOWNLOAD_MUSIC='yes'
 set -e
 
 function main {
+  checkdeps wkhtmltoimage curl egrep sed wring zip
   mkdir -p cache html img pages cbz
   # Download splash screen.
   [[ -f "img/chapter_splash.jpeg" ]] || {
@@ -34,6 +35,20 @@ function main {
   source narbonic.index
   # Download music and podcasts.
   [[ $DOWNLOAD_MUSIC == yes ]] && download-music
+}
+
+function checkdeps {
+  local missing=()
+  for command in "$@"; do
+    if ! type "$command" 2>/dev/null >/dev/null; then
+      missing+="$command"
+    fi
+  done
+  if [[ "${missing[@]}" ]]; then
+    echo "You are missing the following commands: ${missing[@]}" >&2
+    echo "Please install them and try again." >&2
+    exit 1
+  fi
 }
 
 function status {
