@@ -72,14 +72,13 @@ default_commentary=off
 commentary=off
 page=0
 
+function die {
+  echo "Error reading narbonic.index: $@" >&2
+  exit 1
+}
+
 function volume {
-  if [[ $title ]]; then
-    # Finalize the previous volume.
-    render-pages "$title"
-    status '  compile: %s\n' "cbz/$title.cbz"
-    rm -f "cbz/$title.cbz"
-    (cd pages && zip -q -r -0 "../cbz/$title.cbz" "$title")
-  fi
+  [[ $title ]] && die "'volume $@' while still inside another volume ($title)!"
   status '%s\n' "$1"
   title="$1"
   outdir="html/$1"
@@ -89,6 +88,7 @@ function volume {
 }
 
 function chapter {
+  [[ $title ]] || die "'chapter $@' outside a volume!"
   ((++page))
   commentary=$default_commentary
   status '  p.%03d - %s\n' "$page" "$1"
@@ -98,9 +98,20 @@ function chapter {
 
 # page <id> <title>
 function page {
+  [[ $title ]] || die "'page $@' outside a volume!"
   ((++page))
   fetch-page "$1"
   prepare-page "$1" "$2"
+}
+
+function endvolume {
+  [[ $title ]] || die "'endvolume' outside a volume!"
+  # Finalize the previous volume.
+  render-pages "$title"
+  status '  compile: %s\n' "cbz/$title.cbz"
+  rm -f "cbz/$title.cbz"
+  (cd pages && zip -q -r -0 "../cbz/$title.cbz" "$title")
+  title=""
 }
 
 #### Downloading the HTML for each individual page. ####

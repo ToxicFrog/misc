@@ -1,3 +1,13 @@
+# Default image format.
+format=jpeg
+
+# Commentary inclusion or not.
+# This can be overridden on a per-chapter basis by setting `commentary=on` or
+# `commentary=off`, but will reset to the default at the start of the next
+# chapter or volume.
+# e.g: chapter Extras; commentary=on
+default_commentary=on
+
 # This huge function is used to generate both the Narbonic and Narbonic+ volumes.
 # The caller sets default_commentary and then invokes it with an appropriate title.
 function narbonic-volumes {
@@ -16,7 +26,7 @@ function narbonic-volumes {
       page "september-25-30-2000" "ANTONIO SMITH, FORENSIC LINGUIST"
       page "october-2-7-2000" "ANTONIO SMITH, FORENSIC LINGUIST"
       page "october-9-14-2000" "ANTONIO SMITH, FORENSIC LINGUIST"
-    chapter Extras; commentary=on
+    chapter Extras
       page "evil-coffee" "Evil Coffee"
       page "helen-vs-dave-barker-round-one" "Helen vs. Dave Barker, Round One"
       page "results-of-the-name-dave-contest" "Results of the Name Dave Contest"
@@ -39,11 +49,12 @@ function narbonic-volumes {
       page "december-11-16-2000" "Professor Madblood and the Crystal of Marinia"
       page "december-25-30-2000" "Professor Madblood and the Crystal of Marinia"
       page "dave-in-slumberland" "Dave in Slumberland"
-    chapter Extras; commentary=on
+    chapter Extras
       page "december-18-23-2000" "A Week of December 18 Story"
       page "conclusion-to-a-week-of-december-18-story" "Conclusion to \"A Week of December 18 Story\""
       page "a-sexy-bundle-of-evil-lovin" "A Sexy Bundle of Evil Lovin'"
       page "halloween-costumes" "Halloween Costumes!"
+    endvolume
 
   volume "$1 Volume 02"
     chapter "Smart Gerbils"
@@ -56,7 +67,7 @@ function narbonic-volumes {
       page "february-19-24-2001" "Smart Gerbils"
       page "february-26-march-3-2001" "Smart Gerbils"
       page "mssgrm" "MSSGRM"
-    chapter Extras; commentary=on
+    chapter Extras
       page "helen-vs-dave-barker-round-two" "Helen Vs. Dave Barker, Round Two"
       page "dave-runner" "Dave Runner"
       page "the-narbonic-diceless-roleplaying-game" "The Narbonic Diceless Roleplaying Game"
@@ -87,10 +98,11 @@ function narbonic-volumes {
       page "june-11-16-2001" "Dave's Dead, Dave"
       page "june-18-23-2001" "Dave's Dead, Dave"
       page "june-25-30-2001" "Dave's Dead, Dave"
-    chapter Extras; commentary=on
+    chapter Extras
       page "the-characters-recruit-a-new-cartoonist" "The Characters Recruit a New Cartoonist"
       page "the-cartoonist-s-brother-graduates" "The Cartoonist's Brother Graduates"
       page "the-characters-strike" "The Characters Strike"
+    endvolume
 
   volume "$1 Volume 03"
     chapter "Mell's Major"
@@ -104,7 +116,7 @@ function narbonic-volumes {
       page "august-20-25-2001" "Get A Life"
     chapter "Burning Gerbil"
       page "august-27-september-1-2001" "Burning Gerbil"
-    chapter Extras; commentary=on
+    chapter Extras
       page "a-december-pinup-in-july" "A December Pinup in July"
       page "shaenon-s-comic-con-2001-report" "Shaenon's Comic-Con 2001 Report"
       page "an-evil-cake-recipe" "An Evil Cake Recipe"
@@ -140,7 +152,7 @@ function narbonic-volumes {
       page "january-21-26-2002" "Gender Swap"
       page "january-28-february-2-2002" "Gender Swap"
       page "dave-in-slumberland-2" "Dave in Slumberland"
-    chapter Extras; commentary=on
+    chapter Extras
       page "movie-posters" "Movie Posters"
       page "insanity-claus-a-christmas-storybook" "Insanity Claus: A Christmas Storybook"
       page "the-cartoonist-gushes-about-they-might-be-giants" "The Cartoonist Gushes About They Might Be Giants"
@@ -151,6 +163,7 @@ function narbonic-volumes {
       page "halloween-costumes-2" "Halloween Costumes!"
       page "posters-again" "Posters!  Again!"
       page "g-i-and-narbonic-christmas" "G.I. and Narbonic Christmas"
+    endvolume
 
   volume "$1 Volume 04"
     chapter "D-Con"
@@ -167,7 +180,7 @@ function narbonic-volumes {
       page "april-15-20-2002" "D-Con"
       page "april-22-27-2002" "D-Con"
       page "april-29-may-4-2002" "D-Con"
-    chapter Extras; commentary=on
+    chapter Extras
       page "ape-sketches-2002" "APE Sketches, 2002"
       page "the-cartoonist-explains-modern-tales" "The Cartoonist Explains Modern Tales"
       page "the-cartoonist-as-care-bear" "The Cartoonist as Care Bear"
@@ -186,12 +199,13 @@ function narbonic-volumes {
       page "mostly-modern-tales-guest-week" "Mostly Modern Tales Guest Week"
       page "triple-threat-guest-week" "Triple Threat Guest Week"
       page "farago-makes-the-strip-popular" "Farago Makes the Strip Popular"
-    chapter Extras; commentary=on
+    chapter Extras
       page "the-narbonic-caption-challenge" "The Narbonic Caption Challenge"
       page "results-of-the-narbonic-caption-contest" "Results of the Narbonic Caption Contest"
       page "the-caption-contest-sketches" "The Caption Contest Sketches"
       page "the-second-annual-narbonic-summer-t-shirt-contest" "The Second Annual Narbonic Summer T-Shirt Contest"
       page "a-gerbil-named-artie" "A Gerbil Named Artie"
+    endvolume
 
   volume "$1 Volume 05"
     chapter "Grass Roots"
@@ -212,7 +226,7 @@ function narbonic-volumes {
       page "september-16-21-2002" "David Cronenberg's The Geek"
       page "september-23-28-2002" "David Cronenberg's The Geek"
       page "september-30-october-5-2002" "David Cronenberg's The Geek"
-    chapter Extras; commentary=on
+    chapter Extras
       page "mockup-of-the-narbonic-book-cover" "Mockup of the Narbonic Book Cover"
       page "renaming-dave-barker" "Renaming Dave Barker"
       page "dave-barker-s-new-title" "Dave Barker's New Title"
@@ -231,10 +245,11 @@ function narbonic-volumes {
       page "november-18-23-2002" "Class Reunion"
       page "november-25-30-2002" "Class Reunion"
       page "dave-in-slumberland-3" "Dave in Slumberland"
-    chapter Extras; commentary=on
+    chapter Extras
       page "the-cartoonist-loses-a-bet" "The Cartoonist Loses a Bet"
       page "another-t-shirt-photo-another-spider-goat-song" "Another T-Shirt Photo, Another Spider-Goat Song"
       page "halloween-costumes-3" "Halloween Costumes!"
+    endvolume
 
   volume "$1 Volume 06"
     chapter "Professor Madblood and the Doppelganger Gambit"
@@ -272,7 +287,7 @@ function narbonic-volumes {
       page "june-30-july-5-2003" "Professor Madblood and the Doppelganger Gambit"
       page "july-7-12-2003" "Professor Madblood and the Doppelganger Gambit"
       page "july-14-19-2003" "Professor Madblood and the Doppelganger Gambit"
-    chapter Extras; commentary=on
+    chapter Extras
       page "character-design-stuff" "Character Design Stuff"
       page "valentine-s-day-2003" "Valentine's Day 2003"
       page "from-the-narbonic-role-playing-game-mad-scientific-journals" "From the Narbonic Role-Playing Game: Mad Scientific Journals"
@@ -291,6 +306,7 @@ function narbonic-volumes {
       page "mad-libs" "Mad Libs"
       page "a-holiday-greeting-card" "A Holiday Greeting Card"
       page "2003-ape-sketches" "2003 APE Sketches"
+    endvolume
 
   volume "$1 Volume 07"
     chapter "Dave Davenport Has Come Unstuck in Time"
@@ -318,7 +334,7 @@ function narbonic-volumes {
       page "december-15-21-2003" "Dave Davenport Has Come Unstuck in Time"
       page "december-22-28-2003" "Dave Davenport Has Come Unstuck in Time"
       page "dave-in-slumberland-4" "Dave in Slumberland"
-    chapter Extras; commentary=on
+    chapter Extras
       page "time-travel-outtakes" "Time Travel Outtakes"
       page "thoughts-while-drawing" "Thoughts While Drawing"
       page "how-to-write-comics-the-shaenon-way-by-shaenon" "How To Write Comics the Shaenon Way (By Shaenon)"
@@ -335,6 +351,7 @@ function narbonic-volumes {
       page "halloween-costume" "Halloween Costume!"
       page "narbonic-third-anniversary-contest" "Narbonic Third Anniversary Contest"
       page "results-of-the-third-anniversary-gratuitously-obscure-reference-contest" "Results of the Third Anniversary Gratuitously Obscure Reference Contest"
+    endvolume
 
   volume "$1 Volume 08"
     chapter "Demons"
@@ -365,7 +382,7 @@ function narbonic-volumes {
       page "june-7-12-2004" "Demons"
       page "june-14-19-2004" "Demons"
       page "june-21-26-2004" "Demons"
-    chapter Extras; commentary=on
+    chapter Extras
       page "rejected-narbonic-plots" "Rejected Narbonic Plots"
       page "more-rejected-narbonic-plots" "More Rejected Narbonic Plots"
       page "still-more-rejected-narbonic-plots" "Still More Rejected Narbonic Plots"
@@ -383,6 +400,7 @@ function narbonic-volumes {
       page "andrew-s-24-hour-comic-part-three" "Andrew's 24 Hour Comic, Part Three"
       page "andrew-s-24-hour-comic-part-four" "Andrew's 24 Hour Comic, Part Four"
       page "the-animated-bite-me-french-lesson" "The Animated \"Bite Me\" French Lesson"
+    endvolume
 
   volume "$1 Volume 09"
     chapter "Mad Science Is Decadent and Depraved"
@@ -398,7 +416,7 @@ function narbonic-volumes {
       page "september-6-11-2004" "Mad Science Is Decadent and Depraved"
       page "september-13-18-2004" "Mad Science Is Decadent and Depraved"
       page "september-20-25-2004" "Mad Science Is Decadent and Depraved"
-    chapter Extras; commentary=on
+    chapter Extras
       page "four-years-old" "Four Years Old!"
       page "marita-campos-guest-strip" "Maritza Campos Guest Strip"
       page "sketches-from-comic-con" "Sketches from Comic-Con"
@@ -420,7 +438,7 @@ function narbonic-volumes {
       page "december-20-25-2004" "Professor Madblood and the Lovelace Affair"
       page "december-27-january-1-2005" "Professor Madblood and the Lovelace Affair"
       page "dave-in-slumberland-5" "Dave in Slumberland"
-    chapter Extras; commentary=on
+    chapter Extras
       page "mom-visits" "Mom Visits"
       page "ah-election-week" "Ah, Election Week"
       page "anymore" "Anymore"
@@ -429,6 +447,7 @@ function narbonic-volumes {
       page "capricon-art" "Capricon Art"
       page "where-have-they-gone-all-the-scary-costumes-of-our-grandparents" "Where Have They Gone, All the Scary Costumes of Our Grandparents?"
       page "dirk-as-dave" "Dirk as Dave"
+    endvolume
 
   volume "$1 Volume 10"
     chapter "Professor Madblood and the Lovelace Affair (cont'd)"
@@ -443,7 +462,7 @@ function narbonic-volumes {
       page "february-28-march-5-2005" "Professor Madblood and the Lovelace Affair"
       page "march-7-12-2005" "Professor Madblood and the Lovelace Affair"
       page "march-14-19-2005" "Professor Madblood and the Lovelace Affair"
-    chapter Extras; commentary=on
+    chapter Extras
       page "rejected-narbonic-plots-redux" "Rejected Narbonic Plots Redux"
       page "narbonic-vol-2" "Narbonic Vol. 2"
       page "mailbag" "Mailbag!"
@@ -464,7 +483,7 @@ function narbonic-volumes {
       page "june-6-11-2005" "Battle for the Lost Diamond Mines of Brazil"
       page "june-13-18-2005" "Battle for the Lost Diamond Mines of Brazil"
       page "june-20-25-2005" "Battle for the Lost Diamond Mines of Brazil"
-    chapter Extras; commentary=on
+    chapter Extras
       page "victorian-pics" "Victorian Pics"
       page "you-might-be-a-henchman-if" "You Might Be a Henchman If..."
       page "the-cartoonist-speaks-from-napa" "The Cartoonist Speaks from Napa"
@@ -472,6 +491,7 @@ function narbonic-volumes {
       page "famous-mobsters-of-finland" "Famous Mobsters of Finland"
       page "sketches-from-ape-2" "Sketches from APE"
       page "narbonicon-photos" "Narbonicon Photos"
+    endvolume
 
   volume "$1 Volume 11"
     chapter "Hiccup"
@@ -493,7 +513,7 @@ function narbonic-volumes {
       page "october-3-8-2005" "H Is H"
       page "october-10-15-2005" "H Is H"
       page "deadmouse-guest-strip" "Deadmouse Guest Strip"
-    chapter Extras; commentary=on
+    chapter Extras
       page "five-years-old" "Five Years Old!"
       page "helen-paper-doll-revised" "Helen Paper Doll, Revised"
       page "mell-paper-doll-revised" "Mell Paper Doll, Revised"
@@ -515,12 +535,13 @@ function narbonic-volumes {
       page "december-26-31-2005" "Angels"
       page "dave-in-slumberland-6" "Dave in Slumberland"
       page "last-call" "Last Call"
-    chapter Extras; commentary=on
+    chapter Extras
       page "smithson" "Smithson"
       page "i-visit-the-national-atomic-museum" "I Visit the National Atomic Museum"
       page "yes-it-s-more-paper-doll-clothes" "Yes, It's More Paper Doll Clothes"
       page "more-paper-dolls-artie" "More Paper Dolls: Artie!"
       page "moleman-s-christmas" "Moleman's Christmas"
+    endvolume
 
   volume "$1 Volume 12"
     chapter "The End"
@@ -543,7 +564,7 @@ function narbonic-volumes {
       page "april-17-22-2006" "D, D'"
       page "april-24-29-2006" "D, D'"
       page "may-1-6-2006" "D, D'"
-    chapter Extras; commentary=on
+    chapter Extras
       page "summer-day-preview" "Summer Day Preview"
       page "foglio-sketches" "Foglio Sketches"
       page "volume-3-cover-preview" "Volume 3 Cover Preview"
@@ -563,12 +584,13 @@ function narbonic-volumes {
       page "july-3-8-2006" "Professor Madblood and the Everlasting Ices of the North"
       page "july-10-15-2006" "Professor Madblood and the Everlasting Ices of the North"
       page "july-17-22-2006" "Professor Madblood and the Everlasting Ices of the North"
-    chapter Extras; commentary=on
+    chapter Extras
       page "more-rejected-narbonic-strips" "More Rejected Narbonic Strips"
       page "demon-slayer-seth" "Demon Slayer Seth"
       page "demon-slayer-seth-karaoke" "Demon Slayer Seth: Karaoke"
       page "wcn" "WCN"
       page "narbonicon-iv" "Narbonicon IV"
+    endvolume
 
   volume "$1 Volume 13"
     chapter "Madness"
@@ -598,7 +620,7 @@ function narbonic-volumes {
       page "december-25-30-2006" "Genius"
       page "dave-in-slumberland-7" "Dave in Slumberland"
       page "endpaper" "Endpaper"
-    chapter Extras; commentary=on
+    chapter Extras
       page "final-thanks" "Final Thanks"
       page "the-great-comic-mad-scientists" "The Great Comic Mad Scientists"
       page "narbonicon-iv-photos" "Narbonicon IV Photos"
@@ -608,17 +630,16 @@ function narbonic-volumes {
       page "paper-dolls-the-final-battle" "Paper Dolls: The Final Battle"
       page "art-jewelry-music-many-things" "Art! Jewelry! Music! Many Things!"
       page "halloween-costumes-4" "Halloween Costumes!"
+    endvolume
 }
 
-format=jpeg
-
-#### Generate volumes for original run.
+### Generate volumes for original run.
 default_commentary=off; narbonic-volumes "Narbonic"
 
-#### Generate volumes for Narbonic: Director's Cut.
+### Generate volumes for Narbonic: Director's Cut.
 default_commentary=on; narbonic-volumes "Narbonic+"
 
-#### Fan compilations and side stories.
+### Fan compilations and side stories.
 default_commentary=on
 
 volume "Fanart"
@@ -662,6 +683,7 @@ volume "Fanart"
     page "the-art-of-andre-richard-mikko-rasa-and-kurt-tiede" "The Art of Andre Richard, Mikko Rasa, and Kurt Tiede"
     page "two-brains-the-art-of-abby-brian-moore-and-lord-dave" "Two Brains: The Art of Abby, Brian Moore, and Lord_dave"
     page "the-art-of-tiff-hudson-rebecca-faria-alexis-christoforides-gavin-core-paul-gadzikowski-and-juliette-calvaring" "The Art of Tiff Hudson, Rebecca Faria, Alexis Christoforides, Gavin Core, Paul Gadzikowski, and Juliette Calvaring"
+  endvolume
 
 volume "Fantext"
   chapter "Fantext"
@@ -684,6 +706,7 @@ volume "Fantext"
     page "ditch-day" "Ditch Day"
     page "ditch-day-crossword" "Ditch Day Crossword"
     page "ditch-day-crossword-solution-with-bonus-stuff" "Ditch Day Crossword Solution (With Bonus Stuff)"
+  endvolume
 
 volume "Narbonic Haiku Collection"
   chapter "Narbonic Haiku Collection"
@@ -698,6 +721,7 @@ volume "Narbonic Haiku Collection"
     page "haiku" "Haiku!"
     page "more-haiku" "More Haiku"
     page "a-few-more-poems" "A Few More Poems"
+  endvolume
 
 volume "A Narbonic Colouring Book"
   chapter "A Narbonic Colouring Book"
@@ -705,6 +729,7 @@ volume "A Narbonic Colouring Book"
     page "a-narbonic-coloring-book-2" "A Narbonic Coloring Book"
     page "a-narbonic-coloring-book-3" "A Narbonic Coloring Book"
     page "a-narbonic-coloring-book-4" "A Narbonic Coloring Book"
+  endvolume
 
 volume "Artie's Travels"
   chapter "Artie's Travels"
@@ -731,6 +756,7 @@ volume "Artie's Travels"
     page "world-gerbil-updates" "World Gerbil Updates"
     page "gerbil-photos-jason-hartwig-and-nate" "Gerbil Photos: Jason Hartwig and Nate"
     page "on-the-road-gerbil-edition" "On the Road: Gerbil Edition"
+  endvolume
 
 volume "Edie in Orbit"
   chapter "Edie in Orbit"
@@ -739,9 +765,9 @@ volume "Edie in Orbit"
     page "edie-part-three" "Edie, Part Three"
     page "edie-part-four" "Edie, Part Four"
     page "edie-part-five" "Edie, Part Five"
+  endvolume
 
-format=png
-volume "A Brief Moment of Culture"
+volume "A Brief Moment of Culture"; format=png
   chapter "A Brief Moment of Culture"
     page "a-brief-moment-of-culture-part-1" "A Brief Moment of Culture, Part 1"
     page "a-brief-moment-of-culture-part-2" "A Brief Moment of Culture, Part 2"
@@ -763,9 +789,9 @@ volume "A Brief Moment of Culture"
     page "a-brief-moment-of-culture-part-xviii" "A Brief Moment of Culture, Part XVIII"
     page "a-brief-moment-of-culture-part-nineteen" "A Brief Moment of Culture, Part Nineteen"
     page "a-brief-moment-of-culture-the-end" "A Brief Moment of Culture: The End"
+  endvolume
 
-format=jpeg
-volume "The Astonishing Excursions of Helen Narbon & Co."
+volume "The Astonishing Excursions of Helen Narbon & Co."; format=jpeg
   chapter "The Astonishing Excursions of Helen Narbon & Co."
     page "the-astonishing-excursions-of-helen-narbon-co-chapter-one" "The Astonishing Excursions of Helen Narbon & Co, Chapter One."
     page "the-astonishing-excursions-of-helen-narbon-co-chapter-two" "The Astonishing Excursions of Helen Narbon & Co, Chapter Two."
@@ -794,6 +820,4 @@ volume "The Astonishing Excursions of Helen Narbon & Co."
     page "the-astonishing-excursions-of-helen-narbon-co-chapter-twenty-four" "The Astonishing Excursions of Helen Narbon &Co, Chapter Twenty-Four."
     page "the-astonishing-excursions-of-helen-narbon-co-chapter-twenty-five" "The Astonishing Excursions of Helen Narbon &Co., Chapter Twenty-Five."
     page "the-astonishing-excursions-of-helen-narbon-co-chapter-twenty-six" "The Astonishing Excursions of Helen Narbon &Co., Chapter Twenty-Six."
-
-# This forces it to render the final volume.
-volume ''
+  endvolume
