@@ -27,7 +27,7 @@ function main {
   # Download splash screen.
   [[ -f "img/chapter_splash.jpeg" ]] || {
     status "Downloading splash page...\n"
-    wget -q -nc -O "img/chapter_splash.jpeg" \
+    >img/chapter_splash.jpeg curl --silent \
       "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
   }
   # Generate the actual volumes.
@@ -97,9 +97,8 @@ function fetch-page {
   [[ -f $outpage ]] || {
     status "    download: %s" "$1"
     echo "<!-- PAGE $1 -->" > "$outpage.tmp"
-    try-wring html \
-      "http://www.narbonic.com/comic/$1/" .comic-strip-container \
-      "$outpage.tmp"
+    curl --retry 5 --silent "http://narbonic.com/comic/$1/" \
+      | wring html - .comic-strip-container >> "$outpage.tmp"
 
     # Normalize image paths.
     sed -E -i '
@@ -114,14 +113,6 @@ function fetch-page {
   fetch-images "cache/$1"
 }
 
-# try-wring type url selector outfile
-# Like `wring`, but retries until it gets page content.
-function try-wring {
-  while ! fgrep -q comic-strip-container "$4"; do
-    wring "$1" "$2" "$3" >> "$4"
-  done
-}
-
 # fetch-images <id>
 # Fetch all images referenced in the given page that don't already exist locally.
 function fetch-images {
@@ -132,8 +123,7 @@ function fetch-images {
     [[ -f "img/$image" ]] && continue
     status "    image: %s" "$image"
     mkdir -p "$(dirname "img/$image")"
-    wget -q -O "img/$image" "http://www.narbonic.com/wordpress/wp-content/uploads/$image"
-    # echo -n "."
+    >"img/$image" curl --silent "http://narbonic.com/wordpress/wp-content/uploads/$image"
   done
 }
 
@@ -186,14 +176,13 @@ function render-pages {
 #### Music downloads ####
 
 function download-music {
-  echo "Downloading music and podcasts..."
+  echo "Downloading music..."
   mkdir -p music
-  wget -nv -nc -P music \
-    http://narbonic.com/wordpress/wp-content/uploads/2009/08/MadbloodBattleAnthem.mp3 \
-    http://narbonic.com/wordpress/wp-content/uploads/2011/08/Narbonic_Battle.mp3 \
-    http://narbonic.com/wordpress/wp-content/uploads/2013/05/epilogue.mp3 \
-    http://www.talkaboutcomics.com/podcast/mp3s/narbonic_commentary_1.mp3 \
-    http://www.talkaboutcomics.com/podcast/mp3s/narbonic_commentary_2.mp3
+  for track in 2009/08/MadbloodBattleAnthem.mp3 2011/08/Narbonic_Battle.mp3 2013/05/epilogue.mp3; do
+    [[ -f music/"$(basename $track)" ]] && continue
+    curl --silent -o music/"$(basename $track)" \
+      http://narbonic.com/wordpress/wp-content/uploads/$track
+  done
 }
 
 main "$@"
