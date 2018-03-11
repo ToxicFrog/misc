@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+#
+# Run to automatically download all of Narbonic and generate CBZs of it.
+# This downloads about 400MB of data from narbonic.com, and requires 4GB of
+# disk space (23GB if you build the PNG version, and 26GB for both).
+# The generated files are about 1.6GB (JPEG) or 13GB (PNG); the rest of the
+# space is used for temporary files and can be reclaimed afterwards.
+
+# CBZs are left in cbz.png/ for the PNG versions and cbz.jpeg/ for the JPEG
+# versions. The PNG versions are ever so slightly higher quality but about
+# 7x the size; it's usually not worth it, so they're disabled by default
+# to speed up the build.
+
+BUILD_JPEG='yes'
+BUILD_PNG='no'
+
+# It also downloads the Narbonic music tracks and podcasts to music/.
+
+DOWNLOAD_MUSIC='yes'
+
+#### No user serviceable parts below this line. ####
+
+set -e
+
+function main {
+  checkdeps wkhtmltoimage curl egrep sed wring zip
+  mkdir -p cache html img pages cbz
+  # Download splash screen.
+  [[ -f "img/chapter_splash.jpeg" ]] || {
+    status "Downloading splash page...\n"
+    >img/chapter_splash.jpeg curl --silent \
+      "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
+  }
+  # Generate the actual volumes.
+  source narbonic.index
+  # Download music and podcasts.
+  [[ $DOWNLOAD_MUSIC == yes ]] && download-music
+}
+
+function checkdeps {
+  local missing=()
+  for command in "$@"; do
+    if ! type "$command" 2>/dev/null >/dev/null; then
+      missing+="$command"
+    fi
+  done
+  if [[ "${missing[@]}" ]]; then
+    echo "You are missing the following commands: ${missing[@]}" >&2
+    echo "Please install them and try again." >&2
+    exit 1
+  fi
+}
+
+function status {
+  local fmt="$1"; shift
+  printf '\x1B[2K\r'"$fmt" "$@"
+}
+
+#### Handlers for the index file. ####
+
+CHAPTER_TEMPLATE='
+<!-- CHAPTER %s -->
+<div align="center">
+  <img src="../../img/chapter_splash.jpeg"><br>
+  <h1>%s</h1>
+</div>'
+
+# State
+title=""
+outdir=""
+default_commentary=off
+commentary=off
+page=0
+
+function die {
+  echo "Error reading narbonic.index: $@" >&2
+  exit 1
+}
+
+function volume {
+  [[ $title ]] && die "'volume $@' while still inside another volume ($title)!"
+  status '%s\n' "$1"
+  title="$1"
+  outdir="html/$1"
+  commentary=$default_commentary
+  page=0
+  mkdir -p "$outdir"
+}
+
+function chapter {
+  [[ $title ]] || die "'chapter $@' outside a volume!"
+  ((++page))
+  commentary=$default_commentary
+  status '  p.%03d - %s\n' "$page" "$1"
+  local outfile="$(printf "%s/%03d CHAPTER %s.html" "$outdir" "$page" "$1")"
+  [[ -f "$outfile" ]] || printf "$CHAPTER_TEMPLATE" "$1" "$1" > "$outfile"
+}
+
+# page <id> <title>
+function page {
+  [[ $title ]] || die "'page $@' outside a volume!"
+  ((++page))
+  fetch-page "$1"
+  prepare-page "$1" "$2"
+}
+
+function endvolume {
+  [[ $title ]] || die "'endvolume' outside a volume!"
+  # Finalize the previous volume.
+  render-pages "$title"
+  status '  compile: %s\n' "cbz/$title.cbz"
+  rm -f "cbz/$title.cbz"
+  (cd pages && zip -q -r -0 "../cbz/$title.cbz" "$title")
+  title=""
+}
+
+#### Downloading the HTML for each individual page. ####
+
+# fetch-page <id>
+# If page does not exist in the cache, downloads it.
+# Then normalizes image paths and downloads all images not in cache.
+function fetch-page {
+  local outpage="cache/$1"
+  [[ -f $outpage ]] || {
+    status "    download: %s" "$1"
+    echo "<!-- PAGE $1 -->" > "$outpage.tmp"
+    curl --retry 5 --silent "http://narbonic.com/comic/$1/" \
+      | wring html - .comic-strip-container >> "$outpage.tmp"
+
+    # Normalize image paths.
+    sed -E -i '
+      s,src="http://(www\.)?narbonic.com/,src="/,g;
+      s,src="/wordpress/wp-content/uploads/,src="../../img/,g;
+      s,\.JPG",.jpg",g;' "$outpage.tmp"
+
+    mv "$outpage.tmp" "$outpage"
+  }
+
+  # Fetch all missing images.
+  fetch-images "cache/$1"
+}
+
+# fetch-images <id>
+# Fetch all images referenced in the given page that don't already exist locally.
+function fetch-images {
+  egrep -rho 'src="../../img/[^"]+"' "$1" | cut -d\" -f2 \
+  | egrep -v '\.mp3$' \
+  | sed -E 's,../../img/,,' \
+  | while read image; do
+    [[ -f "img/$image" ]] && continue
+    status "    image: %s" "$image"
+    mkdir -p "$(dirname "img/$image")"
+    >"img/$image" curl --silent "http://narbonic.com/wordpress/wp-content/uploads/$image"
+  done
+}
+
+#### Converting the raw HTML into with and without-commentary versions ####
+
+# prepare-page <id> <title>
+# Given a cache ID, generate one or more output pages in html/ based on the
+# contents of the cached file and whether commentary=on.
+# Emits the paths to all the generated files on stdout.
+function prepare-page {
+  if [[ $commentary = on ]]; then
+    extract-commentary "$1" "$2"
+  else
+    local outfile="$(printf "%s/%03d %s %s.html" "$outdir" "$page" "$1" "$2")"
+    [[ "cache/$1" -ot "$outfile" ]] && return 0
+    status "     prepare: %s" "$1"
+    wring html "cache/$1" .comic-strip-image >"$outfile"
+  fi
+}
+
+# extract-commentary <id> <title>
+# Used by prepare-page to generate multiple subpages for pages with commentary.
+function extract-commentary {
+  local subpage=1
+  cat "cache/$1" | egrep -o "comic-strip-container-[0-9]+" | while read id; do
+    local outfile="$(printf "%s/%03d.%02d %s %s.html" "$outdir" "$page" "$subpage" "$1" "$2")"
+    ((++subpage))
+    [[ "cache/$1" -ot "$outfile" ]] && continue
+    status "    prepare: %s/%02d" "$1" "$subpage"
+    wring html "cache/$1" "#$id" > "$outfile"
+  done
+}
+
+# render-pages <title>
+# render all HTML pages in html/<title>/ into pages/<title>
+# controlled by format=
+function render-pages {
+  mkdir -p "pages/$1"
+  ls "html/$1" | while read html; do
+    local outfile="pages/$1/${html%.html}.$format"
+    [[ "html/$1/$html" -ot "$outfile" ]] && continue
+    status "  render: %s" "${html%.html}"
+    wkhtmltoimage --quiet --width 400 --quality 100 \
+      --format "$format" \
+      "html/$1/$html" \
+      "$outfile"
+  done
+}
+
+#### Music downloads ####
+
+function download-music {
+  echo "Downloading music..."
+  mkdir -p music
+  for track in 2009/08/MadbloodBattleAnthem.mp3 2011/08/Narbonic_Battle.mp3 2013/05/epilogue.mp3; do
+    [[ -f music/"$(basename $track)" ]] && continue
+    curl --silent -o music/"$(basename $track)" \
+      http://narbonic.com/wordpress/wp-content/uploads/$track
+  done
+}
+
+main "$@"
+
+# Note: sometimes `wring` silently fails to download a page and emits a blank
+# file. To fix this, run:
+#   find html/orig/ -type f -name '*PAGE*' -print0 \
+#   | xargs -0 fgrep -L 'comic-strip-container' \
+#   | xargs -d\\n -r rm -v
+# Which will delete the broken files and force the builder to redownload them.
+# If you can run this with no output, there's nothing to fix.
+# The script *should* detect and handle this automatically, but this command
+# is included just in case.
