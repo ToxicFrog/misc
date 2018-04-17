@@ -12,7 +12,7 @@ gc=off
 # Games we are currently playing have highest priority.
 # Age/order of addition doesn't affect sort order.
 urgency.active.coefficient=1024
-urgency.age.coefficient=0
+urgency.age.coefficient=-1
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
 
@@ -24,7 +24,8 @@ color.uda.gamestate.completed=rgb551
 color.uda.gamestate.mastered=rgb025
 color.uda.gamestate.null=rgb211
 color.tagged=
-
+color.active=
+color.tag.ACTIVE=on rgb100
 
 # UDAs
 uda.gamestate.label=Play Status
