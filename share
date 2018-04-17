@@ -1,72 +1,39 @@
 #!/usr/bin/env zsh
 #
 # share -- ipfs-based file sharing
-# Assumptions: IPFS node accessible at https://<fqdn>/ipfs/
 #
-# share <path>
-# share -u <path>
-# share -l
+# Can share individual files, directories, or ad hoc collections of files and/or
+# directories (which will be automatically wrapped in a directory).
 #
-# Commands:
-# - share snapshot of file
-# - share snapshot of directory
-# - share updateable directory and publish via IPNS
-# - unshare any of the above
-#
-# Note that the command `unshare` is already in use.
-#
-# Open questions:
-# - what happens if I share a file, modify it, share it again, then unshare it?
+# See `share help` for usage information.
 
-# Idea: all sharing is by name (IPNS).
-# Shares are tied to paths.
-# `unshare path`:
-# - get key name
-# - if key doesn't exist, nothing to do
-# - if key does exist, resolve it and unpin the corresponding object
-# - then unpublish the name and delete the key
-
-# possible share modes:
-# share a single file (wrapped in a directory)
-# share a single directory
-# share a set of files
-# to support the latter, we need to have a "share list" mode that lists all contents
-# to support unsharing, we need to be able to map from share name to IPFS path
-
-# share -> files: ipfs file ls <id>
-# key needs to encode both share name and share ID
-# so:
-# key format is <id>:<share name>, with slashes escaped in the latter case
-# for single file or whole directory shares, the share name is the path
-# for mixed file shares, the share name is $(dirname /path/to/$1)/[n files]
-
-# To create a share:
-# ipfs add the data, using -w if it's a file or multiple arguments are specified
-# the last line from ipfs add is the ID; save that
-# generate the share name
-# generate the key as ID:name
-# ipns-publish the ID using the key
-
-# To list shares:
-# list all keys, split into ID and name, fixup name
-# if a pattern is specified: list all keys, grep for pattern, split,
-#   ipfs ls <id>
-
-# To refresh shares:
-# list all keys [matching pattern]; foreach key, extract id and ipns publish
-
-# To remove shares:
-# get key from share name or ID
-# unpin ID
-# remove key
-# unpin first so we can't end up leaking objects
+# Future work: support sharing by IPNS. (This is why share state is maintained
+# in the IPFS keystore). Currently it's disabled because private IPFS swarms
+# don't support IPNS.
 
 set -e
+
+# Override these settings in ~/.config/ipfs-share if desired.
+
+# IPFS_PATH=/path/to/ipfs/dir
+
+# If running a public node, replacing this with the URL of a gateway closer
+# to your node is recommended for performance reasons.
+# If running a private node you MUST replace this with the URL of a gateway
+# connected to your private swarm.
+IPFS_GATEWAY=https://gateway.ipfs.io
+
+# If you are running a private swarm you must disable this.
+ENABLE_IPNS=1
+
+if [[ -f ~/.config/ipfs-share ]]; then
+  source ~/.config/ipfs-share
+fi
 
 function share/main {
   local cmd="$1"; shift
   case $cmd in
-    add|ls|rm|help) share/cmd-$cmd "$@" ;;
+    add|ls|rm|gc|help) share/cmd-$cmd "$@" ;;
     *)
       share/die "Unknown command '$cmd'. Try '$0 help'." ;;
   esac
@@ -83,7 +50,9 @@ function share/cmd-help {
     "  $0 ls [pattern]"\
     "    List all shares. With <pattern>, list only matching shares and their contents."\
     "  $0 rm [pattern]"\
-    "    Remove all shares matching <pattern>."
+    "    Remove all shares matching <pattern>."\
+    "  $0 gc"\
+    "    Delete from IPFS data associated with shares that have been removed."
     # "  $0 refresh [pattern]"\
     # "    Refresh expired shares so they become accessible again."\
 }
@@ -106,7 +75,7 @@ function share/cmd-add {
     hash=$(ipfs add -r -Q --progress -w "$@")
   fi
   printf 'Name: %s\n' $name
-  printf 'IPFS: http://%s/ipfs/%s\n' $(hostname -f) $hash
+  printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
 
   # Generate key based on ipfs hash and share name.
   local keyname="$(echo $name | tr / '\\')"
@@ -118,7 +87,9 @@ function share/cmd-add {
     # Key already exists with matching hash.
     # Refresh IPNS and return.
     # TODO: IPNS doesn't work at all with private nodes.
-    # printf 'IPNS: https://%s/ipns/%s' $(hostname -f) $(share/publish $key $hash)
+    if (( ENABLE_IPNS )); then
+      printf 'IPNS: %s/ipns/%s' $IPFS_GATEWAY $(share/publish $key $hash)
+    fi
     return 0
   fi
 
@@ -133,11 +104,10 @@ function share/cmd-add {
   fi
 
   # Key does not exist (or we just deleted it).
-  local ipns=$(ipfs key gen --type=rsa --size=2048 "$key")
-  printf "IPNS: %s (not currently supported)\n" $ipns
-
-  # TODO: IPNS doesn't work at all with private nodes.
-  # printf 'IPNS: https://%s/ipns/%s\nPublishing...' $(hostname -f) $ipns
+  ipfs key gen --type=rsa --size=2048 "$key" >/dev/null
+  if (( ENABLE_IPNS )); then
+    printf 'IPNS: %s/ipns/%s' $IPFS_GATEWAY $(share/publish $key $hash)
+  fi
 }
 
 function share/paths-to-name {
@@ -192,8 +162,10 @@ function share/cmd-ls/contents {
   while IFS=' :' read -r ipns ipfs name; do
     printf '\n'
     printf 'Name: %s\n' $(printf '%s' $name | tr '\\' /)
-    printf 'IPFS: http://%s/ipfs/%s\n' $(hostname -f) $ipfs
-    # printf 'IPNS: http://%s/ipns/%s\n' $(hostname -f) $ipns
+    printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $ipfs
+    if (( ENABLE_IPNS )); then
+      printf 'IPNS: %s/ipns/%s\n' $IPFS_GATEWAY $ipns
+    fi
     ipfs ls $ipfs | tr -s ' ' | cut -d' ' -f3- | sed -E 's,^,    ,'
   done
 }
@@ -217,6 +189,10 @@ function share/cmd-rm {
 
 function share/hash-to-key {
   ipfs key list | egrep "^$1:"
+}
+
+function share/cmd-gc {
+  ipfs repo gc
 }
 
 exec share/main "$@"
