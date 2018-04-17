@@ -8,6 +8,13 @@ format=jpeg
 # e.g: chapter Extras; commentary=on
 default_commentary=on
 
+# Whether to include extra content: fan submissions, mailbags, con reports, and
+# other content not part of the comic proper.
+# Note that this relies on the extra content chapters being titled "Extras".
+# If you rename them "Extra Content" or something, this toggle will be stuck
+# "on". TODO: fix this.
+include_extras=on
+
 ## Primary run of Narbonic: Director's Cut
 
 volume "Narbonic+ Volume 01"

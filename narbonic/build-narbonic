@@ -71,6 +71,7 @@ outdir=""
 default_commentary=off
 commentary=off
 page=0
+skip_pages=no
 
 function die {
   echo "Error reading narbonic.index: $@" >&2
@@ -89,8 +90,14 @@ function volume {
 
 function chapter {
   [[ $title ]] || die "'chapter $@' outside a volume!"
-  ((++page))
   commentary=$default_commentary
+  if [[ "$1" == "Extras" && "$include_extras" == "no" ]]; then
+    skip_pages=yes
+    return
+  else
+    skip_pages=no
+  fi
+  ((++page))
   status '  p.%03d - %s\n' "$page" "$1"
   local outfile="$(printf "%s/%03d CHAPTER %s.html" "$outdir" "$page" "$1")"
   [[ -f "$outfile" ]] || printf "$CHAPTER_TEMPLATE" "$1" "$1" > "$outfile"
@@ -99,6 +106,7 @@ function chapter {
 # page <id> <title>
 function page {
   [[ $title ]] || die "'page $@' outside a volume!"
+  [[ $skip_pages == yes ]] && return
   ((++page))
   fetch-page "$1"
   prepare-page "$1" "$2"
