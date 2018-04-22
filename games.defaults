@@ -24,8 +24,8 @@ color.uda.gamestate.completed=rgb551
 color.uda.gamestate.mastered=rgb025
 color.uda.gamestate.null=rgb211
 color.tagged=
-color.active=
-color.tag.ACTIVE=on rgb100
+color.active=on rgb100
+#color.tag.ACTIVE=
 
 # UDAs
 uda.gamestate.label=Play Status
