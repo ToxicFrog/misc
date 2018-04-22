@@ -15,16 +15,16 @@ set -e
 
 # Override these settings in ~/.config/ipfs-share if desired.
 
-# IPFS_PATH=/path/to/ipfs/dir
+# export IPFS_PATH=/path/to/ipfs/dir
 
 # If running a public node, replacing this with the URL of a gateway closer
 # to your node is recommended for performance reasons.
 # If running a private node you MUST replace this with the URL of a gateway
 # connected to your private swarm.
-IPFS_GATEWAY=https://gateway.ipfs.io
+export IPFS_GATEWAY=https://gateway.ipfs.io
 
 # If you are running a private swarm you must disable this.
-ENABLE_IPNS=1
+export ENABLE_IPNS=1
 
 if [[ -f ~/.config/ipfs-share ]]; then
   source ~/.config/ipfs-share
@@ -98,7 +98,7 @@ function share/cmd-add {
     # Key exists with different hash.
     # Unpin the old hash and delete the key.
     local old_key="$old_hash:$keyname"
-    ipfs pin rm $old_hash
+    ipfs pin rm $old_hash || printf 'Warning -- failed to unpin old data.\n' >&2
     ipfs key rm $old_key
     # ipfs repo gc
   fi
@@ -113,7 +113,7 @@ function share/cmd-add {
 function share/paths-to-name {
   if [[ $# == 1 ]]; then
     if [[ -d "$1" ]]; then
-      printf "%s/" $(realpath "$1")
+      printf "%s/" "$(realpath "$1")"
     else
       realpath "$1"
     fi
@@ -161,7 +161,7 @@ function share/cmd-ls {
 function share/cmd-ls/contents {
   while IFS=' :' read -r ipns ipfs name; do
     printf '\n'
-    printf 'Name: %s\n' $(printf '%s' $name | tr '\\' /)
+    printf 'Name: %s\n' "$(printf '%s' $name | tr '\\' /)"
     printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $ipfs
     if (( ENABLE_IPNS )); then
       printf 'IPNS: %s/ipns/%s\n' $IPFS_GATEWAY $ipns
