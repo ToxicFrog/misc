@@ -15,17 +15,18 @@ set -e
 
 # Override these settings in ~/.config/ipfs-share if desired.
 
-# export IPFS_PATH=/path/to/ipfs/dir
 export IPFS_PATH
+# export IPFS_PATH=/path/to/ipfs/dir
 
 # If running a public node, replacing this with the URL of a gateway closer
 # to your node is recommended for performance reasons.
 # If running a private node you MUST replace this with the URL of a gateway
 # connected to your private swarm.
 export IPFS_GATEWAY=https://gateway.ipfs.io
+# export IPFS_GATEWAY=https://$(hostname -f)
 
-# If you are running a private swarm you must disable this.
-export ENABLE_IPNS=1
+# Not currently supported.
+#export ENABLE_IPNS=0
 
 if [[ -f ~/.config/ipfs-share ]]; then
   source ~/.config/ipfs-share
@@ -67,15 +68,17 @@ function share/die {
 # If a single directory is specified, shares that directory as is.
 # If a single file or multiple arguments are specified, wraps them in a directory
 # (using -w) and shares that.
+# N.b. it is not pinned, because the MFS root is considered a GC root as well,
+# so as long as it's referenced by /.shares it won't be garbage collected.
 function share/cmd-add {
   local name=$(share/paths-to-name "$@")
   printf 'Name: %s\n' $name
   local hash
   if [[ $# == 1 && -d "$1" ]]; then
-    hash=$(ipfs add -r -Q --progress "$1")
+    hash=$(ipfs add --pin=false -r -Q --progress "$1")
     printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
   else
-    hash=$(ipfs add -r -Q --progress -w "$@")
+    hash=$(ipfs add --pin=false -r -Q --progress -w "$@")
     if [[ $# == 1 ]]; then
       printf 'IPFS: %s/ipfs/%s/%s\n' $IPFS_GATEWAY $hash "$(basename $1 | sed 's, ,%20,g')"
     else
@@ -83,37 +86,11 @@ function share/cmd-add {
     fi
   fi
 
-  # Generate key based on ipfs hash and share name.
-  local keyname="$(echo $name | tr / '\\')"
-  local key="$hash:$keyname"
-
-  # If a key already exists for this path with a matching hash, nothing to do
-  # except refresh IPNS and return.
-  if ipfs key list | fgrep -qx "$key"; then
-    # Key already exists with matching hash.
-    # Refresh IPNS and return.
-    # TODO: IPNS doesn't work at all with private nodes.
-    if (( ENABLE_IPNS )); then
-      printf 'IPNS: %s/ipns/%s' $IPFS_GATEWAY $(share/publish $key $hash)
-    fi
-    return 0
+  if ipfs files ls /.share | fgrep -qx "$name"; then
+    # We have an existing share with this name. Delete and recreate it.
+    ipfs files rm -r /.shares/$name
   fi
-
-  local old_hash=$(share/name-to-hash "$name")
-  if [[ $old_hash ]]; then
-    # Key exists with different hash.
-    # Unpin the old hash and delete the key.
-    local old_key="$old_hash:$keyname"
-    ipfs pin rm $old_hash || printf 'Warning -- failed to unpin old data.\n' >&2
-    ipfs key rm $old_key
-    # ipfs repo gc
-  fi
-
-  # Key does not exist (or we just deleted it).
-  ipfs key gen --type=rsa --size=2048 "$key" >/dev/null
-  if (( ENABLE_IPNS )); then
-    printf 'IPNS: %s/ipns/%s' $IPFS_GATEWAY $(share/publish $key $hash)
-  fi
+  ipfs files cp /ipfs/$hash /.shares/$name
 }
 
 function share/paths-to-name {
@@ -135,44 +112,29 @@ function share/paths-to-name {
   fi
 }
 
-function share/publish {
-  ipfs name publish --resolve=false --key="$1" "$2" | egrep -o '[^/]+$'
-}
-
-# Given a share name, look up the existing hash for it in the IPNS keystore.
-function share/name-to-hash {
-  local keyname="${1//\//\\}"
-  ipfs key list | fgrep ":$keyname" | while IFS=: read -r hash name; do
-    if [[ $name == "$keyname" ]]; then
-      printf '%s' $hash
-      return 0
-    fi
-  done
-  return 1
-}
-
 # List all shares by name.
 # If no arguments specified, lists all shares with their hashes.
 # If arguments specified, shows only shares matching those args (as `grep`) and
 # lists their name, IPFS path, IPNS path, and contents.
 function share/cmd-ls {
   if [[ $1 ]]; then
-    ipfs key list -l | egrep -v ' self *$' | grep "$@" | share/cmd-ls/contents
+    ipfs files ls /.shares | grep "$@" | share/cmd-ls/contents
   else
-    ipfs key list | fgrep -xv self | sed -E $'s,:,\t,' | tr '\\' / # $'\x16'
+    ipfs files ls /.shares | tr '\\' /
   fi
 }
 
 # Read keys from stdin and list their names, IPFS/IPNS paths and contents.
 function share/cmd-ls/contents {
-  while IFS=' :' read -r ipns ipfs name; do
+  while read -r name; do
+    local hash=$(ipfs files stat --hash /.shares/$name)
     printf '\n'
     printf 'Name: %s\n' "$(printf '%s' $name | tr '\\' /)"
-    printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $ipfs
-    if (( ENABLE_IPNS )); then
-      printf 'IPNS: %s/ipns/%s\n' $IPFS_GATEWAY $ipns
-    fi
-    ipfs ls $ipfs | tr -s ' ' | cut -d' ' -f3- | sed -E 's,^,    ,'
+    printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
+    # if (( ENABLE_IPNS )); then
+    #   printf 'IPNS: %s/ipns/%s\n' $IPFS_GATEWAY $ipns
+    # fi
+    ipfs files ls /.shares/$name | sed -E 's,^,    ,'
   done
 }
 
@@ -180,21 +142,12 @@ function share/cmd-ls/contents {
 # Remove share matching the given name or ID.
 # No globbing/regex support yet.
 function share/cmd-rm {
-  local key
+  local name
   while [[ $1 ]]; do
-    key="$1"
-    if [[ $key == /* ]]; then
-      key=$(share/name-to-hash $key || share/die "No share found with name $key")
-    fi
-    key="$(share/hash-to-key $key || share/die "No share found with hash $key")"
-    ipfs pin rm "$(printf '%s' $key | cut -d: -f1)"
-    ipfs key rm $key
+    name="$(echo "$1" | tr / '\\')"
+    ipfs files rm -r /.shares/"$name"
     shift
   done
-}
-
-function share/hash-to-key {
-  ipfs key list | egrep "^$1:"
 }
 
 function share/cmd-gc {
