@@ -35,7 +35,7 @@ fi
 function share/main {
   local cmd="$1"; shift
   case $cmd in
-    add|ls|rm|gc|help) share/cmd-$cmd "$@" ;;
+    add|add-zip|ls|rm|gc|help) share/cmd-$cmd "$@" ;;
     *)
       share/die "Unknown command '$cmd'. Try '$0 help'." ;;
   esac
@@ -49,6 +49,8 @@ function share/cmd-help {
     "    Share a directory and everything in it."\
     "  $0 add <list of files/dirs>"\
     "    Create a shared directory containing the listed files/dirs."\
+    "  $0 add-zip <name> <list of files/dirs>"\
+    "    Like add, but creates a zip file with the given name and shares that instead."\
     "  $0 ls [pattern]"\
     "    List all shares. With <pattern>, list only matching shares and their contents."\
     "  $0 rm [pattern]"\
@@ -91,6 +93,19 @@ function share/cmd-add {
     ipfs files rm -r /.shares/$name
   fi
   ipfs files cp /ipfs/$hash /.shares/$name
+}
+
+function share/cmd-add-zip {
+  local zipname="$1"; shift
+  if [[ $zipname =~ / ]] || [[ $zipname != *.zip ]]; then
+    share/die "The first argument to add-zip must be a .zip file name with no slashes."
+  fi
+  printf 'Name: %s\n' "$zipname"
+  local hash=$(zip -q -0 -r - "$@" | ipfs add --pin=false -Q --progress)
+  ipfs files mkdir /.shares/$zipname
+  ipfs files cp /ipfs/$hash /.shares/$zipname/$zipname
+  local dirhash=$(ipfs files stat --hash /.shares/$zipname)
+  printf 'IPFS: %s/ipfs/%s/%s\n' $IPFS_GATEWAY $dirhash $zipname
 }
 
 function share/paths-to-name {
