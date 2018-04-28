@@ -16,6 +16,7 @@ set -e
 # Override these settings in ~/.config/ipfs-share if desired.
 
 # export IPFS_PATH=/path/to/ipfs/dir
+export IPFS_PATH
 
 # If running a public node, replacing this with the URL of a gateway closer
 # to your node is recommended for performance reasons.
@@ -68,14 +69,19 @@ function share/die {
 # (using -w) and shares that.
 function share/cmd-add {
   local name=$(share/paths-to-name "$@")
+  printf 'Name: %s\n' $name
   local hash
   if [[ $# == 1 && -d "$1" ]]; then
     hash=$(ipfs add -r -Q --progress "$1")
+    printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
   else
     hash=$(ipfs add -r -Q --progress -w "$@")
+    if [[ $# == 1 ]]; then
+      printf 'IPFS: %s/ipfs/%s/%s\n' $IPFS_GATEWAY $hash "$(basename $1 | sed 's, ,%20,g')"
+    else
+      printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
+    fi
   fi
-  printf 'Name: %s\n' $name
-  printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
 
   # Generate key based on ipfs hash and share name.
   local keyname="$(echo $name | tr / '\\')"
