@@ -70,11 +70,11 @@ task/register grep '^grep' books/grep <<EOF
 
 Display books where the author or description match the given pattern (as a
 case-insensitive regex) in the given report format; if not specified, the report
-defaults to "all".
+defaults to "all". Unlike other commands, searches all years by default.
 EOF
 function books/grep {
   shift
-  \task rc.regex:yes rc.search.case.sensitive:no \
+  \task rc.regex:yes rc.search.case.sensitive:no rc.context: \
     "( author ~ '$1' or desc ~ '$1' )" "${2:=all}"
 }
 
