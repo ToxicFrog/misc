@@ -88,11 +88,12 @@ function share/cmd-add {
     fi
   fi
 
-  if ipfs files ls /.share | fgrep -qx "$name"; then
+  local munged_name="$(echo "$name" | tr / '\\')"
+  if ipfs files ls /.shares | fgrep -qx "$munged_name"; then
     # We have an existing share with this name. Delete and recreate it.
-    ipfs files rm -r /.shares/$name
+    ipfs files rm -r /.shares/$munged_name
   fi
-  ipfs files cp /ipfs/$hash /.shares/$name
+  ipfs files cp /ipfs/$hash /.shares/$munged_name
 }
 
 function share/cmd-add-zip {
