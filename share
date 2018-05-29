@@ -41,6 +41,8 @@ function share/main {
   esac
 }
 
+## share help [command]
+# List available commands, or display help for a specific command.
 function share/cmd-help {
   printf '%s\n'\
     "$0 -- a simple file sharing interface on top of ipfs."\
@@ -66,6 +68,9 @@ function share/die {
   exit 1
 }
 
+## share add <file>
+## share add <directory>
+## share add <multiple files and/or directories...>
 # Add a share.
 # If a single directory is specified, shares that directory as is.
 # If a single file or multiple arguments are specified, wraps them in a directory
@@ -89,11 +94,25 @@ function share/cmd-add {
   fi
 
   local munged_name="$(echo "$name" | tr / '\\')"
-  if ipfs files ls /.shares | fgrep -qx "$munged_name"; then
-    # We have an existing share with this name. Delete and recreate it.
-    ipfs files rm -r /.shares/$munged_name
+  ipfs files mkdir -p /.old-shares/$munged_name
+  if share/exists $munged_name; then
+    share/archive $munged_name
   fi
   ipfs files cp /ipfs/$hash /.shares/$munged_name
+}
+
+# share/exists name
+# true if a share with that name exists
+function share/exists {
+  ipfs files ls /.shares | fgrep -qx "$1"
+}
+
+# share/archive name
+# archive a share to /.old-shares/$name/$date
+# this ensures that links to old versions of the share will continue to work
+# even if garbage collection runs.
+function share/archive {
+  ipfs files mv /.shares/$1 /.old-shares/$1/"$(date +'%Y-%m-%d %H:%M:%S')"
 }
 
 function share/cmd-add-zip {
@@ -103,6 +122,10 @@ function share/cmd-add-zip {
   fi
   printf 'Name: %s\n' "$zipname"
   local hash=$(zip -q -0 -r - "$@" | ipfs add --pin=false -Q --progress)
+  ipfs files mkdir -p /.old-shares/$munged_name
+  if share/exists $zipname; then
+    share/archive $zipname
+  fi
   ipfs files mkdir /.shares/$zipname
   ipfs files cp /ipfs/$hash /.shares/$zipname/$zipname
   local dirhash=$(ipfs files stat --hash /.shares/$zipname)
@@ -147,9 +170,9 @@ function share/cmd-ls/contents {
     printf '\n'
     printf 'Name: %s\n' "$(printf '%s' $name | tr '\\' /)"
     printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
-    # if (( ENABLE_IPNS )); then
-    #   printf 'IPNS: %s/ipns/%s\n' $IPFS_GATEWAY $ipns
-    # fi
+    if ipfs files ls /.old-shares | fgrep -qx $name; then
+      printf 'Old versions: %d\n' "$(ipfs files ls /.old-shares/$name | wc -l)"
+    fi
     ipfs files ls /.shares/$name | sed -E 's,^,    ,'
   done
 }
@@ -161,7 +184,11 @@ function share/cmd-rm {
   local name
   while [[ $1 ]]; do
     name="$(echo "$1" | tr / '\\')"
+    if ! ipfs files ls /.shares | fgrep -qx "$name"; then
+      share/die "No share found with name '$1'."
+    fi
     ipfs files rm -r /.shares/"$name"
+    ipfs files rm -r /.old-shares/"$name"
     shift
   done
 }
