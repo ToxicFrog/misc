@@ -10,6 +10,7 @@ gc=off
 # Stop colourizing books just because they have tags.
 color.tagged=
 color.tag.ANNOTATED=rgb243
+color.blocking=on rgb001
 
 # Books we are currently reading get listed first.
 # More recent books are listed earlier.
@@ -17,6 +18,7 @@ urgency.active.coefficient=1024
 urgency.age.coefficient=-0.1
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
+urgency.blocking.coefficient=0
 
 dateformat.annotation=<>
 
@@ -41,7 +43,7 @@ report.next.description=Unread and in progress books
 report.next.columns=id,genre,gender,author,description,tags,start.age
 report.next.labels=ID,Genre,⚥,Author,Title,Tags,Reading
 report.next.sort=urgency-,start+,author+,description+
-report.next.filter=status:pending
+report.next.filter=status:pending -BLOCKED
 
 ## List: concise list of finished and in progress books.
 report.list.description=Finished and in progress books

@@ -187,4 +187,28 @@ function books/export {
   printf '</table>\n'
 }
 
+task/register set-series '^set-series' books/set-series <<EOF
+
+  $NAME set-series <series name> ID [ID...]
+
+Mark the given books as belonging to the named series, in that order.
+This doesn't do any sort of series numbering; it just indicates that the first
+listed book needs to be read before the second, and that on before the third,
+and so forth. Only the next unread book in the series will show up in
+'books next'.
+
+Internally, the project: field is used for the series name, and depends: for the
+ordering information.
+EOF
+function books/set-series {
+  shift
+  local series="$1"; shift
+  local prev="$1"; shift
+  while [[ $1 ]]; do
+    \task modify $1 depends:$prev project:"$series"
+    prev="$1"
+    shift
+  done
+}
+
 exec main "$@"
