@@ -107,8 +107,14 @@ function task/select {
     "$@" list
 }
 
-# year-filter <year>
-# returns a taskwarrior filter clause that shows only tasks from the given year.
+# year-filter <year range>
+# returns a taskwarrior filter clause that shows only tasks from the given year
+# range. A range can be any of:
+#  2014         tasks from 2014 only
+#  2014-2016    tasks from 2014, 2015, or 2016
+#  2014-        tasks from 2014 to the present
+#      -2016    tasks from the beginning of time to the end of 2016
+#
 # "from $YEAR", in practice, means:
 # - is finished, and was finished during $YEAR, OR
 # - is started, and was started during or before $YEAR, OR
@@ -116,9 +122,32 @@ function task/select {
 # In effect, this means "tasks that were finished during $YEAR, or were pending
 # or in-progress for at least part of $YEAR."
 function task/year-filter {
-  local isfinished="( +COMPLETED and end.after:$1-01-01 and end.before:$(($1+1))-01-01 )"
-  local isactive="( +ACTIVE and start.before:$(($1+1))-01-01 )"
-  local ispending="( +PENDING and -ACTIVE and entered.before:$(($1+1))-01-01 )"
+  local start end
+  case "$1" in
+    *-)
+      start="${1%-}-01-01"
+      end="2099-01-01"
+      ;;
+    -*)
+      start="1985-01-01"
+      end="$((${1#-}+1))-01-01"
+      ;;
+    *-*)
+      start="${1%-*}-01-01"
+      end="$((${1#*-}+1))-01-01"
+      ;;
+    *)
+      start="$1-01-01"
+      end="$(($1+1))-01-01"
+      ;;
+  esac
+  # Items that were completed within the given date range.
+  local isfinished="( +COMPLETED and end.after:$start and end.before:$end )"
+  # Items that are active, and were active during the given date range.
+  local isactive="( +ACTIVE and start.before:$end )"
+  # Items that are not yet started, and existed during the given date range.
+  local ispending="( +PENDING and -ACTIVE and entered.before:$end )"
+  echo "year-filter: $start $end" >&2
   echo -n "( $isfinished or $isactive or $ispending )"
 }
 
