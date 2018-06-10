@@ -10,6 +10,9 @@
 # Note that the local and remote directories are always in the same order, regardless
 # of which one is the source and which one is the destination.
 
+# n.b. if any of your filenames have newlines in them you're going to have a
+# really bad time.
+
 set -e
 
 function shsync/main {
@@ -27,13 +30,11 @@ function shsync/main {
     send)
       shsync/sync "$local_path" "$remote_path" \
         shsync/list-local shsync/list-remote \
-        shsync/stat-local shsync/stat-remote \
         shsync/send-file shsync/delete-remote
       ;;
     recv)
       shsync/sync "$remote_path" "$local_path" \
         shsync/list-remote shsync/list-local \
-        shsync/stat-remote shsync/stat-local \
         shsync/recv-file shsync/delete-local
       ;;
     *)
@@ -45,7 +46,6 @@ function shsync/main {
 
 # shsync/sync <src path> <dst path> \
 #  <src path lister> <dst path lister> \
-#  <src statter> <dst statter> \
 #  <file copier> <file deleter>
 # underlying high-order function to do the actual sync
 # takes as arguments the source and destination paths and the remote name
@@ -55,14 +55,13 @@ function shsync/main {
 function shsync/sync {
   local src="$1" dst="$2" \
     list_src="$3" list_dst="$4" \
-    stat_src="$5" stat_dst="$6" \
-    sync_file="$7" delete_file="$8"
+    sync_file="$5" delete_file="$6"
 
   # Populate destination file list first, since we don't care about ordering.
-  local -A dst_files
   status "Listing destination files..."
-  $list_dst $dst | while read file; do
-    dst_files[$file]=.
+  local -A dst_files
+  $list_dst $dst | while read stat file; do
+    dst_files[${file#./}]="$stat"
   done
   status 'Listing destination files: %d\n' "${#dst_files}"
 
@@ -71,20 +70,19 @@ function shsync/sync {
   # things go quite badly indeed.
   # TODO: fix this.
   status "Listing source files..."
-  IFS=$'\n'
-  local -a src_files=( $($list_src $src) )
-  unset IFS
+  local -A src_files
+  $list_src $src | while read stat file; do
+    src_files[${file#./}]="$stat"
+  done
   status 'Listing source files: %d\n' "${#src_files}"
 
   local n=0
   # $list_src $src | while read file; do
-  for file in "${src_files[@]}"; do
+  for file in "${(k)src_files[@]}"; do
     status 'Checking files: %d' "$((++n))"
     if [[ ${dst_files[$file]} ]]; then
       # check if files are equivalent and sync if not
-      local srcstat="$($stat_src "$src/$file")"
-      local dststat="$($stat_dst "$dst/$file")"
-      if [[ $srcstat != $dststat ]]; then
+      if [[ ${dst_files[$file]} != ${src_files[$file]} ]]; then
         status '> %s\n' "$file"
         $sync_file "$src" "$dst" "$file"
       fi
@@ -115,21 +113,15 @@ function status {
 }
 
 # list-files absolute-path
+# outputs the list with the following format:
+# SIZE <sp> MODIFICATION_TIME <sp> FILENAME <lf>
 function shsync/list-local {
-  find "$1" -type f -printf '%P\n'
+  find . -type f -print0 | xargs -0 stat -c '%s:%Y %n'
 }
 
 function shsync/list-remote {
-  ssh $REMOTE "cd ${(q)1}; find . -type f" | sed -E 's,^\./,,'
-}
-
-# stat-file absolute-path
-function shsync/stat-local {
-  stat -c "%s %Y" "$1"
-}
-
-function shsync/stat-remote {
-  ssh $REMOTE "stat -c '%s %Y' ${(q)1}"
+  # ssh $REMOTE "cd ${(q)1}; find . -type f" | sed -E 's,^\./,,'
+  ssh $REMOTE "cd ${(q)1}; find . -type f -print0 | xargs -0 stat -c '%s:%Y %n'"
 }
 
 # sync-file src-path dst-path relative-path
