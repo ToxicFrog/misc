@@ -147,7 +147,6 @@ function task/year-filter {
   local isactive="( +ACTIVE and start.before:$end )"
   # Items that are not yet started, and existed during the given date range.
   local ispending="( +PENDING and -ACTIVE and entered.before:$end )"
-  echo "year-filter: $start $end" >&2
   echo -n "( $isfinished or $isactive or $ispending )"
 }
 
