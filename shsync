@@ -1,0 +1,163 @@
+#!/usr/bin/env zsh
+
+# Tool for primitive syncing, roughly equivalent to `rsync -tr --delete`, between
+# two systems using only ssh, find, stat, and tar on the remote system.
+# This is useful for downloading/uploading files from a remote system that has
+# very limited utilities installed, and in particular doesn't support rsync, scp
+# or sftp.
+
+# Usage: shsync <send/recv> <localdir> <remotedir> <user@remotehost>
+# Note that the local and remote directories are always in the same order, regardless
+# of which one is the source and which one is the destination.
+
+set -e
+
+function shsync/main {
+  if [[ $1 == "-n" ]]; then
+    local DRY_RUN=1
+    shift
+  fi
+  local op="$1"
+  local local_path="$2"
+  local remote_path="$3"
+  local REMOTE="$4"
+
+  cd "$local_path"
+  case $op in
+    send)
+      shsync/sync "$local_path" "$remote_path" \
+        shsync/list-local shsync/list-remote \
+        shsync/stat-local shsync/stat-remote \
+        shsync/send-file shsync/delete-remote
+      ;;
+    recv)
+      shsync/sync "$remote_path" "$local_path" \
+        shsync/list-remote shsync/list-local \
+        shsync/stat-remote shsync/stat-local \
+        shsync/recv-file shsync/delete-local
+      ;;
+    *)
+      >&2 echo "Usage: shsync <send/recv> <local path> <remote path> <user@host>"
+      exit 1
+      ;;
+  esac
+}
+
+# shsync/sync <src path> <dst path> \
+#  <src path lister> <dst path lister> \
+#  <src statter> <dst statter> \
+#  <file copier> <file deleter>
+# underlying high-order function to do the actual sync
+# takes as arguments the source and destination paths and the remote name
+# function names to list the source and destination
+# function names to stat individual files on the source and destination
+# and a function to copy files from src to dst
+function shsync/sync {
+  local src="$1" dst="$2" \
+    list_src="$3" list_dst="$4" \
+    stat_src="$5" stat_dst="$6" \
+    sync_file="$7" delete_file="$8"
+
+  # Populate destination file list first, since we don't care about ordering.
+  local -A dst_files
+  status "Listing destination files..."
+  $list_dst $dst | while read file; do
+    dst_files[$file]=.
+  done
+  status 'Listing destination files: %d\n' "${#dst_files}"
+
+  # Read the whole source file list up front because, for some reason, if we
+  # try to stream it the ssh connection terminates after the first line and
+  # things go quite badly indeed.
+  # TODO: fix this.
+  status "Listing source files..."
+  IFS=$'\n'
+  local -a src_files=( $($list_src $src) )
+  unset IFS
+  status 'Listing source files: %d\n' "${#src_files}"
+
+  local n=0
+  # $list_src $src | while read file; do
+  for file in "${src_files[@]}"; do
+    status 'Checking files: %d' "$((++n))"
+    if [[ ${dst_files[$file]} ]]; then
+      # check if files are equivalent and sync if not
+      local srcstat="$($stat_src "$src/$file")"
+      local dststat="$($stat_dst "$dst/$file")"
+      if [[ $srcstat != $dststat ]]; then
+        status '> %s\n' "$file"
+        $sync_file "$src" "$dst" "$file"
+      fi
+      unset "dst_files[$file]"
+    else
+      status '+ %s\n' "$file"
+      $sync_file "$src" "$dst" "$file"
+    fi
+  done
+
+  # delete files on sender not on receiver
+  for file in ${(k)dst_files[@]}; do
+    status '- %s\n' "$file"
+    if [[ ! $DRY_RUN ]]; then
+      $delete_file "$dst/$file"
+    fi
+  done
+
+  # clean up empty directories
+  # status "Cleaning empty directories..."
+  # find $dst -type d -empty -delete
+  status "Done.\\n"
+}
+
+function status {
+  local fmt="$1"; shift
+  printf '\x1B[2K\r'"$fmt" "$@"
+}
+
+# list-files absolute-path
+function shsync/list-local {
+  find "$1" -type f -printf '%P\n'
+}
+
+function shsync/list-remote {
+  ssh $REMOTE "cd ${(q)1}; find . -type f" | sed -E 's,^\./,,'
+}
+
+# stat-file absolute-path
+function shsync/stat-local {
+  stat -c "%s %Y" "$1"
+}
+
+function shsync/stat-remote {
+  ssh $REMOTE "stat -c '%s %Y' ${(q)1}"
+}
+
+# sync-file src-path dst-path relative-path
+function shsync/send-file {
+  # we can assume we're already in src-path
+  if [[ ! $DRY_RUN ]]; then
+    tar c -- "$3" | ssh "$REMOTE" "cd '$2'; tar x"
+  fi
+}
+
+function shsync/recv-file {
+  # we can assume we're already in dst-path
+  if [[ ! $DRY_RUN ]]; then
+    ssh "$REMOTE" "cd '$1'; tar c -- ${(q)3}" | tar x
+  fi
+}
+
+# delete-file absolute-path
+function shsync/delete-local {
+  if [[ ! $DRY_RUN ]]; then
+    rm "$1"
+  fi
+}
+
+function shsync/delete-remote {
+  if [[ ! $DRY_RUN ]]; then
+    ssh "$REMOTE" "rm ${(q)1}"
+  fi
+}
+
+shsync/main "$@"
