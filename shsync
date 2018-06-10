@@ -58,56 +58,56 @@ function shsync/sync {
     sync_file="$5" delete_file="$6"
 
   # Populate destination file list first, since we don't care about ordering.
-  status "Listing destination files..."
+  shsync/status "Listing destination files..."
   local -A dst_files
   $list_dst $dst | while read stat file; do
     dst_files[${file#./}]="$stat"
   done
-  status 'Listing destination files: %d\n' "${#dst_files}"
+  shsync/status 'Listing destination files: %d\n' "${#dst_files}"
 
   # Read the whole source file list up front because, for some reason, if we
   # try to stream it the ssh connection terminates after the first line and
   # things go quite badly indeed.
   # TODO: fix this.
-  status "Listing source files..."
+  shsync/status "Listing source files..."
   local -A src_files
   $list_src $src | while read stat file; do
     src_files[${file#./}]="$stat"
   done
-  status 'Listing source files: %d\n' "${#src_files}"
+  shsync/status 'Listing source files: %d\n' "${#src_files}"
 
   local n=0
   # $list_src $src | while read file; do
   for file in "${(k)src_files[@]}"; do
-    status 'Checking files: %d' "$((++n))"
+    shsync/status 'Checking files: %d' "$((++n))"
     if [[ ${dst_files[$file]} ]]; then
       # check if files are equivalent and sync if not
       if [[ ${dst_files[$file]} != ${src_files[$file]} ]]; then
-        status '> %s\n' "$file"
+        shsync/status '> %s\n' "$file"
         $sync_file "$src" "$dst" "$file"
       fi
       unset "dst_files[$file]"
     else
-      status '+ %s\n' "$file"
+      shsync/status '+ %s\n' "$file"
       $sync_file "$src" "$dst" "$file"
     fi
   done
 
   # delete files on sender not on receiver
   for file in ${(k)dst_files[@]}; do
-    status '- %s\n' "$file"
+    shsync/status '- %s\n' "$file"
     if [[ ! $DRY_RUN ]]; then
       $delete_file "$dst/$file"
     fi
   done
 
   # clean up empty directories
-  # status "Cleaning empty directories..."
+  # shsync/status "Cleaning empty directories..."
   # find $dst -type d -empty -delete
-  status "Done.\\n"
+  shsync/status "Done.\\n"
 }
 
-function status {
+function shsync/status {
   local fmt="$1"; shift
   printf '\x1B[2K\r'"$fmt" "$@"
 }
