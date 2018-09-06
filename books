@@ -204,11 +204,48 @@ function books/set-series {
   shift
   local series="$1"; shift
   local prev="$1"; shift
+  \task modify "$prev" project:"$series"
   while [[ $1 ]]; do
     \task modify $1 depends:$prev project:"$series"
     prev="$1"
     shift
   done
+}
+
+task/register add-series '^add-series' books/add-series <<EOF
+
+  $NAME add-series <series name> <arguments to '$NAME add'> -- <list of book titles>
+
+Add a bunch of books in a series, in the given order. This is equivalent to
+calling '$NAME add <args> <title>' on each title, then '$NAME set-series' on
+the added books, except you don't need to manually look up the book IDs before
+calling set-series.
+EOF
+function books/add-series {
+  shift
+  local series="$1"; shift
+  local -a add_args=()
+  while [[ $1 && $1 != -- ]]; do
+    add_args+="$1"; shift
+  done
+  if [[ $1 != -- ]]; then
+    echo >&2 "add-series: missing '--' to separate arguments from titles"
+    return 1
+  fi
+  shift
+
+  if [[ ! $1 ]]; then
+    >&2 echo "Missing book titles after -- in add-series; try $NAME help add-series"
+    return 1
+  fi
+
+  local -a uuids=()
+  while [[ $1 ]]; do
+    \task add "${add_args[@]}" "$1"; shift
+    uuids+=$(\task +LATEST uuids)
+  done
+
+  books/set-series _ "$series" "${uuids[@]}"
 }
 
 exec main "$@"
