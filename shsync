@@ -44,6 +44,16 @@ function shsync/main {
   esac
 }
 
+# TODO replace with command line options
+function shsync/ignored {
+  if [[ ! $SHSYNC_IGNORE ]]; then
+    return 1
+  elif [[ "$1" =~ "$SHSYNC_IGNORE" ]]; then
+    return 0
+  fi
+  return 1
+}
+
 # shsync/sync <src path> <dst path> \
 #  <src path lister> <dst path lister> \
 #  <file copier> <file deleter>
@@ -80,7 +90,11 @@ function shsync/sync {
   # $list_src $src | while read file; do
   for file in "${(k)src_files[@]}"; do
     shsync/status 'Checking files: %d' "$((++n))"
-    if [[ ${dst_files[$file]} ]]; then
+    if shsync/ignored "$file"; then
+      # skip ignored files, remove from destination map so we don't delete it
+      # shsync/status 'I %s\n' "$file"
+      unset "dst_files[$file]"
+    elif [[ ${dst_files[$file]} ]]; then
       # check if files are equivalent and sync if not
       if [[ ${dst_files[$file]} != ${src_files[$file]} ]]; then
         shsync/status '> %s\n' "$file"
@@ -93,11 +107,15 @@ function shsync/sync {
     fi
   done
 
-  # delete files on sender not on receiver
+  # delete files on sender not on receiver, unless ignored
   for file in ${(k)dst_files[@]}; do
-    shsync/status '- %s\n' "$file"
-    if [[ ! $DRY_RUN ]]; then
-      $delete_file "$dst/$file"
+    if shsync/ignored "$file"; then
+      # shsync/status 'I %s\n' "$file"
+    else
+      shsync/status '- %s\n' "$file"
+      if [[ ! $DRY_RUN ]]; then
+        $delete_file "$dst/$file"
+      fi
     fi
   done
 
