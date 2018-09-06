@@ -6,6 +6,8 @@ confirmation=no
 #bulk=0
 #defaultwidth=0
 
+journal.info=off
+
 # Turn off garbage collection.
 gc=off
 

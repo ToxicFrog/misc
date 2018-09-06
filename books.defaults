@@ -7,6 +7,8 @@ confirmation=no
 defaultwidth=10240
 gc=off
 
+journal.info=off
+
 # Stop colourizing books just because they have tags.
 color.tagged=
 color.tag.ANNOTATED=rgb243
