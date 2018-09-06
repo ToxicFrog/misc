@@ -26,8 +26,15 @@ color.uda.gamestate.completed=rgb551
 color.uda.gamestate.mastered=rgb025
 color.uda.gamestate.null=rgb211
 color.tagged=
-color.active=on rgb100
-#color.tag.ACTIVE=
+
+# Ok, so, this is kind of gross
+# color.active is used if the task is started but not yet finished.
+# color.completed is used if the task is completed
+# color.tag.ACTIVE is used if the task has a start date.
+#
+#color.active=on rgb200
+#color.tag.ACTIVE=on rgb100
+#color.completed=on rgb404
 
 # UDAs
 uda.gamestate.label=Play Status
@@ -35,8 +42,8 @@ uda.gamestate.type=string
 uda.gamestate.values=unplayed,unfinished,finished,completed,mastered,null
 
 # Aliases
-alias.unplayed=modify status:pending start: gamestate:unplayed
-alias.unfinished=modify status:pending start:now gamestate:unfinished
+alias.unplayed=modify status:pending start: end: gamestate:unplayed
+alias.unfinished=modify status:pending start:now end: gamestate:unfinished
 alias.finished=modify status:completed end:now gamestate:finished
 alias.completed=modify status:completed end:now gamestate:completed
 alias.mastered=modify status:completed end:now gamestate:mastered
@@ -52,7 +59,7 @@ report.list.sort=end+,start+,description+
 report.list.filter=(+COMPLETED or +ACTIVE)
 
 ## Next: games in progress & waiting to be played
-report.next.columns=id,start.age,project,gamestate,tags,description
+report.next.columns=id,start.age,project,gamestate,tags,description.desc
 report.next.labels=ID,Playing,Plt,Status,Tags,Title
 report.next.sort=urgency-,start+
 
