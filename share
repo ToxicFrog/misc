@@ -12,6 +12,7 @@
 # don't support IPNS.
 
 set -e
+setopt no_function_argzero
 
 # Override these settings in ~/.config/ipfs-share if desired.
 
@@ -34,11 +35,11 @@ fi
 
 function share/main {
   local cmd="$1"; shift
-  case $cmd in
-    add|add-zip|ls|rm|gc|help) share/cmd-$cmd "$@" ;;
-    *)
-      share/die "Unknown command '$cmd'. Try '$0 help'." ;;
-  esac
+  if (( ${+functions[share/cmd-$cmd]} )); then
+    share/cmd-$cmd "$@"
+  else
+    share/die "Unknown command '$cmd'. Try '$0 help'."
+  fi
 }
 
 ## share help [command]
