@@ -217,6 +217,39 @@ function task/-annocat {
   \task "$@" annotate "$(cat)"
 }
 
+task/register star ' star$' task/-star <<EOF
+
+  $NAME [filter] star
+
+Add the ★ tag to entries matching the filter.
+EOF
+function task/-star {
+  shift -p
+  \task "$@" modify +★
+}
+
+task/register unstar ' unstar$' task/-unstar <<EOF
+
+  $NAME [filter] unstar
+
+Remove the ★ tag from entries matching the filter.
+EOF
+function task/-unstar {
+  shift -p
+  \task "$@" modify -★
+}
+
+task/register stars ' stars$' task/-stars <<EOF
+
+  $NAME [filter] stars
+
+List all completed entries that match the filter and have the ★ tag.
+EOF
+function task/-stars {
+  shift -p
+  \task "$@" +★ list
+}
+
 # task/get-field uuid field
 # Wrapper around task/select and \task get to extract individual fields.
 # Outputs the field on stdout, NULL TERMINATED for use with xargs -0.
@@ -273,4 +306,11 @@ function task/printf {
     | xargs -0 printf "$format"
     # printf '\n'
   done
+}
+
+# Utility function: task/status <format> ...
+# As shell `printf`, but clears the line and resets the cursor first.
+function task/status {
+  local fmt="$1"; shift
+  printf '\x1B[2K\r'"$fmt" "$@"
 }
