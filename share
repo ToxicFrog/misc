@@ -168,13 +168,20 @@ function share/cmd-ls {
 function share/cmd-ls/contents {
   while read -r name; do
     local hash=$(ipfs files stat --hash /.shares/$name)
+    local count=$(ipfs files ls /.shares/$name | wc -l)
+    local old_count=$(ipfs files ls /.old-shares/$name | wc -l)
     printf '\n'
     printf 'Name: %s\n' "$(printf '%s' $name | tr '\\' /)"
-    printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
-    if ipfs files ls /.old-shares | fgrep -qx $name; then
+    if (( old_count )); then
       printf 'Old versions: %d\n' "$(ipfs files ls /.old-shares/$name | wc -l)"
     fi
-    ipfs files ls /.shares/$name | sed -E 's,^,    ,'
+    if (( count == 1 )); then
+      printf 'IPFS: %s/ipfs/%s/%s\n' \
+        $IPFS_GATEWAY $hash "$(ipfs files ls /.shares/$name | sed -E 's, ,%20,g')"
+    else
+      printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
+      ipfs files ls /.shares/$name | sed -E 's,^,    ,'
+    fi
   done
 }
 
