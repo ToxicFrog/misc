@@ -52,6 +52,8 @@ function share/cmd-help {
     "    Share a directory and everything in it."\
     "  $0 add [-n name] <list of files/dirs>"\
     "    Create a shared directory containing the listed files/dirs."\
+    "  $0 add-album [-n name] <list of files/dirs>"\
+    "    As add, but creates an HTML/JS thumbnail album from the contents."\
     "  $0 add-zip <name> <list of files/dirs>"\
     "    Like add, but creates a zip file with the given name and shares that instead."\
     "  $0 ls [pattern]"\
@@ -99,6 +101,31 @@ function share/cmd-add {
       printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
     fi
   fi
+
+  local munged_name="$(echo "$name" | tr / '\\')"
+  ipfs files mkdir -p /.old-shares/$munged_name
+  if share/exists $munged_name; then
+    share/archive $munged_name
+  fi
+  ipfs files cp /ipfs/$hash /.shares/$munged_name
+}
+
+## share add-album <files-and-directories...>
+# As share, but generates an HTML album from the contents using fgallery
+# and then shares that.
+function share/cmd-add-album {
+  local name=album:$(share/paths-to-name "$@")
+  if [[ "$1" == "-n" ]]; then
+    shift 2
+  fi
+  echo "Generating gallery files..."
+  mkdir /tmp/$$
+  find "$@" -type f -print0 | xargs -0 ln -t /tmp/$$ --backup=numbered -s -r
+  fgallery -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
+  printf 'Name: %s\n' $name
+  local hash=$(ipfs add --pin=false -r -Q --progress "/tmp/$$.fgallery")
+  printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
+  rm -rf /tmp/$$ /tmp/$$.fgallery
 
   local munged_name="$(echo "$name" | tr / '\\')"
   ipfs files mkdir -p /.old-shares/$munged_name
