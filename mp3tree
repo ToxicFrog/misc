@@ -1,36 +1,48 @@
 #!/usr/bin/env bash
-# Usage: mp3tree <source directory> <destination directory>
-# Mirrors <source> to <destination>, symlinking MP3s into place and converting
-# other music formats to MP3. Non-music files and unrecognized files are ignored.
-# Requires ffmpeg for the conversion.
-# Files that haven't changed since last time will be skipped, and in any case
-# the original files will be left unaltered.
 
 set -e
 
-if (($# < 2)); then
-  exec sed -nE '/^# / { s/^# //; p }; /^$/ q' < $0 >&2
-fi
+MUSIC_DIR="${1:-/ancilla/media/music/Library}"
+MP3_DIR="${2:-/ancilla/media/music/MP3}"
+VGMPLAY_INI=/ancilla/media/music/vgmplay.ini
 
-MUSIC_DIR="$1"
-MP3_DIR="$2"
-NTHREADS=$(($(cat /proc/cpuinfo | egrep '^processor' | wc -l) - 2))
-if ((NTHREADS < 1)); then
-  NTHREADS=1
-fi
+function safe_path() {
+  tr '<>:"/\|?*' '[_*]'
+}
 
-function find_match_for_mp3() {
-  mp3="$1"
-  pattern="${mp3/$MP3_DIR/$MUSIC_DIR}"
-  pattern="${pattern%.*}"
-  if [[ $(echo "$pattern"*) == "$pattern*" ]]; then
-    return 1;
-  fi
-  return 0
+# Helper function for converting VGM/VGZ files.
+function vgm_to_mp3() {
+  mkdir /tmp/$$.vgm
+  pushd /tmp/$$.vgm
+
+  vgm="$1"
+  wav="${1%.vg?}.wav"
+  mp3="$2"
+
+  # set up vgmplay.ini
+  # vgmplay will prefer the one it finds in ./ to the user/system ones.
+  sed 's/^LogSound.*/LogSound = 1/' < "$VGMPLAY_INI" > vgmplay.ini
+
+  # invoke vgmplay to convert vgm -> wav
+  </dev/null >/dev/null vgmplay "$vgm"
+
+  # now the wav is next to the original vgm/vgz file
+  # invoke ffmpeg to encode it
+  [[ -f "$wav" ]] || { echo "ERROR"; return 1; }
+  </dev/null ffmpeg -y -i "$wav" -v error -stats -map 0:0 -q:a 0 -codec:a libmp3lame "$mp3"
+
+  # cleanup
+  popd
+  rm "$wav"
+  rm -rf /tmp/$$.vgm
+  echo "DONE"
 }
 
 function ffmpeg_convert() {
-  </dev/null ffmpeg -y -i "$1" -v error -nostats -map 0:0 -q:a 0 -codec:a libmp3lame "$2" || echo "[ERR] $1"
+  input="$1"
+  output="$2"
+  shift 2
+  </dev/null ffmpeg -y -i "$input" -v error -nostats -map 0:0 "$@" -q:a 0 -codec:a libmp3lame "$output" || echo "[ERR] $input"
 }
 
 NTHREADS=4
@@ -42,64 +54,88 @@ function spawn() {
   "$@" &
 }
 
-# Clean up all non-symlink files that no longer correspond to files in MUSIC_DIR.
-echo "Cleaning up stale converted files..."
-find "$MP3_DIR" -type f | while read -r file; do
-  if ! find_match_for_mp3 "$file"; then
-    rm -fv "$file"
+# Keep a list of converted files here so we can find ones that are stale later.
+> /tmp/$$.new
+
+echo "Creating mp3s..."
+find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
+  # Strip non-FAT characters from filenames so we can e.g. rsync this onto USB
+  # keys without everything being terrible.
+  relpath="${src#$MUSIC_DIR/}"
+  dst="${MP3_DIR}/$(echo "$relpath" | tr '<>:"|?*' '[-*]')"
+ # echo "$src"
+ # echo "  == $relpath"
+ # echo "  -> $dst"
+
+  # Handle directories. Create mirrors of non-empty directories, skip empty ones.
+  if [[ -d $src ]]; then
+    if [[ $(ls -A "$src") && ! -e "$dst" ]]; then
+      echo "[DIR] $dst"
+      mkdir -p "$dst"
+    fi
+    continue
   fi
+
+  # Handle files.
+  dst="${dst%.*}.mp3"
+
+  # Skip things that don't need to be updated
+  if [[ -e $dst && ! $src -nt $dst ]]; then
+    echo "$dst" | sed -E 's;/+;/;g' >> /tmp/$$.new
+    continue
+  fi
+
+  case "$(echo "$src" | tr '[:upper:]' '[:lower:]')" in
+    *.mp3)
+      ln -sf "$src" "$dst"
+      echo "[MP3] $src"
+      ;;
+    *.opus|*.ogg)
+      # Use map_metadata to map metadata from stream0 to the whole file, since
+      # OGG OPUS files have per-stream metadata and MP3s don't.
+      spawn ffmpeg_convert "$src" "$dst" -map_metadata 0:s:0
+      echo "[PCM] $src"
+      ;;
+    *.flac|*.m4a|*.mpc|*.wav|*.aif|*.aiff|*.wma)
+      spawn ffmpeg_convert "$src" "$dst"
+      echo "[PCM] $src"
+      ;;
+    *.xm|*.mod|*.s3m)
+      spawn ffmpeg_convert "$src" "$dst"
+      echo "[MOD] $src"
+      ;;
+    # *.vgm|*.vgz)
+      #(vgm_to_mp3 "$src" "$dst")
+      # spawn ffmpeg_convert "$src" "$dst"
+      # echo "[VGM] $src"
+      # ;;
+    *.vgm|*.vgz|*.mid|*.midi)
+      # File is recognized but we don't have a converter for it.
+      echo "[!!!] $src"
+      continue
+      ;;
+    *.txt|*.m3u|*.png|*.jpg)
+      # skip
+      continue
+      ;;
+    *)
+      # File is not recognized.
+      echo "[???] $src"
+      continue
+      ;;
+  esac
+  echo "$dst" | sed -E 's;/+;/;g' >> /tmp/$$.new
 done
 
 # Clean up all broken symlinks
 echo "Cleaning up broken symlinks..."
 find "$MP3_DIR" -depth \( \( -type l -xtype l \) -or \( -type d -empty \) \) -print -delete
 
-echo "Creating mp3s..."
-find "$MUSIC_DIR" -path "${MP3_DIR%/}" -prune -o -print | while read -r path; do
-  # Create directories
-  mp3="${path/$MUSIC_DIR/$MP3_DIR}"
-  if [[ -d $path ]] && [[ $(ls -A "$path") ]]; then
-    [[ -e $mp3 ]] || mkdir -vp "$mp3"
-    continue
-  fi
+# Clean up all non-symlink files that no longer correspond to files in MUSIC_DIR.
+echo "Cleaning up stale converted files..."
+find "$MP3_DIR" -type f -or -type l > /tmp/$$.all
+cat /tmp/$$.new /tmp/$$.all | sort | uniq -u \
+  | xargs -r -d\\n rm -fv
 
-  # Handle files.
-  mp3="${mp3%.*}.mp3"
-
-  # Skip things that don't need to be updated
-  if [[ -e $mp3 && ! $path -nt $mp3 ]]; then
-    continue
-  fi
-
-  case "$(echo "$path" | tr '[:upper:]' '[:lower:]')" in
-    *.mp3)
-      ln -s "$path" "$mp3"
-      echo "[MP3] $path"
-      ;;
-    *.flac|*.ogg|*.m4a|*.mpc|*.wav|*.aif|*.opus)
-      spawn ffmpeg_convert "$path" "$mp3"
-      echo "[PCM] $path"
-      ;;
-    *.xm|*.mod|*.s3m)
-      spawn ffmpeg_convert "$path" "$mp3"
-      echo "[MOD] $path"
-      ;;
-    *.vgm|*.vgz)
-      spawn ffmpeg_convert "$path" "$mp3"
-      echo "[VGM] $path"
-      ;;
-    *.mid|*.midi)
-      # File is recognized but we don't have a converter for it.
-      echo "[!!!] $path"
-      ;;
-    *.txt|*.m3u|*.png|*.jpg)
-      # skip
-      ;;
-    *)
-      # File is not recognized.
-      echo "[???] $path"
-      ;;
-  esac
-done
-
+rm /tmp/$$.new /tmp/$$.all
 echo "Done!"
