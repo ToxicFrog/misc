@@ -48,16 +48,16 @@ function share/cmd-help {
   printf '%s\n'\
     "$0 -- a simple file sharing interface on top of ipfs."\
     "Usage:"\
-    "  $0 add <dir>"\
+    "  $0 add [-n name] <dir>"\
     "    Share a directory and everything in it."\
-    "  $0 add <list of files/dirs>"\
+    "  $0 add [-n name] <list of files/dirs>"\
     "    Create a shared directory containing the listed files/dirs."\
     "  $0 add-zip <name> <list of files/dirs>"\
     "    Like add, but creates a zip file with the given name and shares that instead."\
     "  $0 ls [pattern]"\
     "    List all shares. With <pattern>, list only matching shares and their contents."\
-    "  $0 rm [pattern]"\
-    "    Remove all shares matching <pattern>."\
+    "  $0 rm <name> [<name>...]"\
+    "    Remove the named shares."\
     "  $0 gc"\
     "    Delete from IPFS data associated with shares that have been removed."
     # "  $0 refresh [pattern]"\
@@ -80,16 +80,22 @@ function share/die {
 # so as long as it's referenced by /.shares it won't be garbage collected.
 function share/cmd-add {
   local name=$(share/paths-to-name "$@")
+  if [[ "$1" == "-n" ]]; then
+    shift 2
+  fi
   printf 'Name: %s\n' $name
   local hash
   if [[ $# == 1 && -d "$1" ]]; then
+    # Add single directory
     hash=$(ipfs add --pin=false -r -Q --progress "$1")
     printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
   else
     hash=$(ipfs add --pin=false -r -Q --progress -w "$@")
     if [[ $# == 1 ]]; then
+      # Added single file
       printf 'IPFS: %s/ipfs/%s/%s\n' $IPFS_GATEWAY $hash "$(basename $1 | sed 's, ,%20,g')"
     else
+      # Added multiple files
       printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
     fi
   fi
@@ -134,6 +140,10 @@ function share/cmd-add-zip {
 }
 
 function share/paths-to-name {
+  if [[ $1 == "-n" ]]; then
+    printf '%s' "$2"
+    return
+  fi
   if [[ $# == 1 ]]; then
     if [[ -d "$1" ]]; then
       printf "%s/" "$(realpath "$1")"
