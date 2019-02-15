@@ -182,7 +182,7 @@ function task/-help {
   else
     echo "Available commands:"
     printf "  %s\\n" ${TASK_COMMANDS[@]} | cut -d: -f1 | sort
-    echo "For detailed help, use \`$0 help <command>\`."
+    echo "For detailed help, use \`$NAME help <command>\`."
   fi
 }
 
