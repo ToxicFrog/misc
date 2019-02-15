@@ -123,7 +123,7 @@ function share/cmd-add-zip {
   fi
   printf 'Name: %s\n' "$zipname"
   local hash=$(zip -q -0 -r - "$@" | ipfs add --pin=false -Q --progress)
-  ipfs files mkdir -p /.old-shares/$munged_name
+  ipfs files mkdir -p /.old-shares/$zipname
   if share/exists $zipname; then
     share/archive $zipname
   fi
