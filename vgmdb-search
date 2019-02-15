@@ -1,0 +1,41 @@
+#!/usr/bin/env zsh
+
+function main {
+  if [[ "$1" ]]; then
+    while [[ $1 ]]; do
+      wget -q -O- "http://vgmdb.info/search/$1" | show-results
+      shift
+    done
+    exit 0
+  fi
+  while read $'query?\nvgmdb> '; do
+    wget -q -O- "http://vgmdb.info/search/$query" | show-results
+    # if [[ $query =~ ^[0-9]+$ ]]; then
+    #   curl -s "https://vgmdb.net/album/$query" | show-album
+    # fi
+  done
+}
+
+function show-results {
+  jshon -Q \
+    -e results -e albums -a \
+      -e link -u -p \
+      -e catalog -u -p \
+      -e titles \
+        -e en -u -p \
+        -e ja -u \
+  | paste - - - - \
+  | while IFS=$'\t' read link catalog en_title jp_title; do
+    if [[ $en_title != null ]]; then
+      show-listing ${link#album/} "$catalog" "$en_title"
+    else
+      show-listing ${link#album/} "$catalog" "$jp_title"
+    fi
+  done
+}
+
+function show-listing {
+  printf "%6d %9s  %s\n" "$@"
+}
+
+exec main "$@"
