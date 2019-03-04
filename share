@@ -1,75 +1,130 @@
 #!/usr/bin/env zsh
 #
-# share -- ipfs-based file sharing
+# share -- hash-based file sharing
 #
 # Can share individual files, directories, or ad hoc collections of files and/or
 # directories (which will be automatically wrapped in a directory).
 #
 # See `share help` for usage information.
 
-# Future work: support sharing by IPNS. (This is why share state is maintained
-# in the IPFS keystore). Currently it's disabled because private IPFS swarms
-# don't support IPNS.
-
 set -e
 setopt no_function_argzero
 
-# Override these settings in ~/.config/ipfs-share if desired.
+SHARE_LIST="$HOME/.config/shares"
+SHARE_PATH=${SHARE_PATH:=/srv/www/share}
+SHARE_URL="https://ancilla.ancilla.ca/share"
+PROGNAME="$(basename $0)"
 
-export IPFS_PATH
-# export IPFS_PATH=/path/to/ipfs/dir
-
-# If running a public node, replacing this with the URL of a gateway closer
-# to your node is recommended for performance reasons.
-# If running a private node you MUST replace this with the URL of a gateway
-# connected to your private swarm.
-export IPFS_GATEWAY=https://gateway.ipfs.io
-# export IPFS_GATEWAY=https://$(hostname -f)
-
-# Not currently supported.
-#export ENABLE_IPNS=0
-
-if [[ -f ~/.config/ipfs-share ]]; then
-  source ~/.config/ipfs-share
+missing=""
+for prog in xxd pv fgallery rsync exiftool; do
+  if ! &>/dev/null type $prog; then
+    missing="$missing $prog"
+  fi
+done
+if [[ $missing ]]; then
+  echo "This script requires the following tools, but can't find them:$missing" >&2
+  exit 1
 fi
 
 function share/main {
+  touch $SHARE_LIST
   local cmd="$1"; shift
-  if (( ${+functions[share/cmd-$cmd]} )); then
-    share/cmd-$cmd "$@"
+  while [[ $1 ]]; do
+    case $1 in
+      -n) local SHARE_NAME="$2"; shift 2;;
+      --) shift; break;;
+      -*) share/die "Unknown option '$1'";;
+      *) break;;
+    esac
+  done
+  if (( ${+functions[share-$cmd]} )); then
+    share-$cmd "$@"
   else
-    share/die "Unknown command '$cmd'. Try '$0 help'."
+    share/die "Unknown command '$cmd'. Try '$PROGNAME help'."
   fi
 }
 
 ## share help [command]
 # List available commands, or display help for a specific command.
-function share/cmd-help {
+function share-help {
   printf '%s\n'\
-    "$0 -- a simple file sharing interface on top of ipfs."\
+    "$PROGNAME -- a simple hash-based file sharing program."\
     "Usage:"\
-    "  $0 add [-n name] <dir>"\
+    "  $PROGNAME add [-n name] <dir>"\
     "    Share a directory and everything in it."\
-    "  $0 add [-n name] <list of files/dirs>"\
+    "  $PROGNAME add [-n name] <list of files/dirs>"\
     "    Create a shared directory containing the listed files/dirs."\
-    "  $0 add-album [-n name] <list of files/dirs>"\
+    "  $PROGNAME add-album [-n name] <list of files/dirs>"\
     "    As add, but creates an HTML/JS thumbnail album from the contents."\
-    "  $0 add-zip <name> <list of files/dirs>"\
+    "  $PROGNAME add-zip <name> <list of files/dirs>"\
     "    Like add, but creates a zip file with the given name and shares that instead."\
-    "  $0 ls [pattern]"\
+    "  $PROGNAME ls [pattern]"\
     "    List all shares. With <pattern>, list only matching shares and their contents."\
-    "  $0 rm <name> [<name>...]"\
+    "  $PROGNAME rm <name> [<name>...]"\
     "    Remove the named shares."\
-    "  $0 gc"\
-    "    Delete from IPFS data associated with shares that have been removed."
-    # "  $0 refresh [pattern]"\
-    # "    Refresh expired shares so they become accessible again."\
 }
 
+### Library functions ###
+
+# Print arguments to stderr and then exit.
 function share/die {
   >&2 printf '%s\n' "$@"
   exit 1
 }
+
+# Generate a hash from the arguments.
+# Internally, it's sha256sum in base64 with url-hostile characters replaced.
+# Hash is based on UID + share name, so different people sharing the same thing
+# have different share hashes.
+function share/hash {
+  printf '%s%s' "$UID" "$@" | sha256sum | cut -d' ' -f1 | xxd -r -p | base64 | tr '+/' '-_'
+}
+
+# register NAME
+function share/register {
+  local hash=$(share/hash $1)
+  egrep -q "^$hash" $SHARE_LIST || printf '%s\x1F%s\n' "$hash" "$1" >> $SHARE_LIST
+}
+
+# unregister NAME
+function share/unregister {
+  local hash=$(share/hash $1)
+  sed -E -i "/^$hash/ d" $SHARE_LIST
+}
+
+# True if a share with the given name exists.
+function share/exists {
+  egrep -q "^$(share/hash $1)" $SHARE_LIST
+}
+
+function share/paths-to-name {
+  if [[ $SHARE_NAME ]]; then
+    printf '%s' "$SHARE_NAME"
+    return
+  fi
+  if [[ $# == 1 ]]; then
+    if [[ -d "$1" ]]; then
+      # Single directory argument: realpath with / suffix
+      printf "%s/" "$(realpath "$1")"
+    else
+      # Single file argument: realpath with no suffix
+      realpath "$1"
+    fi
+  else
+    # This is so gross I'm just forbidding it for now.
+    share/die "If you're sharing multiple things you need to specify a name with -n"
+    # Multiple file and/or directory arguments. This needs work.
+    # At the moment, the name is the first (lexical) argument with the first eight
+    # characters of the sha1sum of all the arguments appended.
+    local hash=$(printf '%s\n' "$@" | xargs -d\\n realpath | sort | sha1sum | cut -c1-8)
+    local prefix=$(printf '%s\n' "$@" | xargs -d\\n realpath | sort | head -n1)
+    # This is kind of gross.
+    # TODO: come up with a better naming scheme for ad hoc dirs.
+    printf '%s/<%d items>@%s' "$prefix" "$#" "$hash"
+  fi
+}
+
+### Command implementations ###
 
 ## share add <file>
 ## share add <directory>
@@ -77,169 +132,119 @@ function share/die {
 # Add a share.
 # If a single directory is specified, shares that directory as is.
 # If a single file or multiple arguments are specified, wraps them in a directory
-# (using -w) and shares that.
-# N.b. it is not pinned, because the MFS root is considered a GC root as well,
-# so as long as it's referenced by /.shares it won't be garbage collected.
-function share/cmd-add {
+# and shares that.
+function share-add {
   local name=$(share/paths-to-name "$@")
+  local hash=$(share/hash $name)
   if [[ "$1" == "-n" ]]; then
     shift 2
   fi
-  printf 'Name: %s\n' $name
-  local hash
   if [[ $# == 1 && -d "$1" ]]; then
     # Add single directory
-    hash=$(ipfs add --pin=false -r -Q --progress "$1")
-    printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
+    command rsync -a --delete --info=progress2 "$1/" "$SHARE_PATH/$hash/"
+    printf 'Name: %s\n' $name
+    printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
   else
-    hash=$(ipfs add --pin=false -r -Q --progress -w "$@")
+    # One file, or multiple files and/or directories.
+    # As with rsync, a trailing slash on directory arguments means "merge into"
+    # and a lack of trailing slash means "copy into".
+    command rsync -a --delete --info=progress2 "$@" "$SHARE_PATH/$hash/"
+    printf 'Name: %s\n' $name
     if [[ $# == 1 ]]; then
       # Added single file
-      printf 'IPFS: %s/ipfs/%s/%s\n' $IPFS_GATEWAY $hash "$(basename $1 | sed 's, ,%20,g')"
+      printf ' URL: %s/%s/%s\n' "$SHARE_URL" "$hash" "$(basename $1 | sed 's, ,%20,g')"
     else
-      # Added multiple files
-      printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
+      # Added multiple files or dirs
+      printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
     fi
   fi
 
-  local munged_name="$(echo "$name" | tr / '\\')"
-  ipfs files mkdir -p /.old-shares/$munged_name
-  if share/exists $munged_name; then
-    share/archive $munged_name
-  fi
-  ipfs files cp /ipfs/$hash /.shares/$munged_name
+  share/register $name
 }
 
 ## share add-album <files-and-directories...>
 # As share, but generates an HTML album from the contents using fgallery
 # and then shares that.
-function share/cmd-add-album {
-  local name=album:$(share/paths-to-name "$@")
-  if [[ "$1" == "-n" ]]; then
-    shift 2
-  fi
+# Makes the original images available for download, but strips EXIF metadata
+# from them first.
+function share-add-album {
+  local name=$(share/paths-to-name "$@")
+  local hash=$(share/hash $name)
+
   echo "Generating gallery files..."
+  trap "rm -rf /tmp/$$ /tmp/$$.fgallery" EXIT
   mkdir /tmp/$$
   find "$@" -type f -print0 | xargs -0 ln -t /tmp/$$ --backup=numbered -s -r
-  fgallery -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
+  fgallery -f -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
+  # Remove EXIF data from original JPEG files
+  exiftool -all= -overwrite_original /tmp/$$.fgallery/files/*
+  command rsync -a --delete --info=progress2 "/tmp/$$.fgallery/" "$SHARE_PATH/$hash/"
+
   printf 'Name: %s\n' $name
-  local hash=$(ipfs add --pin=false -r -Q --progress "/tmp/$$.fgallery")
-  printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
-  rm -rf /tmp/$$ /tmp/$$.fgallery
+  printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
 
-  local munged_name="$(echo "$name" | tr / '\\')"
-  ipfs files mkdir -p /.old-shares/$munged_name
-  if share/exists $munged_name; then
-    share/archive $munged_name
-  fi
-  ipfs files cp /ipfs/$hash /.shares/$munged_name
+  share/register $name
 }
 
-# share/exists name
-# true if a share with that name exists
-function share/exists {
-  ipfs files ls /.shares | fgrep -qx "$1"
-}
-
-# share/archive name
-# archive a share to /.old-shares/$name/$date
-# this ensures that links to old versions of the share will continue to work
-# even if garbage collection runs.
-function share/archive {
-  ipfs files mv /.shares/$1 /.old-shares/$1/"$(date +'%Y-%m-%d %H:%M:%S')"
-}
-
-function share/cmd-add-zip {
-  local zipname="$1"; shift
-  if [[ $zipname =~ / ]] || [[ $zipname != *.zip ]]; then
+function share-add-zip {
+  local name=$1; shift
+  local hash=$(share/hash $name)
+  if [[ $name =~ / ]] || [[ $name != *.zip ]]; then
     share/die "The first argument to add-zip must be a .zip file name with no slashes."
   fi
-  printf 'Name: %s\n' "$zipname"
-  local hash=$(zip -q -0 -r - "$@" | ipfs add --pin=false -Q --progress)
-  ipfs files mkdir -p /.old-shares/$zipname
-  if share/exists $zipname; then
-    share/archive $zipname
-  fi
-  ipfs files mkdir /.shares/$zipname
-  ipfs files cp /ipfs/$hash /.shares/$zipname/$zipname
-  local dirhash=$(ipfs files stat --hash /.shares/$zipname)
-  printf 'IPFS: %s/ipfs/%s/%s\n' $IPFS_GATEWAY $dirhash $zipname
-}
 
-function share/paths-to-name {
-  if [[ $1 == "-n" ]]; then
-    printf '%s' "$2"
-    return
-  fi
-  if [[ $# == 1 ]]; then
-    if [[ -d "$1" ]]; then
-      printf "%s/" "$(realpath "$1")"
-    else
-      realpath "$1"
-    fi
-  else
-    local hash=$(printf '%s\n' "$@" | xargs -d\\n realpath | sort | sha1sum | cut -c1-8)
-    local prefix=$(printf '%s\n' "$@" | xargs -d\\n realpath | sort | head -n1)
-    if [[ -f $prefix ]]; then
-      prefix="$(dirname $prefix)"
-    fi
-    # This is kind of gross.
-    # TODO: come up with a better naming scheme for ad hoc dirs.
-    printf '%s/<%d items>@%s' "$prefix" "$#" "$hash"
-  fi
+  mkdir -p "$SHARE_PATH/$hash"
+  zip -q -0 -r - "$@" | pv > "$SHARE_PATH/$hash/$name"
+  local dirhash=$(ipfs files stat --hash /.shares/$zipname)
+  printf 'Name: %s\n' $name
+  printf ' URL: %s/%s/%s\n' "$SHARE_URL" "$hash" "${name// /%20}"
+  share/register $name
 }
 
 # List all shares by name.
 # If no arguments specified, lists all shares with their hashes.
 # If arguments specified, shows only shares matching those args (as `grep`) and
 # lists their name, IPFS path, IPNS path, and contents.
-function share/cmd-ls {
+function share-ls {
   if [[ $1 ]]; then
-    ipfs files ls /.shares | grep "$@" | share/cmd-ls/contents
+    share/ls-detail "$@"
   else
-    ipfs files ls /.shares | tr '\\' /
+    cat $SHARE_LIST | sed -E 's,\x1F, ,'
   fi
 }
 
 # Read keys from stdin and list their names, IPFS/IPNS paths and contents.
-function share/cmd-ls/contents {
-  while read -r name; do
-    local hash=$(ipfs files stat --hash /.shares/$name)
-    local count=$(ipfs files ls /.shares/$name | wc -l)
-    local old_count=$(ipfs files ls /.old-shares/$name | wc -l)
+function share/ls-detail {
+  grep "$@" $SHARE_LIST | while IFS=$'\x1F' read -r hash name; do
+    local count=$(find $SHARE_PATH/$hash -type f | wc -l)
+    local size=$(du -sh --apparent-size $SHARE_PATH/$hash | cut -f1)
     printf '\n'
-    printf 'Name: %s\n' "$(printf '%s' $name | tr '\\' /)"
-    if (( old_count )); then
-      printf 'Old versions: %d\n' "$(ipfs files ls /.old-shares/$name | wc -l)"
-    fi
+    printf 'Name: %s\n' $name
+    printf 'Size: %s (%d files)\n' $size $count
     if (( count == 1 )); then
-      printf 'IPFS: %s/ipfs/%s/%s\n' \
-        $IPFS_GATEWAY $hash "$(ipfs files ls /.shares/$name | sed -E 's, ,%20,g')"
+      printf ' URL: %s/%s/%s\n' $SHARE_URL $hash $(ls -A $SHARE_PATH/$hash | sed -E 's, ,%20,g')
     else
-      printf 'IPFS: %s/ipfs/%s\n' $IPFS_GATEWAY $hash
-      ipfs files ls /.shares/$name | sed -E 's,^,    ,'
+      printf ' URL: %s/%s/\n' $SHARE_URL $hash
     fi
   done
 }
 
-# share rm name-or-id
-# Remove share matching the given name or ID.
-# No globbing/regex support yet.
-function share/cmd-rm {
-  local name
+# share rm name
+# Remove share matching the given name.
+# No globbing/regex or remove by hash yet.
+function share-rm {
   while [[ $1 ]]; do
-    name="$(echo "$1" | tr / '\\')"
-    if ! ipfs files ls /.shares | fgrep -qx "$name"; then
-      share/die "No share found with name '$1'."
+    if ! share/exists $1; then
+      share/die "No share with name '$1'"
     fi
-    ipfs files rm -r /.shares/"$name"
-    ipfs files rm -r /.old-shares/"$name"
+    local hash="$(share/hash $1)"
+    echo "Removing $1 ($hash)"
+    rm -rf "$SHARE_PATH/$hash"
+    share/unregister "$1"
     shift
   done
 }
 
-function share/cmd-gc {
-  ipfs repo gc
-}
+### Entry point ###
 
 exec share/main "$@"
