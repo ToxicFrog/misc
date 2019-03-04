@@ -162,11 +162,59 @@ function share-add {
   share/register $name
 }
 
+# Add a source image ($2) to a gallery input directory ($1)
+# Image types supported by fgallery are symlinked in.
+# GIFs have a PNG thumbnail extracted and inserted.
+function share/add-source-image {
+  case "$(echo $2 | tr A-Z a-z)" in
+    *.jpg|*.jpeg|*.png|*.tif|*.tiff)
+      ln -s -r -f -t "$1" "$2"
+      ;;
+    *.gif)
+      local frames=$(identify $2 | wc -l)
+      if (( frames > 1 )); then
+        local name=$(basename $2 | sed -E 's,\.gif$,,i')
+        local size=$(convert "$2[0]" -format "%wx%h" info:)
+        convert "$2[0]" \
+          \( $HOME/devel/misc/play-circle.svg \
+              -resize "$size" -resize "50%" \
+              -gravity Center -negate \
+          \) \
+          -compose difference -composite "$1/$name.jpeg"
+      else
+        convert "$2" "$1/$name.jpeg"
+      fi
+      # Output the name of the renamed/converted file so the caller can
+      # replace it later.
+      echo "$name.jpeg"
+      ;;
+    *.mp4)
+      local name=$(basename $2 | sed -E 's,\.mp4$,,i')
+      # extract thumbnail from frame 30
+      ffmpeg -hide_banner -loglevel quiet -i "$2" -vf "select=gte(n\,30)" -vframes 1 "$1/$name.thumb.jpeg"
+      local size=$(convert "$1/$name.thumb.jpeg" -format "%wx%h" info:)
+      convert "$1/$name.thumb.jpeg" \
+        \( $HOME/devel/misc/play-circle.svg \
+            -resize "$size" -resize "50%" \
+            -gravity Center -negate \
+        \) \
+        -compose difference -composite "$1/$name.jpeg"
+      rm "$1/$name.thumb.jpeg"
+      echo "$name.jpeg"
+      ;;
+    *)
+      echo "Skipping: $2" >&2
+      ;;
+  esac
+}
+
 ## share add-album <files-and-directories...>
 # As share, but generates an HTML album from the contents using fgallery
 # and then shares that.
 # Makes the original images available for download, but strips EXIF metadata
 # from them first.
+# GIFs and MP4 video are added to the gallery as thumbnails with a (>) overlay
+# such that clicking on it takes you to the original file.
 function share-add-album {
   local name=$(share/paths-to-name "$@")
   local hash=$(share/hash $name)
@@ -174,8 +222,25 @@ function share-add-album {
   echo "Generating gallery files..."
   trap "rm -rf /tmp/$$ /tmp/$$.fgallery" EXIT
   mkdir /tmp/$$
-  find "$@" -type f -print0 | xargs -0 ln -t /tmp/$$ --backup=numbered -s -r
-  fgallery -f -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
+  # TODO: this unconditionally overwrites duplicates. Option to merge instead?
+  local -A replacements
+  find "$@" -type f | while read file; do
+    local replacement=$(share/add-source-image "/tmp/$$" "$file")
+    if [[ $replacement ]]; then
+      replacements[$file]="$replacement"
+    fi
+  done
+  # TODO: optional -f for face detection?
+  # TODO: "persistent" mode, that keeps the generated gallery around for
+  # incremental updates and remembers what arguments it was invoked with.
+  # Generate gallery
+  fgallery -j 4 -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
+  # Replace "fake" originals with the real originals
+  for original replacement in "${(@kv)replacements}"; do
+    rm /tmp/$$.fgallery/files/$replacement
+    install -m 644 $original /tmp/$$.fgallery/files/
+    sed -Ei 's,"files/'$replacement'","files/'$(basename $original)'",' /tmp/$$.fgallery/data.json
+  done
   # Remove EXIF data from original JPEG files
   exiftool -all= -overwrite_original /tmp/$$.fgallery/files/*
   command rsync -a --delete --info=progress2 "/tmp/$$.fgallery/" "$SHARE_PATH/$hash/"
