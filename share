@@ -186,7 +186,7 @@ function share/add-source-image {
       fi
       # Output the name of the renamed/converted file so the caller can
       # replace it later.
-      echo "$name.jpeg"
+      echo "$name"
       ;;
     *.mp4)
       local name=$(basename $2 | sed -E 's,\.mp4$,,i')
@@ -200,7 +200,7 @@ function share/add-source-image {
         \) \
         -compose difference -composite "$1/$name.jpeg"
       rm "$1/$name.thumb.jpeg"
-      echo "$name.jpeg"
+      echo "$name"
       ;;
     *)
       echo "Skipping: $2" >&2
@@ -225,9 +225,9 @@ function share-add-album {
   # TODO: this unconditionally overwrites duplicates. Option to merge instead?
   local -A replacements
   find "$@" -type f | while read file; do
-    local replacement=$(share/add-source-image "/tmp/$$" "$file")
+    local replacement=$(share/add-source-image "/tmp/$$" "$file" | tr ' .' '__')
     if [[ $replacement ]]; then
-      replacements[$file]="$replacement"
+      replacements[$file]="$replacement.jpeg"
     fi
   done
   # TODO: optional -f for face detection?
@@ -237,9 +237,10 @@ function share-add-album {
   fgallery -j 4 -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
   # Replace "fake" originals with the real originals
   for original replacement in "${(@kv)replacements}"; do
-    rm /tmp/$$.fgallery/files/$replacement
-    install -m 644 $original /tmp/$$.fgallery/files/
-    sed -Ei 's,"files/'$replacement'","files/'$(basename $original)'",' /tmp/$$.fgallery/data.json
+    echo "Replacement: $original <-> $replacement"
+    rm "/tmp/$$.fgallery/files/$replacement"
+    install -m 644 "$original" /tmp/$$.fgallery/files/
+    sed -Ei 's,"files/'"$replacement"'","files/'"$(basename $original)"'",' /tmp/$$.fgallery/data.json
   done
   # Remove EXIF data from original JPEG files
   exiftool -all= -overwrite_original /tmp/$$.fgallery/files/*
