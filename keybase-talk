@@ -106,7 +106,7 @@ function watch-chat {
   while true; do
     local screen="$(watch-chat-once "$@")"
     if [[ $screen != $old_screen ]]; then
-      printf '\x1B[2J\x1B[0;0H\x07%s' "$screen"
+      printf '\x1Bc\x1B[0;0H\x07%s' "$screen"
       old_screen="$screen"
     fi
     sleep 1
@@ -119,8 +119,13 @@ function shutdown {
 }
 
 function header {
-  printf '\x1B2J\x1B[0;0H\x1B[1;37;41m%s\x1B[0K\x1B[0m\n' \
-    "  $*"
+  if [[ $2 ]]; then
+    printf '\x1Bc\x1B[0;0H\x1B[1;37;41m    %s #%s\x1B[0K\x1B[0m\n' \
+      $1 $2
+  else
+    printf '\x1Bc\x1B[0;0H\x1B[1;37;41m    %s\x1B[0K\x1B[0m\n' \
+      $1
+  fi
 }
 
 function show-log {
@@ -163,12 +168,16 @@ if (( $(tmux list-panes | wc -l) > 1 )); then
   echo "This means either you have multiple panes open and I was about to ruin them, or that my pane-opening logic has a bug and I was about to crash your tmux server by creating infinitely many panes."
   exit 1
 fi
+
+# Strip leading hash from $2, if present.
+if [[ $2 ]]; then
+  set -- $1 ${2#\#}
+fi
+
 # Set up the windows.
 # The watcher goes in the top pane.
 # We create it above us (-b) and don't give it focus (-d)
-tmux split-window -d -b "sleep 1; $0 --watch $*; sleep 30"
-tmux resize-pane -D 999
-clear
+tmux split-window -l $((LINES-4)) -d -b "$0 --watch $*"
 
 # Initialize a new in-memory history, which will be used for the input box.
 fc -p -a /dev/null
