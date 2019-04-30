@@ -7,6 +7,24 @@
 #
 # See `share help` for usage information.
 
+# A bunch of the features below probably require storing information about
+# the share somewhere convenient, say in a .share file in the share itself --
+# should probably set it 600 so httpd can't read it
+# TODO: "persistent" mode, that keeps the generated gallery around for
+# incremental updates and remembers what arguments it was invoked with.
+# TODO: "ephemeral" mode, that is automatically deleted after a certain number
+# of days (when share is run).
+# TODO: share aliasing (using symlinks) -- removing the share needs to remove the
+# aliases as well!
+# TODO: share renaming (with option to alias the old name)
+# sharedata format
+# stored in $SHARE_DIR/.sharedata
+# k-v store, each line has the format "key\tvalue\n" (so no tabs in keys, and no newlines in anything)
+# name <name of share>
+# hash <hash of share>
+# pwd <dir program was run in to create the share>
+#
+
 set -e
 setopt no_function_argzero
 
