@@ -36,11 +36,12 @@ function flush {
     # Skip errors, usually this means the message has expired or predates us joining the channel.
   else
     nick=$(formatnick $nick)
-    message="$(printf '%s \x1B[48;2;60;60;60m%s\x1B[0m' $message $reactji)"
+    if [[ $reactji ]]; then
+      message="$(printf '%s \x1B[48;2;60;60;60m%s\x1B[0m' $message $reactji)"
+    fi
     printf '%s\n' "$message" | fold -s -w $((COLUMNS-22)) | while read -r line; do
       # Field width for the name is calculated as [20 + 9 nonprinting control code characters]
       # for a display width of 20.
-      [[ $message ]] || continue  # fold sometimes emits a trailing blank line?
       printf '%29s %s\n' "$nick" "$line"
       nick=$(printf '\x1B[000000m') # nine characters of nonprinting padding
     done
