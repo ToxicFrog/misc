@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
 # simple interactive chat UI for keybase chat
+# usage: keybase-talk <conversation name> [channel name]
 
 # keybase chat output format:
 #     [index] [username timestamp] [expires in timestamp] reactji message
@@ -15,7 +16,28 @@
 # - for system messages, the message text itself is wrapped in [], e.g.
 #     [3] [xxxxxxx 45s]                       [Added @yyyy to the team]
 
+# Planned but not yet implemented features:
+# /list,/join,/upload,/download
+# /buf to switch which channel you're chatting in
+# /msg to create a privmsg, may be eqv to /join in keybase
+# a user list (requires keybase chat list-members to be fixed)
+# /log <date range>
+# /restart <args>
+# keep more backscroll and let the user use pageup/down to scroll through it
+# (probably needs zle hackery to bind those keys)
+
+# keybase chat is annoyingly inconsistent:
+#  keybase chat read <conv> [--channel=foo]
+#  keybase chat send <conv> [--channel=foo]
+#  keybase chat list-members <conv> <channel>
+# note that the former accepts both #foo and foo, and the latter only accepts foo
+
 unsetopt FUNCTION_ARGZERO
+
+if [[ ! $TMUX ]]; then
+  echo "This program must be run inside tmux."
+  exit 1
+fi
 
 function hashnick {
   echo "$1" | od -td1 -An -w1024 -v | sed -E 's,^ +,print((,; s, *$,)%6+31),; s, +,+,g;' | lua
@@ -120,6 +142,12 @@ if [[ $1 == --watch ]]; then
   exit 0
 fi
 
+
+if (( $(tmux list-panes | wc -l) > 1 )); then
+  echo "I found more than one open tmux pane."
+  echo "This means either you have multiple panes open and I was about to ruin them, or that my pane-opening logic has a bug and I was about to crash your tmux server by creating infinitely many panes."
+  exit 1
+fi
 # Set up the windows.
 # The watcher goes in the top pane.
 # We create it above us (-b) and don't give it focus (-d)
@@ -131,9 +159,10 @@ clear
 fc -p -a /dev/null
 
 # The input reader goes in the bottom (currently focused) pane.
-# TODO: use `vared` and history settings here to permit readline editing
-# and in-memory history
-while header "$*"; input=""; vared -h -p '> ' input; do
+# to bind scroll commands:
+# bindkey "^[[5~" scroll-up-fn
+# bindkey "^[[6~" scroll-down-fn
+while header "$@"; input=""; vared -h -p '> ' input; do
   case "$input" in
     /quit) break ;;
     /restart)
