@@ -1,0 +1,163 @@
+#!/usr/bin/env zsh
+# simple interactive chat UI for keybase chat
+
+# keybase chat output format:
+#     [index] [username timestamp] [expires in timestamp] reactji message
+# - reactji are optional, and have the format: emoji [count]
+#   or: :emoji-name: [count]
+#   n.b. the space between the emoji and the count is optional!
+#   similarly, there is no fixed number of spaces between the expiration counter
+#   and the reactji, or the reactji and the message, beyond "at least one".
+# - keybase hard-wraps messages, even if !isatty(stdout); lines after the first
+#   will be prefixed with spaces to align them with the previous line.
+#   these can be identified as a line starting with lots of spaces and no [index].
+# - the "expires in" message is optional
+# - for system messages, the message text itself is wrapped in [], e.g.
+#     [3] [xxxxxxx 45s]                       [Added @yyyy to the team]
+
+unsetopt FUNCTION_ARGZERO
+
+function hashnick {
+  echo "$1" | od -td1 -An -w1024 -v | sed -E 's,^ +,print((,; s, *$,)%6+31),; s, +,+,g;' | lua
+}
+
+function formatnick {
+  printf '<\x1B[%dm%s\x1B[0m>' $(hashnick $1) $1
+}
+
+# Trim leading whitespace. Leaves trailing whitespace alone -- we need it for
+# line pasting.
+function trim {
+  sed -E 's,^ +,,; s, +$,,'
+}
+
+function flush {
+  if [[ $message == *'chat read error'* ]]; then
+    # Skip errors, usually this means the message has expired or predates us joining the channel.
+  else
+    nick=$(formatnick $nick)
+    message="$(printf '%s \x1B[48;2;60;60;60m%s\x1B[0m' $message $reactji)"
+    printf '%s\n' "$message" | fold -s -w $((COLUMNS-22)) | while read -r line; do
+      # Field width for the name is calculated as [20 + 9 nonprinting control code characters]
+      # for a display width of 20.
+      [[ $message ]] || continue  # fold sometimes emits a trailing blank line?
+      printf '%29s %s\n' "$nick" "$line"
+      nick=$(printf '\x1B[000000m') # nine characters of nonprinting padding
+    done
+  fi
+  nick=""
+  message=""
+  reactji=""
+}
+
+function parse-line {
+  if [[ $1 == '['* ]]; then
+    flush
+    nick=$(echo "$1" | cut -d'[' -f3 | cut -d' ' -f1)
+    message=$(echo "$1" | sed -E 's,\[expires in [^]]+\],,' | cut -d']' -f3- | trim)
+    # the second space here is \xA0, nonbreaking space, so that `fold` later on doesn't
+    # split it up.
+    reactji=$(echo "$message" | egrep -o '^([^ ]+ ?\[[0-9]+\] )+' | sed -E 's, , ,g')
+    if [[ $reactji ]]; then
+      message=$(echo "$message" | egrep -o '  .*' | trim)
+    fi
+  else
+    message="$message $(echo "$1" | trim)"
+  fi
+}
+
+function pretty-chat {
+  nick=""; message=""; reactji="";
+  while read -r line; do parse-line "$line"; done
+}
+
+function watch-chat-once {
+  keybase chat read \
+    --at-least=$((LINES)) --at-most=$((LINES)) "$@" \
+    | pretty-chat
+  flush
+}
+
+function watch-chat {
+  local old_screen=""
+  while true; do
+    local screen="$(watch-chat-once "$@")"
+    if [[ $screen != $old_screen ]]; then
+      printf '\x1B[2J\x1B[0;0H\x07%s' "$screen"
+      old_screen="$screen"
+    fi
+    sleep 1
+  done
+}
+
+function shutdown {
+  clear
+  tmux kill-pane -t 0
+}
+
+function header {
+  printf '\x1B2J\x1B[0;0H\x1B[1;37;41m%s\x1B[0K\x1B[0m\n' \
+    "  $*"
+}
+
+function show-log {
+  keybase chat read \
+    --since 1d --at-most 0 --at-least 10240 \
+    "$@" \
+    | pretty-chat | less -R +G
+}
+
+function zoom {
+  tmux resize-pane -Z
+  "$@"
+  tmux resize-pane -Z
+}
+
+if [[ $1 == --watch ]]; then
+  shift
+  watch-chat "$@"
+  exit 0
+fi
+
+# Set up the windows.
+# The watcher goes in the top pane.
+# We create it above us (-b) and don't give it focus (-d)
+tmux split-window -d -b "sleep 1; $0 --watch $*; sleep 30"
+tmux resize-pane -D 999
+clear
+
+# Initialize a new in-memory history, which will be used for the input box.
+fc -p -a /dev/null
+
+# The input reader goes in the bottom (currently focused) pane.
+# TODO: use `vared` and history settings here to permit readline editing
+# and in-memory history
+while header "$*"; input=""; vared -h -p '> ' input; do
+  case "$input" in
+    /quit) break ;;
+    /restart)
+      shutdown
+      exec "$0" "$@"
+      ;;
+    /sh) zoom $SHELL -i ;;
+    /log) zoom show-log "$@" ;;
+    /*)
+      ;;
+    # /join*)
+    #   need to parse out args and then restart
+    # /names|/who)
+    #   requires `keybase list-members` to work, which it doesn't
+    # /list)
+    #   resize-pane -Z
+    #   keybase chat list | less  # also need to list channels
+    #   resize-pane -Z
+    #   ;;
+    *)
+      keybase chat send \
+        --exploding-lifetime=168h0m0s \
+        $@ "$input"
+      ;;
+  esac
+done
+
+shutdown
