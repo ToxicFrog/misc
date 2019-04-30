@@ -130,6 +130,21 @@ function show-log {
     | pretty-chat | less -R +G
 }
 
+function show-help {
+  (cat | less) <<EOF
+  Type a message and press enter to send it, or enter one of the following commands:
+
+    /quit       exit keybase-talk and return your terminal to normal
+    /restart    restart keybase-talk with the same arguments
+    /sh         open a full-screen shell
+    /help       this screen
+    /log        show the last day of chat
+
+  This help screen (and /log) uses less(1), so use arrows and pageup/down to scroll, / and ? to search forward and back, and q to quit.
+
+EOF
+}
+
 function zoom {
   tmux resize-pane -Z
   "$@"
@@ -171,6 +186,7 @@ while header "$@"; input=""; vared -h -p '> ' input; do
       ;;
     /sh) zoom $SHELL -i ;;
     /log) zoom show-log "$@" ;;
+    /help) zoom show-help ;;
     /*)
       ;;
     # /join*)
