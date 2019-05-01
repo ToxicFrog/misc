@@ -204,11 +204,11 @@ fi
 # Set up the windows.
 # The watcher goes in the top pane.
 # We create it above us (-b) and don't give it focus (-d)
-tmux split-window -l $((LINES-4)) -d -b "$0 --watch $*"
+tmux split-window -l $((LINES-4)) -d -b "$0 --watch $*; echo 'chat watcher exited unexpectedly'; read"
 if [[ $2 ]]; then
   # User has requested an organization channel. Those have user lists, so
   # add a name list to the right of the chat pane.
-  tmux split-window -l 20 -d -h -t 0 "$0 --names $*"
+  tmux split-window -l 20 -d -h -t 0 "$0 --names $*; echo 'name list exited unexpectedly'; read"
 fi
 
 trap /resize WINCH
