@@ -94,22 +94,22 @@ function pretty-chat {
   while read -r line; do parse-line "$line"; done
 }
 
-function watch-chat-once {
-  keybase chat read \
-    --at-least=$((LINES)) --at-most=$((LINES)) "$@" \
-    | pretty-chat
-  flush
+function render-chat {
+  local screen="$(
+    keybase chat read \
+      --at-least=$((LINES)) --at-most=$((LINES)) "$@" \
+      | pretty-chat
+    flush
+  )"
+  printf '\x1Bc\x1B[0;0H\x07%s' "$screen"
 }
 
 function watch-chat {
-  local old_screen=""
-  while true; do
-    local screen="$(watch-chat-once "$@")"
-    if [[ $screen != $old_screen ]]; then
-      printf '\x1Bc\x1B[0;0H\x07%s' "$screen"
-      old_screen="$screen"
-    fi
-    sleep 1
+  printf 'Loading chat history, please wait...'
+  render-chat "$@"
+  # keybase chat api-listen --exploding 2>/dev/null | jq --unbuffered -r .msg.content.type | while read event; do
+  keybase chat api-listen --exploding 2>/dev/null | while read -r event; do
+    render-chat "$@"
   done
 }
 
