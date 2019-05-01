@@ -113,9 +113,19 @@ function watch-chat {
   done
 }
 
+function watch-names {
+  local old_screen=""
+  while true; do
+    keybase chat list-members $@ | sed -E '1,2 d' | while read name; do
+      printf '%s\n' $(formatnick $name)
+    done
+    sleep 60
+  done
+}
+
 function shutdown {
   clear
-  tmux kill-pane -t 0
+  tmux kill-pane -a -t $TMUX_PANE
 }
 
 function header {
@@ -174,6 +184,11 @@ if [[ $1 == --watch ]]; then
   exit 0
 fi
 
+if [[ $1 == --names ]]; then
+  shift
+  watch-names "$@"
+  exit 0
+fi
 
 if (( $(tmux list-panes | wc -l) > 1 )); then
   echo "I found more than one open tmux pane."
@@ -190,6 +205,11 @@ fi
 # The watcher goes in the top pane.
 # We create it above us (-b) and don't give it focus (-d)
 tmux split-window -l $((LINES-4)) -d -b "$0 --watch $*"
+if [[ $2 ]]; then
+  # User has requested an organization channel. Those have user lists, so
+  # add a name list to the right of the chat pane.
+  tmux split-window -l 20 -d -h -t 0 "$0 --names $*"
+fi
 
 trap /resize WINCH
 
