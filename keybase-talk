@@ -23,8 +23,6 @@
 # a user list (requires keybase chat list-members to be fixed)
 # /log <date range>
 # /restart <args>
-# keep more backscroll and let the user use pageup/down to scroll through it
-# (probably needs zle hackery to bind those keys)
 
 # keybase chat is annoyingly inconsistent:
 #  keybase chat read <conv> [--channel=foo]
@@ -149,7 +147,8 @@ function /log {
 
 function /help {
   (cat | less) <<EOF
-  Type a message and press enter to send it, or enter one of the following commands:
+  Type a message and press enter to send it. Use pageup/down to scroll the chat history.
+  You can also enter the following commands:
 
     /quit       exit keybase-talk and return your terminal to normal
     /restart    restart keybase-talk with the same arguments
@@ -170,10 +169,31 @@ function /resize {
   fi
 }
 
+#### Misc UI helpers ####
+
 function zoom {
   tmux resize-pane -Z
   "$@"
   tmux resize-pane -Z
+}
+
+function scroll-up {
+  tmux copy-mode -t 0 -e
+  tmux send -t 0 PgUp
+}
+
+function scroll-down {
+  # Send only in copy mode, otherwise we get garbage
+  if [[ $(tmux display-message -t 0 -p -F '#{pane_in_mode}') == 1 ]]; then
+    tmux send -t 0 PgDn
+  fi
+}
+
+function exit-scroll {
+  # Send only in copy mode, otherwise we get garbage
+  if [[ $(tmux display-message -t 0 -p -F '#{pane_in_mode}') == 1 ]]; then
+    tmux send -t 0 Escape
+  fi
 }
 
 #### Startup code ####
@@ -210,16 +230,22 @@ if [[ $2 ]]; then
   # add a name list to the right of the chat pane.
   tmux split-window -l 20 -d -h -t 0 "$0 --names $*; echo 'name list exited unexpectedly'; read"
 fi
+# The input reader goes in the bottom (currently focused) pane.
 
+# Automatically resize page when size changes.
 trap /resize WINCH
 
 # Initialize a new in-memory history, which will be used for the input box.
 fc -p -a /dev/null
 
-# The input reader goes in the bottom (currently focused) pane.
-# to bind scroll commands:
-# bindkey "^[[5~" scroll-up-fn
-# bindkey "^[[6~" scroll-down-fn
+# Bind pageup/down to scroll through history.
+zle -N scroll-up
+bindkey "^[[5~" scroll-up
+zle -N scroll-down
+bindkey "^[[6~" scroll-down
+zle -N exit-scroll
+bindkey "^[" exit-scroll
+
 while header "$@"; input=""; vared -h -p '> ' input; do
   case "$input" in
     /quit) break ;;
