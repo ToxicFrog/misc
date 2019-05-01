@@ -44,7 +44,7 @@ function hashnick {
 }
 
 function formatnick {
-  printf '<\x1B[%dm%s\x1B[0m>' $(hashnick $1) $1
+  printf '\x1B[%dm%s\x1B[0m' $(hashnick $1) $1
 }
 
 # Trim leading whitespace. Leaves trailing whitespace alone -- we need it for
@@ -57,7 +57,7 @@ function flush {
   if [[ $message == *'chat read error'* ]]; then
     # Skip errors, usually this means the message has expired or predates us joining the channel.
   else
-    nick=$(formatnick $nick)
+    nick="<$(formatnick $nick)>"
     if [[ $reactji ]]; then
       message="$(printf '%s \x1B[48;2;60;60;60m%s\x1B[0m' $message $reactji)"
     fi
@@ -128,14 +128,16 @@ function header {
   fi
 }
 
-function show-log {
+#### Implementation of /commands ####
+
+function /log {
   keybase chat read \
     --since 1d --at-most 0 --at-least 10240 \
     "$@" \
     | pretty-chat | less -R +G
 }
 
-function show-help {
+function /help {
   (cat | less) <<EOF
   Type a message and press enter to send it, or enter one of the following commands:
 
@@ -155,6 +157,8 @@ function zoom {
   "$@"
   tmux resize-pane -Z
 }
+
+#### Startup code ####
 
 if [[ $1 == --watch ]]; then
   shift
@@ -194,8 +198,8 @@ while header "$@"; input=""; vared -h -p '> ' input; do
       exec "$0" "$@"
       ;;
     /sh) zoom $SHELL -i ;;
-    /log) zoom show-log "$@" ;;
-    /help) zoom show-help ;;
+    /log) zoom /log "$@" ;;
+    /help) zoom /help ;;
     /*)
       ;;
     # /join*)
