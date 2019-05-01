@@ -146,10 +146,18 @@ function /help {
     /sh         open a full-screen shell
     /help       this screen
     /log        show the last day of chat
+    /resize     resize the UI to fit window; this should happen automatically
 
   This help screen (and /log) uses less(1), so use arrows and pageup/down to scroll, / and ? to search forward and back, and q to quit.
 
 EOF
+}
+
+function /resize {
+  tmux resize-pane -y 3
+  if (( $(tmux list-panes | wc -l) > 2 )); then
+    tmux resize-pane -t 1 -x 20
+  fi
 }
 
 function zoom {
@@ -183,6 +191,8 @@ fi
 # We create it above us (-b) and don't give it focus (-d)
 tmux split-window -l $((LINES-4)) -d -b "$0 --watch $*"
 
+trap /resize WINCH
+
 # Initialize a new in-memory history, which will be used for the input box.
 fc -p -a /dev/null
 
@@ -200,6 +210,7 @@ while header "$@"; input=""; vared -h -p '> ' input; do
     /sh) zoom $SHELL -i ;;
     /log) zoom /log "$@" ;;
     /help) zoom /help ;;
+    /resize) /resize ;;
     /*)
       ;;
     # /join*)
