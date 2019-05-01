@@ -221,10 +221,17 @@ if [[ $2 ]]; then
   set -- $1 ${2#\#}
 fi
 
+conv="$1"
+if [[ "$2" ]]; then
+  chan="--channel=$2"
+else
+  chan=""
+fi
+
 # Set up the windows.
 # The watcher goes in the top pane.
 # We create it above us (-b) and don't give it focus (-d)
-tmux split-window -l $((LINES-4)) -d -b "$0 --watch $*; echo 'chat watcher exited unexpectedly'; read"
+tmux split-window -l $((LINES-4)) -d -b "$0 --watch $channel $conv; echo 'chat watcher exited unexpectedly'; read"
 if [[ $2 ]]; then
   # User has requested an organization channel. Those have user lists, so
   # add a name list to the right of the chat pane.
@@ -271,7 +278,7 @@ while header "$@"; input=""; vared -h -p '> ' input; do
     *)
       keybase chat send \
         --exploding-lifetime=168h0m0s \
-        $@ "$input"
+        $channel $conv "$input"
       ;;
   esac
 done
