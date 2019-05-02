@@ -20,9 +20,39 @@
 # /list,/join,/upload,/download
 # /buf to switch which channel you're chatting in
 # /msg to create a privmsg, may be eqv to /join in keybase
-# a user list (requires keybase chat list-members to be fixed)
 # /log <date range>
 # /restart <args>
+# Show activity in other chats in the status bar
+
+# event handling
+# change in user list: refresh user list
+# event in current channel: refresh channel view
+# event in other channel: refresh status bar
+# messages will have msg.channel.name set to the conversation name, which will
+# be the team name for messages in a team channel or "foo,bar" for PMs (where
+# foo and bar are the participants).
+# for team channels, msg.channel.topic_name will be set to the channel name
+# jq -r '.result.messages | map([.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")) | .[]'
+# jq -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")'
+# known message types:
+# attachment
+# delete
+# edit
+# none -- a previously expired or deleted message
+# reaction
+# system -- so far only seen addedtoteam messages; should probably just refresh
+#           everything on system messages
+# text
+# unfurl -- like text but has onebox information associated
+# all of these will have type and name set, and topic_name if they're part of a team chat
+# in practice we can just do something like:
+# get target
+#  if focused:
+#   on text, unfurl, attach, delete, edit, none, or reaction, refresh text
+#   on system, refresh text and user list
+#  if not focused:
+#   on text, unfurl, attach, or edit, mark as major activity
+#   on delete, none, reaction, or system, mark as minor activity
 
 # keybase chat is annoyingly inconsistent:
 #  keybase chat read <conv> [--channel=foo]
@@ -167,14 +197,17 @@ function /resize {
   if (( $(tmux list-panes | wc -l) > 2 )); then
     tmux resize-pane -t 1 -x 20
   fi
+  # TODO: tell the talk pane to redraw
 }
 
 #### Misc UI helpers ####
 
 function zoom {
+  trap '' WINCH
   tmux resize-pane -Z
   "$@"
   tmux resize-pane -Z
+  trap /resize WINCH
 }
 
 function scroll-up {
