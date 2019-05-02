@@ -279,12 +279,18 @@ trap /resize WINCH
 fc -p -a /dev/null
 
 # Bind pageup/down to scroll through history.
+[[ -f ~/.zkbd/$TERM-$VENDOR-$OSTYPE ]] && source ~/.zkbd/$TERM-$VENDOR-$OSTYPE
 zle -N scroll-up
-bindkey "^[[5~" scroll-up
+bindkey "${key[PageUp]:=^[[5~}" scroll-up
 zle -N scroll-down
-bindkey "^[[6~" scroll-down
+bindkey "${key[PageDown]:=^[[6~}" scroll-down
 zle -N exit-scroll
 bindkey "^[" exit-scroll
+
+# These aren't bound by default, and we can't inherit the bindkey settings from
+# our parent shell (which may not even be zsh), so make an attempt here.
+bindkey "${key[Home]:=^[[1~}" beginning-of-line
+bindkey "${key[End]:=^[[1~}" end-of-line
 
 while header "$@"; input=""; vared -h -p '> ' input; do
   case "$input" in
