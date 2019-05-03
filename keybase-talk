@@ -74,7 +74,8 @@
 #  keybase chat list-members <conv> <channel>
 # note that the former accepts both #foo and foo, and the latter only accepts foo
 
-unsetopt FUNCTION_ARGZERO
+unsetopt function_argzero
+setopt prompt_subst prompt_percent
 function err { >&2 echo "$@"; }
 
 #### Safety checks ####
@@ -117,7 +118,10 @@ function main {
   setup-gui "$@"
   setup-input "$@"
 
-  while header "$@"; input=""; vared -h -p '> ' input; do
+  export LPROMPT="    $1${2/#%?*/#$2} ($(keybase chat list-members $@ | wc -l))"
+  export RPROMPT="" # TODO show activity in other channels here
+
+  while header "$@"; input=""; vared -h -p '$(left-prompt)' -r '$(right-prompt)' input; do
     case "$input" in
       /quit) break ;;
       /restart)
@@ -194,6 +198,23 @@ function setup-input {
   bindkey "${key[End]:=^[[1~}" end-of-line
 }
 
+# Draw the red status bar, left-hand status, and > prompt.
+# LPROMPT is set externally and contains the channel name and user count.
+function left-prompt {
+  printf '%b' \
+    '%{\x1Bc\x1B[0;0H%}%B%F{white}%K{red}' \
+    $LPROMPT '%E%b%f%k\n> '
+}
+
+# Draw the right-hand status, typically empty or a list of active channels.
+function right-prompt {
+  printf '%b' \
+    '%B%F{white}%K{red}%{' $(echotc UP 1) '%}' \
+    '%-' $(( ${#LPROMPT}+2 )) '>...>' \
+    $RPROMPT \
+    '%>>%{' $(echotc DO 1) '%}%b%f%k'
+}
+
 function zoom {
   trap '' WINCH
   tmux resize-pane -Z
@@ -218,16 +239,6 @@ function exit-scroll {
   # Send only in copy mode, otherwise we get garbage
   if [[ $(tmux display-message -t 0 -p -F '#{pane_in_mode}') == 1 ]]; then
     tmux send -t 0 Escape
-  fi
-}
-
-function header {
-  if [[ $2 ]]; then
-    printf '\x1Bc\x1B[0;0H\x1B[1;37;41m    %s #%s\x1B[0K\x1B[0m\n' \
-      $1 $2
-  else
-    printf '\x1Bc\x1B[0;0H\x1B[1;37;41m    %s\x1B[0K\x1B[0m\n' \
-      $1
   fi
 }
 
