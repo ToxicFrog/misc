@@ -195,7 +195,7 @@ function setup-events {
 function event-listener {
   stty -onlcr
   keybase chat api-listen --exploding 2>/dev/null \
-  | jq -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")'
+  | jq --unbuffered -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")'
 }
 
 # called by zle -F with the active FD as the only argument.
