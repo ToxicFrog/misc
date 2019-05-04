@@ -122,15 +122,17 @@ function main {
   setup-input "$@"
   setup-events
 
+  # We have to do this after setup-gui, because opening the pipes will block
+  # until the other end has opened them as well.
   exec 9>$PIPEDIR/chat 8>$PIPEDIR/names
   export CHATFD=9 NAMEFD=8
-  export NET=$1 CHANNEL=$2
-  event-handler __init__ $NET $CHANNEL # to draw the initial chat contents
+  export NET=$1 CHAN=$2
+  event-handler-focused __init__ $NET $CHAN # to draw the initial chat contents
 
   export LPROMPT="    $1${2/#%?*/#$2} ($(keybase chat list-members $@ | wc -l))"
   export RPROMPT="" # TODO show activity in other channels here
 
-  while header "$@"; input=""; vared -h -p '$(left-prompt)' -r '$(right-prompt)' input; do
+  while input=""; vared -h -p '$(left-prompt)' -r '$(right-prompt)' input; do
     case "$input" in
       /quit) break ;;
       /restart)
@@ -141,12 +143,9 @@ function main {
       /log) zoom /log "$@" ;;
       /help) zoom /help ;;
       /resize) /resize ;;
-      /*)
-        ;;
+      /*) ;;
       # /join*)
       #   need to parse out args and then restart
-      # /names|/who)
-      #   requires `keybase list-members` to work, which it doesn't
       # /list)
       #   resize-pane -Z
       #   keybase chat list | less  # also need to list channels
@@ -196,13 +195,20 @@ function setup-events {
 function event-listener {
   stty -onlcr
   keybase chat api-listen --exploding 2>/dev/null \
-  | jq -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")' \
-  | while IFS=$'\t' read type net chan; do
-      event-handler $type $net $chan
-    done
+  | jq -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")'
 }
 
+# called by zle -F with the active FD as the only argument.
 function event-handler {
+  read -u $1 -r type net chan
+  if [[ $net == $NET && $chan == $CHAN ]]; then
+    event-handler-focused $type $net $chan
+  else
+    event-handler-unfocused $type $net $chan
+  fi
+}
+
+function event-handler-focused {
   local type=$1 net=$2 chan=$3
   case $type in
     attachment|delete|edit|none|reaction|text|unfurl)
@@ -215,6 +221,21 @@ function event-handler {
       # Unknown message type!
       send $CHATFD ${chan/?*/--channel=$chan} $net
       send $NAMEFD $net ${chan:-general}
+      ;;
+  esac
+}
+
+function event-handler-unfocused {
+  local type=$1 net=$2 chan=$3
+  case $type in
+    delete|edit|none|reaction|system)
+      # minor activity in channel
+      ;;
+    attachment|text|unfurl)
+      # major activity in channel
+      ;;
+    *)
+      # Unknown message type!
       ;;
   esac
 }
@@ -335,7 +356,7 @@ function /resize {
   if (( $(tmux list-panes | wc -l) > 2 )); then
     tmux resize-pane -t 1 -x 20
   fi
-  event-handler __init__ $NET $CHANNEL
+  event-handler-focused __init__ $NET $CHAN
 }
 
 #### Name list ####
