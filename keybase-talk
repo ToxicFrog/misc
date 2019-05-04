@@ -78,6 +78,8 @@ unsetopt function_argzero
 setopt prompt_subst prompt_percent
 function err { >&2 echo "$@"; }
 
+export PIPEDIR=/run/user/$UID/keybase-talk.$$
+
 #### Safety checks ####
 
 missing=""
@@ -115,8 +117,15 @@ function main {
     set -- $1 ${2#\#}
   fi
 
+  setup-pipes
   setup-gui "$@"
   setup-input "$@"
+  setup-events
+
+  exec 9>$PIPEDIR/chat 8>$PIPEDIR/names
+  export CHATFD=9 NAMEFD=8
+  export NET=$1 CHANNEL=$2
+  event-handler __init__ $NET $CHANNEL # to draw the initial chat contents
 
   export LPROMPT="    $1${2/#%?*/#$2} ($(keybase chat list-members $@ | wc -l))"
   export RPROMPT="" # TODO show activity in other channels here
@@ -156,7 +165,58 @@ function main {
 
 function shutdown {
   clear
+  trap '' WINCH  # or the resize handler will run when we kill-pane, and crash
   tmux kill-pane -a -t $TMUX_PANE
+  zpty -d event-listener
+  rm -rf $PIPEDIR
+}
+
+#### IPC ####
+
+function setup-pipes {
+  mkdir -p $PIPEDIR
+  mkfifo -m 0600 $PIPEDIR/chat
+  mkfifo -m 0600 $PIPEDIR/names
+}
+
+function send {
+  local fd=$1; shift
+  print -r -u $fd -- "$@"
+}
+
+#### Event handlers ####
+
+zmodload zsh/zpty
+
+function setup-events {
+  zpty event-listener event-listener
+  zle -F $REPLY event-handler
+}
+
+function event-listener {
+  stty -onlcr
+  keybase chat api-listen --exploding 2>/dev/null \
+  | jq -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")' \
+  | while IFS=$'\t' read type net chan; do
+      event-handler $type $net $chan
+    done
+}
+
+function event-handler {
+  local type=$1 net=$2 chan=$3
+  case $type in
+    attachment|delete|edit|none|reaction|text|unfurl)
+      send $CHATFD ${chan/?*/--channel=$chan} $net
+      ;;
+    system)
+      send $NAMEFD $net ${chan:-general}
+      ;;
+    *)
+      # Unknown message type!
+      send $CHATFD ${chan/?*/--channel=$chan} $net
+      send $NAMEFD $net ${chan:-general}
+      ;;
+  esac
 }
 
 #### UI management code ####
@@ -166,11 +226,13 @@ function setup-gui {
   # Set up the windows.
   # The watcher goes in the top pane.
   # We create it above us (-b) and don't give it focus (-d)
-  tmux split-window -l $((LINES-4)) -d -b "MAIN=main/chat $0 $*; echo 'chat watcher exited unexpectedly'; read"
+  tmux split-window -l $((LINES-4)) -d -b \
+    "MAIN=main/chat $0 $PIPEDIR/chat; echo 'chat watcher exited unexpectedly'; read"
   if [[ $2 ]]; then
     # User has requested an organization channel. Those have user lists, so
     # add a name list to the right of the chat pane.
-    tmux split-window -l 20 -d -h -t 0 "MAIN=main/names $0 $*; echo 'name list exited unexpectedly'; read"
+    tmux split-window -l 20 -d -h -t 0 \
+      "MAIN=main/names $0 $PIPEDIR/names; echo 'name list exited unexpectedly'; read"
   fi
   # The input reader goes in the bottom (currently focused) pane.
 
@@ -273,18 +335,17 @@ function /resize {
   if (( $(tmux list-panes | wc -l) > 2 )); then
     tmux resize-pane -t 1 -x 20
   fi
-  # TODO: tell the talk pane to redraw
+  event-handler __init__ $NET $CHANNEL
 }
 
 #### Name list ####
 
 function main/names {
-  local old_screen=""
-  while true; do
-    keybase chat list-members $@ | sed -E '1,2 d' | while read name; do
+  exec 9<$1
+  while read -r -u 9 -A args; do
+    keybase chat list-members "${args[@]}" | sed -E '1,2 d' | while read name; do
       printf '%s\n' $(formatnick $name)
     done
-    sleep 60
   done
 }
 
@@ -299,11 +360,10 @@ function hashnick {
 #### Chat window ####
 
 function main/chat {
-  printf 'Loading chat history, please wait...'
-  render-chat "$@"
-  # keybase chat api-listen --exploding 2>/dev/null | jq --unbuffered -r .msg.content.type | while read event; do
-  keybase chat api-listen --exploding 2>/dev/null | while read -r event; do
-    render-chat "$@"
+  echo 'Loading chat history, please wait...'
+  exec 9<$1
+  while read -r -u 9 -A args; do
+    render-chat "${args[@]}"
   done
 }
 
