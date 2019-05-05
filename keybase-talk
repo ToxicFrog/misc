@@ -121,8 +121,8 @@ function main {
 
   # We have to do this after setup-gui, because opening the pipes will block
   # until the other end has opened them as well.
-  exec 9>$PIPEDIR/chat 8>$PIPEDIR/names
-  export CHATFD=9 NAMEFD=8
+  exec 9>$PIPEDIR/chat 8>$PIPEDIR/status
+  export CHATFD=9 STATUSFD=8
   export NET=$1 CHAN=$2
   event-handler-focused __init__ $NET $CHAN # to draw the initial chat contents
 
@@ -158,7 +158,7 @@ function shutdown {
 function setup-pipes {
   mkdir -p $PIPEDIR
   mkfifo -m 0600 $PIPEDIR/chat
-  mkfifo -m 0600 $PIPEDIR/names
+  mkfifo -m 0600 $PIPEDIR/status
 }
 
 function send {
@@ -198,12 +198,12 @@ function event-handler-focused {
       send $CHATFD ${chan/?*/--channel=$chan} $net
       ;;
     system)
-      send $NAMEFD $net ${chan:-general}
+      send $STATUSFD $net $chan
       ;;
     *)
       # Unknown message type!
       send $CHATFD ${chan/?*/--channel=$chan} $net
-      send $NAMEFD $net ${chan:-general}
+      send $STATUSFD $net $chan
       ;;
   esac
 }
@@ -232,9 +232,9 @@ function setup-gui {
   # We create it above us (-b) and don't give it focus (-d)
   tmux split-window -l $((LINES-4)) -d -b \
     "MAIN=main/chat $0 $PIPEDIR/chat; echo 'chat watcher exited unexpectedly'; read"
-  # Then we create the user list to the right of it.
+  # Then we create the status window to the right of it.
   tmux split-window -l 20 -d -h -t 0 \
-    "MAIN=main/names $0 $PIPEDIR/names; echo 'name list exited unexpectedly'; read"
+    "MAIN=main/status $0 $PIPEDIR/status; echo 'name list exited unexpectedly'; read"
   # The input reader goes in the bottom (currently focused) pane.
 
   # Automatically resize page when size changes.
@@ -457,14 +457,57 @@ EOF
   zoom-out
 }
 
-#### Name list ####
+#### Status pane ####
 
-function main/names {
+function main/status {
   exec 9<$1
-  while read -r -u 9 -A args; do
-    keybase chat list-members "${args[@]}" | sed -E '1,2 d' | while read name; do
-      printf '%s\n' $(formatnick $name)
-    done
+  local net chan
+  while read -r -u 9 net chan; do
+    printf '\x1Bc\x1B[0;0H'
+    if [[ $chan ]]; then
+      print -P '%F{black}%K{cyan}      CHANNEL%E%f%k%B'
+      print ''
+      print -P "  %U$net%u"
+      print "    #$chan"
+      print "    ($(keybase chat list-members $net $chan | wc -l) members)"
+    else
+      print -P '%F{black}%K{cyan}      PRIVATE%E%f%k%B'
+      print ''
+      printf '  %s\n' $(echo $net | sed -E 's/,/ /g')
+    fi
+    print -P '%f%k%b'
+    pretty-activity-tree
+  done
+}
+
+function pretty-activity-tree {
+  local current_net=""
+  local activity=$(
+    echo '{"method": "list"}' \
+    | keybase chat api \
+    | jq -r '.result.conversations | map([.unread, .channel.name, .channel.topic_name]) | map(join("\t")) | .[]'
+  )
+
+  print -P '%B%F{white}%K{blue}      CHANNELS%E%b%f%k'
+  print ''
+  echo "$activity" | egrep -v $'\t$' | sort -k2 | while read unread net chan; do
+    if [[ $unread != true ]]; then
+      unread=''
+    fi
+    if [[ $net == $current_net ]]; then
+      print -P "    ${unread/?*/%B}#$chan%b"
+    else
+      current_net=$net
+      print -P "  %U$net%u"
+      print -P "    ${unread/?*/%B}#$chan%b"
+    fi
+  done
+  print ''
+  print -P '%B%F{white}%K{blue}  PRIVATE MESSAGES%E%b%f%k'
+  print ''
+  echo "$activity" | egrep $'^true\t.*\t$' | sort -k2 | while read unread pm; do
+    # no printing of fully read PMs
+    print -P "    %B$chan%b"
   done
 }
 
