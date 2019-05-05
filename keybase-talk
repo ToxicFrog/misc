@@ -129,38 +129,24 @@ function main {
   export NET=$1 CHAN=$2
   event-handler-focused __init__ $NET $CHAN # to draw the initial chat contents
 
-  export LPROMPT="    $1${2/#%?*/#$2} ($(keybase chat list-members $@ | wc -l))"
-  export RPROMPT="" # TODO show activity in other channels here
+  export LPROMPT="    $NET${CHAN/#%?*/#$CHAN}"
 
   while input=""; vared -h -p '$(left-prompt)' -r '$(right-prompt)' input; do
-    case "$input" in
-      /quit) break ;;
-      /restart)
-        shutdown
-        exec "$0" "$@"
-        ;;
-      /sh) zoom $SHELL -i ;;
-      /log) zoom /log "$@" ;;
-      /help) zoom /help ;;
-      /resize) /resize ;;
-      "/debug "*)
-        /debug "$input" ;;
-      /*) ;;
-      # /join*)
-      #   need to parse out args and then restart
-      # /list)
-      #   resize-pane -Z
-      #   keybase chat list | less  # also need to list channels
-      #   resize-pane -Z
-      #   ;;
-      *)
-        keybase chat send \
-          --exploding-lifetime=168h0m0s \
-          ${2/#%?*/--channel=$2} $1 "$input"
-        ;;
-    esac
+    if [[ $input == /* ]]; then
+      # handle /command
+      printf '%s' "$input" | read command args
+      if [[ $(printf '%s\n' ${(k)functions[@]} | egrep "^$command" | wc -l) == 1 ]]; then
+        $(printf '%s\n' ${(k)functions[@]} | egrep "^$command") ${(z)args}
+      else
+        err "Unknown or ambiguous command: $command"
+        read -q
+      fi
+    else
+      /say "$*"
+    fi
   done
 
+  err "Main loop exited unexpectedly!"
   shutdown
 }
 
@@ -251,12 +237,9 @@ function setup-gui {
   # We create it above us (-b) and don't give it focus (-d)
   tmux split-window -l $((LINES-4)) -d -b \
     "MAIN=main/chat $0 $PIPEDIR/chat; echo 'chat watcher exited unexpectedly'; read"
-  if [[ $2 ]]; then
-    # User has requested an organization channel. Those have user lists, so
-    # add a name list to the right of the chat pane.
-    tmux split-window -l 20 -d -h -t 0 \
-      "MAIN=main/names $0 $PIPEDIR/names; echo 'name list exited unexpectedly'; read"
-  fi
+  # Then we create the user list to the right of it.
+  tmux split-window -l 20 -d -h -t 0 \
+    "MAIN=main/names $0 $PIPEDIR/names; echo 'name list exited unexpectedly'; read"
   # The input reader goes in the bottom (currently focused) pane.
 
   # Automatically resize page when size changes.
@@ -315,10 +298,12 @@ function right-prompt {
     '%>>%{' $(echotc DO 1) '%}%b%f%k'
 }
 
-function zoom {
+function zoom-in {
   trap '' WINCH
   tmux resize-pane -Z
-  "$@"
+}
+
+function zoom-out {
   tmux resize-pane -Z
   trap /resize WINCH
 }
@@ -344,23 +329,54 @@ function exit-scroll {
 
 #### Implementation of /commands ####
 
-function /log {
-  keybase chat read \
-    --since 1d --at-most 0 --at-least 10240 \
-    "$@" \
-    | pretty-chat | less -R +G
-}
-
 # Run some debug code. Useful for e.g. directly calling event handlers.
-# Probably the first things you want to do here are:
-# /debug CLEAR_ON_PROMPT=0
-# /debug trap '' WINCH
-# So that you can resize the input window and view the backscroll in it.
 function /debug {
   eval "${1#/debug }"
 }
 
+function /log {
+  zoom-in
+  keybase chat read \
+    --since 1d --at-most 0 --at-least 10240 \
+    "$@" \
+    | pretty-chat | less -R +G
+  zoom-out
+}
+
+function /quit {
+  shutdown
+  exit 0
+}
+
+function /resize {
+  trap '' WINCH
+  tmux resize-pane -y 3
+  if (( $(tmux list-panes | wc -l) > 2 )); then
+    tmux resize-pane -t 1 -x 20
+  fi
+  event-handler-focused __init__ $NET $CHAN
+  trap /resize WINCH
+}
+
+function /restart {
+  shutdown
+  exec $0 $NET $CHAN
+}
+
+function /say {
+  keybase chat send \
+    --exploding-lifetime=168h0m0s \
+    ${CHAN/#%?*/--channel=$CHAN} $NET "$*"
+}
+
+function /shell {
+  zoom-in
+  $SHELL -i
+  zoom-out
+}
+
 function /help {
+  zoom-in
   (cat | less) <<EOF
   Type a message and press enter to send it. Use pageup/down to scroll the chat history.
   You can also enter the following commands:
@@ -389,14 +405,7 @@ function /help {
 
     /sh         Open a full-screen \$SHELL. Returns to chat when the shell exits.
 EOF
-}
-
-function /resize {
-  tmux resize-pane -y 3
-  if (( $(tmux list-panes | wc -l) > 2 )); then
-    tmux resize-pane -t 1 -x 20
-  fi
-  event-handler-focused __init__ $NET $CHAN
+  zoom-out
 }
 
 #### Name list ####
