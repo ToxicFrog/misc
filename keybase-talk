@@ -99,7 +99,7 @@ function main {
   exec 9>$PIPEDIR/chat 8>$PIPEDIR/status
   export CHATFD=9 STATUSFD=8
   export NET=$1 CHAN=$2
-  event-handler-focused __init__ $NET $CHAN # to draw the initial chat contents
+  redraw-both
 
   while input=""; vared -h -p '$(left-prompt)' input; do
     if [[ $input == /* ]]; then
@@ -159,43 +159,22 @@ function event-listener {
 # called by zle -F with the active FD as the only argument.
 function event-handler {
   read -u $1 -r type net chan
+  # Redraw status pane on any activity.
+  redraw-status
   if [[ $net == $NET && $chan == $CHAN ]]; then
-    event-handler-focused $type $net $chan
-  else
-    event-handler-unfocused $type $net $chan
+    # Activity in focused channel? Redraw chat pane.
+    redraw-chat
   fi
 }
 
-function event-handler-focused {
-  local type=$1 net=$2 chan=$3
-  case $type in
-    attachment|delete|edit|none|reaction|text|unfurl)
-      send $CHATFD ${chan/?*/--channel=$chan} $net
-      ;;
-    system)
-      send $STATUSFD $net $chan
-      ;;
-    *)
-      # Unknown message type!
-      send $CHATFD ${chan/?*/--channel=$chan} $net
-      send $STATUSFD $net $chan
-      ;;
-  esac
+function redraw-both { redraw-chat; redraw-status; }
+
+function redraw-status {
+  send $STATUSFD $NET $CHAN
 }
 
-declare -A ACTIVITY=()
-function event-handler-unfocused {
-  local type=$1 net=$2 chan=$3
-  local fqcn="$net${chan/?*/#$chan}" # net#chan if chan, net otherwise. TODO: normalize PMs.
-  case $type in
-    delete|edit|none|reaction|system) # minor activity in channel
-      : ${ACTIVITY[$fqcn]:=minor}
-      ;;
-    attachment|text|unfurl|*) # major activity in channel or unknown message type
-      ACTIVITY[$fqcn]=major
-      ;;
-  esac
-  zle && zle reset-prompt
+function redraw-chat {
+    send $CHATFD ${CHAN/?*/--channel=$CHAN} $NET
 }
 
 #### UI management code ####
@@ -297,7 +276,7 @@ function /buffer {
   parse-conv "$1" | read net chan
   NET=$net
   CHAN=$chan
-  event-handler-focused __init__ $NET $CHAN
+  redraw-both
 }
 
 # Run some debug code. Useful for e.g. directly calling event handlers.
@@ -350,7 +329,7 @@ function /resize {
   if (( $(tmux list-panes | wc -l) > 2 )); then
     tmux resize-pane -t 1 -x 20
   fi
-  event-handler-focused __init__ $NET $CHAN
+  redraw-both
   trap /resize WINCH
 }
 
@@ -431,21 +410,26 @@ function main/status {
   exec 9<$1
   local net chan
   while read -r -u 9 net chan; do
-    printf '\x1Bc\x1B[0;0H'
-    if [[ $chan ]]; then
-      print -P '%F{black}%K{cyan}      CHANNEL%E%f%k%B'
-      print ''
-      print -P "  %U$net%u"
-      print "    #$chan"
-      print "    ($(keybase chat list-members $net $chan | wc -l) members)"
-    else
-      print -P '%F{black}%K{cyan}      PRIVATE%E%f%k%B'
-      print ''
-      printf '  %s\n' $(echo $net | sed -E 's/,/ /g')
-    fi
-    print -P '%f%k%b'
-    pretty-activity-tree
+    local screen=$(draw-status)
+    printf '%s' "$screen"
   done
+}
+
+function draw-status {
+  printf '\x1Bc\x1B[0;0H'
+  if [[ $chan ]]; then
+    print -P '%F{black}%K{cyan}      CHANNEL%E%f%k%B'
+    print ''
+    print -P "  %U$net%u"
+    print "    #$chan"
+    print "    ($(keybase chat list-members $net $chan | wc -l) members)"
+  else
+    print -P '%F{black}%K{cyan}      PRIVATE%E%f%k%B'
+    print ''
+    printf '  %s\n' $(echo $net | sed -E 's/,/ /g')
+  fi
+  print -P '%f%k%b'
+  pretty-activity-tree
 }
 
 function pretty-activity-tree {
