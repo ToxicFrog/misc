@@ -522,9 +522,13 @@ function hashnick {
 #### Chat window ####
 
 function main/chat {
-  echo 'Loading chat history, please wait...'
+  local old_args=""
   exec 9<$1
   while read -r -u 9 -A args; do
+    if [[ $old_args != ${args[*]} ]]; then
+      printf '\x1Bc\x1B[0;0HLoading chat history, please wait...\n'
+      old_args="${args[*]}"
+    fi
     render-chat "${args[@]}"
   done
 }
