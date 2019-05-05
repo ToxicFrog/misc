@@ -284,6 +284,18 @@ function /debug {
   eval "${1#/debug }"
 }
 
+function /join {
+  [[ $1 ]] || return
+  local net chan
+  parse-conv "$1" | read net chan
+  if [[ $chan ]]; then
+    keybase chat join-channel $net $chan
+  else
+    keybase team request-access $net
+  fi
+  redraw-both
+}
+
 function /list {
   zoom-in
   if [[ $1 ]]; then
@@ -316,6 +328,18 @@ function /names {
     keybase chat list-members $net $chan | less
   fi
   zoom-out
+}
+
+function /part {
+  [[ $1 ]] || return
+  local net chan
+  parse-conv "$1" | read net chan
+  if [[ $chan ]]; then
+    keybase chat leave-channel $net $chan
+  else
+    keybase team leave $net
+  fi
+  redraw-both
 }
 
 function /quit {
@@ -376,6 +400,10 @@ function /help {
 
     /help       This screen. Use pageup/down to scroll, q to return to chat.
 
+    /join <team>
+    /join <conversation>
+                Join a team, or a channel within a team.
+
     /list
     /list <team>
                 List all conversations you are in; or list all channels in a team.
@@ -388,6 +416,10 @@ function /help {
                 Pageup/down to scroll, / or ? to search, q to return to chat.
 
     /names      List all members of the current channel.
+
+    /part <team>
+    /part <conversation>
+                Leave a team channel, or leave the entire team.
 
     /quit       Exit keybase-talk.
 
