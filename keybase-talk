@@ -17,12 +17,9 @@
 #     [3] [xxxxxxx 45s]                       [Added @yyyy to the team]
 
 # Planned but not yet implemented features:
-# /list,/join,/upload,/download
+# /join,/upload,/download
 # /buf to switch which channel you're chatting in
 # /msg to create a privmsg, may be eqv to /join in keybase
-# /log <date range>
-# /restart <args>
-# Show activity in other chats in the status bar
 
 # event handling
 # change in user list: refresh user list
@@ -247,6 +244,7 @@ function setup-gui {
 # Configures ZLE for chat input.
 function setup-input {
   # Initialize a new in-memory history, which will be used for the input box.
+  # FIXME: used to be working, isn't working anymore?
   fc -p -a /dev/null
 
   # Bind pageup/down to scroll through history.
@@ -327,6 +325,18 @@ function exit-scroll {
 
 #### Implementation of /commands ####
 
+function parse-conv {
+  echo "$1" | sed -E 's,#, ,'
+}
+
+function parse-conv-optional {
+  if [[ $1 ]]; then
+    parse-conv $1
+  else
+    printf '%s\t%s' $NET $CHAN
+  fi
+}
+
 # Run some debug code. Useful for e.g. directly calling event handlers.
 function /debug {
   eval "${1#/debug }"
@@ -344,9 +354,12 @@ function /list {
 
 function /log {
   zoom-in
+  local duration=${1:-1d}
+  local net chan
+  parse-conv-optional "$2" | read net chan
   keybase chat read \
-    --since 1d --at-most 0 --at-least 10240 \
-    "$@" \
+    --since $duration --at-most 0 --at-least 10240 \
+    ${chan/?*/--channel=$chan} "$net" \
     | pretty-chat | less -R +G
   zoom-out
 }
@@ -368,7 +381,11 @@ function /resize {
 
 function /restart {
   shutdown
-  exec $0 $NET $CHAN
+  if [[ $1 ]]; then
+    exec $0 $@
+  else
+    exec $0 $NET $CHAN
+  fi
 }
 
 function /say {
@@ -387,8 +404,10 @@ function /help {
   zoom-in
   (cat | less) <<EOF
   Type a message and press enter to send it. Use pageup/down to scroll the chat history.
-  You can also enter the following commands:
 
+  You can also enter the following commands. Any command that asks for a <conversation>
+  as an argument is expecting either a private conversation name (e.g. "me,them") or
+  a team#channel pair, e.g. "keybasefriends#general".
 
     /debug <zsh code>
                 Execute code in the context of the keybase-talk input pane.
@@ -402,7 +421,10 @@ function /help {
                 List all conversations you are in; or list all channels in a team.
 
     /log
-                Show the last day of messages.
+    /log <duration>
+    /log <duration> <conversation>
+                Show the last day of messages, or the last <duration> (e.g. 7d),
+                for the current conversation or the specified <conversation>.
                 Pageup/down to scroll, / or ? to search, q to return to chat.
 
     /quit       Exit keybase-talk.
@@ -411,11 +433,11 @@ function /help {
                 list. This should happen automatically as needed, but if it doesn't,
                 use this command.
 
-    /restart [args]
+    /restart <args>
                 Restart keybase-talk with the given arguments; with no arguments,
                 uses whatever arguments it was originally invoked with.
 
-    /sh         Open a full-screen \$SHELL. Returns to chat when the shell exits.
+    /shell      Open a full-screen \$SHELL. Returns to chat when the shell exits.
 EOF
   zoom-out
 }
