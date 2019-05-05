@@ -332,6 +332,16 @@ function /debug {
   eval "${1#/debug }"
 }
 
+function /list {
+  zoom-in
+  if [[ $1 ]]; then
+    keybase chat list-channels "$1" | less
+  else
+    keybase chat list | less
+  fi
+  zoom-out
+}
+
 function /log {
   zoom-in
   keybase chat read \
@@ -386,6 +396,10 @@ function /help {
                 /debug trap '' WINCH before anything else.
 
     /help       This screen. Use pageup/down to scroll, q to return to chat.
+
+    /list
+    /list <team>
+                List all conversations you are in; or list all channels in a team.
 
     /log
                 Show the last day of messages.
