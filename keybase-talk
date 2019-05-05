@@ -106,10 +106,11 @@ function main {
       # handle /command
       printf '%s' "$input" | read command args
       if [[ $(printf '%s\n' ${(k)functions[@]} | egrep "^$command" | wc -l) == 1 ]]; then
+        # TODO: capture stderr output of command and show it to the user
         $(printf '%s\n' ${(k)functions[@]} | egrep "^$command") ${(z)args}
       else
         err "Unknown or ambiguous command: $command"
-        read -q
+        read -q '?--more--'
       fi
     else
       /say "$*"
@@ -185,10 +186,10 @@ function setup-gui {
   # The watcher goes in the top pane.
   # We create it above us (-b) and don't give it focus (-d)
   tmux split-window -l $((LINES-4)) -d -b \
-    "MAIN=main/chat $0 $PIPEDIR/chat; echo 'chat watcher exited unexpectedly'; read"
+    "MAIN=main/chat $0 $PIPEDIR/chat; echo 'chat watcher exited unexpectedly'; read -q '?--more--'"
   # Then we create the status window to the right of it.
   tmux split-window -l 20 -d -h -t 0 \
-    "MAIN=main/status $0 $PIPEDIR/status; echo 'name list exited unexpectedly'; read"
+    "MAIN=main/status $0 $PIPEDIR/status; echo 'name list exited unexpectedly'; read -q '?--more--'"
   # The input reader goes in the bottom (currently focused) pane.
 
   # Automatically resize page when size changes.
