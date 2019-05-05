@@ -143,6 +143,8 @@ function main {
       /log) zoom /log "$@" ;;
       /help) zoom /help ;;
       /resize) /resize ;;
+      "/debug "*)
+        /debug "$input" ;;
       /*) ;;
       # /join*)
       #   need to parse out args and then restart
@@ -334,17 +336,23 @@ function /log {
     | pretty-chat | less -R +G
 }
 
+function /debug {
+  eval "${1#/debug }"
+}
+
 function /help {
   (cat | less) <<EOF
   Type a message and press enter to send it. Use pageup/down to scroll the chat history.
   You can also enter the following commands:
 
-    /quit       exit keybase-talk and return your terminal to normal
-    /restart    restart keybase-talk with the same arguments
-    /sh         open a full-screen shell
+    /debug [zsh code]
+                execute code in the context of the keybase-talk input pane
     /help       this screen
     /log        show the last day of chat
+    /quit       exit keybase-talk and return your terminal to normal
     /resize     resize the UI to fit window; this should happen automatically
+    /restart    restart keybase-talk with the same arguments
+    /sh         open a full-screen shell
 
   This help screen (and /log) uses less(1), so use arrows and pageup/down to scroll, / and ? to search forward and back, and q to quit.
 
