@@ -113,7 +113,7 @@ function main {
         read -q '?--more--'
       fi
     else
-      /say "$*"
+      /say "$input"
     fi
   done
 
