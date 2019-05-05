@@ -227,19 +227,19 @@ function event-handler-focused {
   esac
 }
 
+declare -A ACTIVITY=()
 function event-handler-unfocused {
   local type=$1 net=$2 chan=$3
+  local fqcn="$net${chan/?*/#$chan}" # net#chan if chan, net otherwise. TODO: normalize PMs.
   case $type in
-    delete|edit|none|reaction|system)
-      # minor activity in channel
+    delete|edit|none|reaction|system) # minor activity in channel
+      : ${ACTIVITY[$fqcn]:=minor}
       ;;
-    attachment|text|unfurl)
-      # major activity in channel
-      ;;
-    *)
-      # Unknown message type!
+    attachment|text|unfurl|*) # major activity in channel or unknown message type
+      ACTIVITY[$fqcn]=major
       ;;
   esac
+  zle && zle reset-prompt
 }
 
 #### UI management code ####
@@ -300,10 +300,18 @@ function left-prompt {
 
 # Draw the right-hand status, typically empty or a list of active channels.
 function right-prompt {
+  local activitylist=" "
+  for k v in ${(kv)ACTIVITY[@]}; do
+    case $v in
+      minor) activitylist="$activitylist$k " ;;
+      major) activitylist="$activitylist%B$k%b " ;;
+      *) ;;
+    esac
+  done
   printf '%b' \
-    '%B%F{white}%K{red}%{' $(echotc UP 1) '%}' \
+    '%F{white}%K{red}%{' $(echotc UP 1) '%}' \
     '%-' $(( ${#LPROMPT}+2 )) '>...>' \
-    $RPROMPT \
+    $activitylist \
     '%>>%{' $(echotc DO 1) '%}%b%f%k'
 }
 
