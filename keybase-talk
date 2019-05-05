@@ -285,10 +285,17 @@ function setup-input {
 
 # Draw the red status bar, left-hand status, and > prompt.
 # LPROMPT is set externally and contains the channel name and user count.
+CLEAR_ON_PROMPT=1
 function left-prompt {
-  printf '%b' \
-    '%{\x1Bc\x1B[0;0H%}%B%F{white}%K{red}' \
-    $LPROMPT '%E%b%f%k\n> '
+  if (( CLEAR_ON_PROMPT )); then
+    printf '%b' \
+      '%{\x1Bc\x1B[0;0H%}%B%F{white}%K{red}' \
+      $LPROMPT '%E%b%f%k\n> '
+  else
+    printf '%b' \
+      '%B%F{white}%K{red}' \
+      $LPROMPT '%E%b%f%k\n> '
+  fi
 }
 
 # Draw the right-hand status, typically empty or a list of active channels.
@@ -336,6 +343,11 @@ function /log {
     | pretty-chat | less -R +G
 }
 
+# Run some debug code. Useful for e.g. directly calling event handlers.
+# Probably the first things you want to do here are:
+# /debug CLEAR_ON_PROMPT=0
+# /debug trap '' WINCH
+# So that you can resize the input window and view the backscroll in it.
 function /debug {
   eval "${1#/debug }"
 }
