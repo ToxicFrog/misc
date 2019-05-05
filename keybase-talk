@@ -129,8 +129,6 @@ function main {
   export NET=$1 CHAN=$2
   event-handler-focused __init__ $NET $CHAN # to draw the initial chat contents
 
-  export LPROMPT="    $NET${CHAN/#%?*/#$CHAN}"
-
   while input=""; vared -h -p '$(left-prompt)' -r '$(right-prompt)' input; do
     if [[ $input == /* ]]; then
       # handle /command
@@ -272,12 +270,12 @@ CLEAR_ON_PROMPT=1
 function left-prompt {
   if (( CLEAR_ON_PROMPT )); then
     printf '%b' \
-      '%{\x1Bc\x1B[0;0H%}%B%F{white}%K{red}' \
-      $LPROMPT '%E%b%f%k\n> '
+      '%{\x1Bc\x1B[0;0H%}%B%F{white}%K{red}  ' \
+      $NET ${CHAN/?*/#$CHAN} '%E%b%f%k\n> '
   else
     printf '%b' \
       '%B%F{white}%K{red}' \
-      $LPROMPT '%E%b%f%k\n> '
+      $NET ${CHAN/?*/#$CHAN} '%E%b%f%k\n> '
   fi
 }
 
@@ -293,7 +291,7 @@ function right-prompt {
   done
   printf '%b' \
     '%F{white}%K{red}%{' $(echotc UP 1) '%}' \
-    '%-' $(( ${#LPROMPT}+2 )) '>...>' \
+    '%-' $(( 4 + $(echo "$NET#$CHAN" | wc -c) )) '>...>' \
     $activitylist \
     '%>>%{' $(echotc DO 1) '%}%b%f%k'
 }
