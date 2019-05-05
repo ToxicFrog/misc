@@ -365,17 +365,29 @@ function /help {
   Type a message and press enter to send it. Use pageup/down to scroll the chat history.
   You can also enter the following commands:
 
-    /debug [zsh code]
-                execute code in the context of the keybase-talk input pane
-    /help       this screen
-    /log        show the last day of chat
-    /quit       exit keybase-talk and return your terminal to normal
-    /resize     resize the UI to fit window; this should happen automatically
-    /restart    restart keybase-talk with the same arguments
-    /sh         open a full-screen shell
 
-  This help screen (and /log) uses less(1), so use arrows and pageup/down to scroll, / and ? to search forward and back, and q to quit.
+    /debug <zsh code>
+                Execute code in the context of the keybase-talk input pane.
+                You probably want to /debug CLEAR_ON_PROMPT=0 and
+                /debug trap '' WINCH before anything else.
 
+    /help       This screen. Use pageup/down to scroll, q to return to chat.
+
+    /log
+                Show the last day of messages.
+                Pageup/down to scroll, / or ? to search, q to return to chat.
+
+    /quit       Exit keybase-talk.
+
+    /resize     Resize the UI to fit the window and redraw the backscroll and user
+                list. This should happen automatically as needed, but if it doesn't,
+                use this command.
+
+    /restart [args]
+                Restart keybase-talk with the given arguments; with no arguments,
+                uses whatever arguments it was originally invoked with.
+
+    /sh         Open a full-screen \$SHELL. Returns to chat when the shell exits.
 EOF
 }
 
