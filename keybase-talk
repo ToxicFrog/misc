@@ -126,7 +126,7 @@ function main {
   export NET=$1 CHAN=$2
   event-handler-focused __init__ $NET $CHAN # to draw the initial chat contents
 
-  while input=""; vared -h -p '$(left-prompt)' -r '$(right-prompt)' input; do
+  while input=""; vared -h -p '$(left-prompt)' input; do
     if [[ $input == /* ]]; then
       # handle /command
       printf '%s' "$input" | read command args
@@ -267,31 +267,10 @@ function setup-input {
 CLEAR_ON_PROMPT=1
 function left-prompt {
   if (( CLEAR_ON_PROMPT )); then
-    printf '%b' \
-      '%{\x1Bc\x1B[0;0H%}%B%F{white}%K{red}  ' \
-      $NET ${CHAN/?*/#$CHAN} '%E%b%f%k\n> '
+    printf '%b' '%{\x1Bc\x1B[0;0H%}%B>%b '
   else
-    printf '%b' \
-      '%B%F{white}%K{red}' \
-      $NET ${CHAN/?*/#$CHAN} '%E%b%f%k\n> '
+    printf '%b' '%B>%b '
   fi
-}
-
-# Draw the right-hand status, typically empty or a list of active channels.
-function right-prompt {
-  local activitylist=" "
-  for k v in ${(kv)ACTIVITY[@]}; do
-    case $v in
-      minor) activitylist="$activitylist$k " ;;
-      major) activitylist="$activitylist%B$k%b " ;;
-      *) ;;
-    esac
-  done
-  printf '%b' \
-    '%F{white}%K{red}%{' $(echotc UP 1) '%}' \
-    '%-' $(( 4 + $(echo "$NET#$CHAN" | wc -c) )) '>...>' \
-    $activitylist \
-    '%>>%{' $(echotc DO 1) '%}%b%f%k'
 }
 
 function zoom-in {
