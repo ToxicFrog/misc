@@ -337,6 +337,15 @@ function parse-conv-optional {
   fi
 }
 
+function /buffer {
+  [[ $1 ]] || return
+  local net chan
+  parse-conv "$1" | read net chan
+  NET=$net
+  CHAN=$chan
+  event-handler-focused __init__ $NET $CHAN
+}
+
 # Run some debug code. Useful for e.g. directly calling event handlers.
 function /debug {
   eval "${1#/debug }"
@@ -408,6 +417,12 @@ function /help {
   You can also enter the following commands. Any command that asks for a <conversation>
   as an argument is expecting either a private conversation name (e.g. "me,them") or
   a team#channel pair, e.g. "keybasefriends#general".
+
+  You can shorten commands as long as the shortened version is unambiguous, e.g. /b
+  instead of /buffer.
+
+    /buffer <conversation>
+                Switch to a different conversation.
 
     /debug <zsh code>
                 Execute code in the context of the keybase-talk input pane.
