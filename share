@@ -7,9 +7,20 @@
 #
 # See `share help` for usage information.
 
-# A bunch of the features below probably require storing information about
-# the share somewhere convenient, say in a .share file in the share itself --
-# should probably set it 600 so httpd can't read it
+# Information about the share itself is stored in a .share file inside the
+# share directory, with mode 0600. It's one entry per line, tab separated;
+# the same key can occur multiple times.
+# Currently, name, hash, and pwd (the working directory when `share` was
+# invoked) are stored.
+# Planned features:
+# - share creation command (add, add-zip, add-album)
+# - arguments
+# - expiration date (once expiring shares are implemented)
+# - cache location (once gallery caches are implemented)
+# In particular, having the command and arguments stored means that you can
+# run `share refresh name` and it'll automatically figure out what directory
+# to cd into and what command to run to refresh/replace it.
+
 # TODO: "persistent" mode, that keeps the generated gallery around for
 # incremental updates and remembers what arguments it was invoked with.
 # TODO: "ephemeral" mode, that is automatically deleted after a certain number
@@ -17,24 +28,16 @@
 # TODO: share aliasing (using symlinks) -- removing the share needs to remove the
 # aliases as well!
 # TODO: share renaming (with option to alias the old name)
-# sharedata format
-# stored in $SHARE_DIR/.sharedata
-# k-v store, each line has the format "key\tvalue\n" (so no tabs in keys, and no newlines in anything)
-# name <name of share>
-# hash <hash of share>
-# pwd <dir program was run in to create the share>
-#
 
 set -e
 setopt no_function_argzero
 
-SHARE_LIST="$HOME/.config/shares"
 SHARE_PATH=${SHARE_PATH:=/srv/www/share}
 SHARE_URL="https://ancilla.ancilla.ca/share"
 PROGNAME="$(basename $0)"
 
 missing=""
-for prog in xxd pv fgallery rsync exiftool; do
+for prog in xxd pv fgallery rsync exiftool convert; do
   if ! &>/dev/null type $prog; then
     missing="$missing $prog"
   fi
@@ -45,7 +48,6 @@ if [[ $missing ]]; then
 fi
 
 function share/main {
-  touch $SHARE_LIST
   local cmd="$1"; shift
   while [[ $1 ]]; do
     case $1 in
@@ -94,25 +96,24 @@ function share/die {
 # Internally, it's sha256sum in base64 with url-hostile characters replaced.
 # Hash is based on UID + share name, so different people sharing the same thing
 # have different share hashes.
+# TODO: stronger salting?
 function share/hash {
-  printf '%s%s' "$UID" "$@" | sha256sum | cut -d' ' -f1 | xxd -r -p | base64 | tr '+/' '-_'
-}
-
-# register NAME
-function share/register {
-  local hash=$(share/hash $1)
-  egrep -q "^$hash" $SHARE_LIST || printf '%s\x1F%s\n' "$hash" "$1" >> $SHARE_LIST
-}
-
-# unregister NAME
-function share/unregister {
-  local hash=$(share/hash $1)
-  sed -E -i "/^$hash/ d" $SHARE_LIST
+  printf '%s%s' "$UID" "$*" | sha256sum | cut -d' ' -f1 | xxd -r -p | base64 | tr '+/' '-_'
 }
 
 # True if a share with the given name exists.
 function share/exists {
-  egrep -q "^$(share/hash $1)" $SHARE_LIST
+  [[ -e "$SHARE_PATH/$(share/hash $1)" ]]
+}
+
+# share/register hash name
+function share/register {
+  local hash=$1; shift
+  install -m 0600 /dev/null "$SHARE_PATH/$hash/.share"
+  while [[ $1 ]]; do
+    share/cfg-set $hash "$1" "$2"
+    shift 2
+  done
 }
 
 function share/paths-to-name {
@@ -151,6 +152,7 @@ function share/paths-to-name {
 # If a single directory is specified, shares that directory as is.
 # If a single file or multiple arguments are specified, wraps them in a directory
 # and shares that.
+# TODO: if a share by that name already exists, re-use the hash for that share.
 function share-add {
   local name=$(share/paths-to-name "$@")
   local hash=$(share/hash $name)
@@ -177,7 +179,13 @@ function share-add {
     fi
   fi
 
-  share/register $name
+  share/register "$hash" \
+    hash "$hash" \
+    name "$name" \
+    pwd "$PWD"
+  for arg in "$@"; do
+    share/cfg-add "$hash" arg "$arg"
+  done
 }
 
 # Add a source image ($2) to a gallery input directory ($1)
@@ -209,7 +217,7 @@ function share/add-source-image {
     *.mp4)
       local name=$(basename $2 | sed -E 's,\.mp4$,,i')
       # extract thumbnail from frame 30
-      ffmpeg -hide_banner -loglevel quiet -i "$2" -vf "select=gte(n\,30)" -vframes 1 "$1/$name.thumb.jpeg"
+      </dev/null ffmpeg -hide_banner -loglevel quiet -i "$2" -vf "select=gte(n\,30)" -vframes 1 "$1/$name.thumb.jpeg"
       local size=$(convert "$1/$name.thumb.jpeg" -format "%wx%h" info:)
       convert "$1/$name.thumb.jpeg" \
         \( $HOME/devel/misc/play-circle.svg \
@@ -243,14 +251,15 @@ function share-add-album {
   # TODO: this unconditionally overwrites duplicates. Option to merge instead?
   local -A replacements
   find "$@" -type f | while read file; do
+    if [[ ! -e "$file" ]]; then
+      echo "Warning: $file vanished during scan!"
+    fi
     local replacement=$(share/add-source-image "/tmp/$$" "$file" | tr ' .' '__')
     if [[ $replacement ]]; then
       replacements[$file]="$replacement.jpeg"
     fi
   done
   # TODO: optional -f for face detection?
-  # TODO: "persistent" mode, that keeps the generated gallery around for
-  # incremental updates and remembers what arguments it was invoked with.
   # Generate gallery
   fgallery -j 4 -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
   # Replace "fake" originals with the real originals
@@ -267,7 +276,13 @@ function share-add-album {
   printf 'Name: %s\n' $name
   printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
 
-  share/register $name
+  share/register "$hash" \
+    hash "$hash" \
+    name "$name" \
+    pwd "$PWD"
+  for arg in "$@"; do
+    share/cfg-add "$hash" arg "$arg"
+  done
 }
 
 function share-add-zip {
@@ -279,10 +294,40 @@ function share-add-zip {
 
   mkdir -p "$SHARE_PATH/$hash"
   zip -q -0 -r - "$@" | pv > "$SHARE_PATH/$hash/$name"
-  local dirhash=$(ipfs files stat --hash /.shares/$zipname)
   printf 'Name: %s\n' $name
   printf ' URL: %s/%s/%s\n' "$SHARE_URL" "$hash" "${name// /%20}"
-  share/register $name
+
+  share/register "$hash" \
+    hash "$hash" \
+    name "$name" \
+    pwd "$PWD"
+  for arg in "$@"; do
+    share/cfg-add "$hash" arg "$arg"
+  done
+}
+
+# share config manipulation functions
+# the config is stored as a multimap, one line per entry, k-v tab separated
+
+# cfg-get <hash> <key>
+function share/cfg-get {
+  egrep "^$2" "$SHARE_PATH/$1/.share" | cut -f2-
+}
+
+# cfg-set <hash> <key> <value>
+function share/cfg-set {
+  share/cfg-del $1 $2
+  share/cfg-add $1 $2 $3
+}
+
+# cfg-del <hash> <key>
+function share/cfg-del {
+  sed -i -E "/^$2/ d" "$SHARE_PATH/$1/.share"
+}
+
+# cfg-add <hash> <key> <value>
+function share/cfg-add {
+  printf '%s\t%s\n' "$2" "$3" >> "$SHARE_PATH/$1/.share"
 }
 
 # List all shares by name.
@@ -293,13 +338,18 @@ function share-ls {
   if [[ $1 ]]; then
     share/ls-detail "$@"
   else
-    cat $SHARE_LIST | sed -E 's,\x1F, ,'
+    find $SHARE_PATH -mindepth 1 -maxdepth 1 \
+        -user $UID -type d -printf '%f\n' | while read hash; do
+      printf '%s %s\n' \
+        "$(share/cfg-get $hash hash)" \
+        "$(share/cfg-get $hash name)"
+    done | sort -k2
   fi
 }
 
-# Read keys from stdin and list their names, IPFS/IPNS paths and contents.
+# Read keys from stdin and list their names, URLs and info about the contents.
 function share/ls-detail {
-  grep "$@" $SHARE_LIST | while IFS=$'\x1F' read -r hash name; do
+  share-ls | grep "$@" | while read -r hash name; do
     local count=$(find $SHARE_PATH/$hash -type f | wc -l)
     local size=$(du -sh --apparent-size $SHARE_PATH/$hash | cut -f1)
     printf '\n'
@@ -324,7 +374,6 @@ function share-rm {
     local hash="$(share/hash $1)"
     echo "Removing $1 ($hash)"
     rm -rf "$SHARE_PATH/$hash"
-    share/unregister "$1"
     shift
   done
 }
