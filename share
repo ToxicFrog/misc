@@ -47,7 +47,7 @@ if [[ $missing ]]; then
   exit 1
 fi
 
-function share/main {
+function main {
   local cmd="$1"; shift
   while [[ $1 ]]; do
     case $1 in
@@ -57,8 +57,8 @@ function share/main {
       *) break;;
     esac
   done
-  if (( ${+functions[share-$cmd]} )); then
-    share-$cmd "$@"
+  if (( ${+functions[cmd/$cmd]} )); then
+    cmd/$cmd "$@"
   else
     share/die "Unknown command '$cmd'. Try '$PROGNAME help'."
   fi
@@ -66,22 +66,23 @@ function share/main {
 
 ## share help [command]
 # List available commands, or display help for a specific command.
-function share-help {
-  printf '%s\n'\
-    "$PROGNAME -- a simple hash-based file sharing program."\
-    "Usage:"\
-    "  $PROGNAME add [-n name] <dir>"\
-    "    Share a directory and everything in it."\
-    "  $PROGNAME add [-n name] <list of files/dirs>"\
-    "    Create a shared directory containing the listed files/dirs."\
-    "  $PROGNAME add-album [-n name] <list of files/dirs>"\
-    "    As add, but creates an HTML/JS thumbnail album from the contents."\
-    "  $PROGNAME add-zip <name> <list of files/dirs>"\
-    "    Like add, but creates a zip file with the given name and shares that instead."\
-    "  $PROGNAME ls [pattern]"\
-    "    List all shares. With <pattern>, list only matching shares and their contents."\
-    "  $PROGNAME rm <name> [<name>...]"\
-    "    Remove the named shares."\
+function cmd/help {
+  if [[ "$1" ]]; then
+    # display command-specific help
+    cat "$0" | sed -n -E "
+      /^## $PROGNAME $1[ $]/,/^function/ {
+        /^function/ d
+        s,^## (.*),\n    \1\n,
+        s,^# ,  ,
+        p
+      }
+    "
+  else
+    # List all commands
+    echo "$PROGNAME -- a simple hash-based web sharing program."
+    echo "Usage:"
+    cat "$0" | sed -n -E '/^## /,+1 { s,^## ,  ,; s,^# ,    ,; p }'
+  fi
 }
 
 ### Library functions ###
@@ -145,20 +146,16 @@ function share/paths-to-name {
 
 ### Command implementations ###
 
-## share add <file>
-## share add <directory>
-## share add <multiple files and/or directories...>
-# Add a share.
+## share add [-n name] <directory|files-and-directories...>
+# Create or update a share.
 # If a single directory is specified, shares that directory as is.
 # If a single file or multiple arguments are specified, wraps them in a directory
 # and shares that.
-# TODO: if a share by that name already exists, re-use the hash for that share.
-function share-add {
+function cmd/add {
+  # TODO: if a share by that name already exists, re-use the hash for that share.
+  # TODO: normalize trailing slash handling WRT rsync use.
   local name=$(share/paths-to-name "$@")
   local hash=$(share/hash $name)
-  if [[ "$1" == "-n" ]]; then
-    shift 2
-  fi
   if [[ $# == 1 && -d "$1" ]]; then
     # Add single directory
     command rsync -a --delete --info=progress2 "$1/" "$SHARE_PATH/$hash/"
@@ -235,13 +232,15 @@ function share/add-source-image {
 }
 
 ## share add-album <files-and-directories...>
-# As share, but generates an HTML album from the contents using fgallery
-# and then shares that.
+# Generates an HTML+JS album from image files and shares that.
+# If given directories, searches under them for image files and adds everything
+# that it finds to the album. If multiple files occur with the same basename,
+# it picks one effectively at random (!).
 # Makes the original images available for download, but strips EXIF metadata
 # from them first.
 # GIFs and MP4 video are added to the gallery as thumbnails with a (>) overlay
 # such that clicking on it takes you to the original file.
-function share-add-album {
+function cmd/add-album {
   local name=$(share/paths-to-name "$@")
   local hash=$(share/hash $name)
 
@@ -285,7 +284,12 @@ function share-add-album {
   done
 }
 
-function share-add-zip {
+## share add-zip <name.zip> <list of files/dirs...>
+# Like add, but zips all of the inputs first.
+# The name argument must be an unqualified zip file name.
+# Contents are currently zipped without compression; this is an aggregation
+# tool, not a compression one.
+function cmd/add-zip {
   local name=$1; shift
   local hash=$(share/hash $name)
   if [[ $name =~ / ]] || [[ $name != *.zip ]]; then
@@ -330,11 +334,12 @@ function share/cfg-add {
   printf '%s\t%s\n' "$2" "$3" >> "$SHARE_PATH/$1/.share"
 }
 
-# List all shares by name.
-# If no arguments specified, lists all shares with their hashes.
-# If arguments specified, shows only shares matching those args (as `grep`) and
-# lists their name, IPFS path, IPNS path, and contents.
-function share-ls {
+## share ls [grep arguments...]
+# List shares or display information about a share.
+# With no arguments, lists all shares with their hashes.
+# With arguments, interprets them as `grep` does and lists detailed information
+# about all shares with names that match those arguments.
+function cmd/ls {
   if [[ $1 ]]; then
     share/ls-detail "$@"
   else
@@ -349,7 +354,7 @@ function share-ls {
 
 # Read keys from stdin and list their names, URLs and info about the contents.
 function share/ls-detail {
-  share-ls | grep "$@" | while read -r hash name; do
+  cmd/ls | grep "$@" | while read -r hash name; do
     local count=$(find $SHARE_PATH/$hash -type f | wc -l)
     local size=$(du -sh --apparent-size $SHARE_PATH/$hash | cut -f1)
     printf '\n'
@@ -363,10 +368,9 @@ function share/ls-detail {
   done
 }
 
-# share rm name
-# Remove share matching the given name.
-# No globbing/regex or remove by hash yet.
-function share-rm {
+## share rm <name>
+# Delete a share.
+function cmd/rm {
   while [[ $1 ]]; do
     if ! share/exists $1; then
       share/die "No share with name '$1'"
@@ -380,4 +384,4 @@ function share-rm {
 
 ### Entry point ###
 
-exec share/main "$@"
+exec main "$@"
