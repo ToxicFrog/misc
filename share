@@ -51,7 +51,6 @@ function main {
   local cmd="$1"; shift
   while [[ $1 ]]; do
     case $1 in
-      -n) local SHARE_NAME="$2"; shift 2;;
       --) shift; break;;
       -*) die "Unknown option '$1'";;
       *) break;;
@@ -117,36 +116,9 @@ function share/register {
   done
 }
 
-function share/paths-to-name {
-  if [[ $SHARE_NAME ]]; then
-    printf '%s' "$SHARE_NAME"
-    return
-  fi
-  if [[ $# == 1 ]]; then
-    if [[ -d "$1" ]]; then
-      # Single directory argument: realpath with / suffix
-      printf "%s/" "$(realpath "$1")"
-    else
-      # Single file argument: realpath with no suffix
-      realpath "$1"
-    fi
-  else
-    # This is so gross I'm just forbidding it for now.
-    share/die "If you're sharing multiple things you need to specify a name with -n"
-    # Multiple file and/or directory arguments. This needs work.
-    # At the moment, the name is the first (lexical) argument with the first eight
-    # characters of the sha1sum of all the arguments appended.
-    local hash=$(printf '%s\n' "$@" | xargs -d\\n realpath | sort | sha1sum | cut -c1-8)
-    local prefix=$(printf '%s\n' "$@" | xargs -d\\n realpath | sort | head -n1)
-    # This is kind of gross.
-    # TODO: come up with a better naming scheme for ad hoc dirs.
-    printf '%s/<%d items>@%s' "$prefix" "$#" "$hash"
-  fi
-}
-
 ### Command implementations ###
 
-## share add [-n name] <directory|files-and-directories...>
+## share add <name> <directory|files-and-directories...>
 # Create or update a share.
 # If a single directory is specified, shares that directory as is.
 # If a single file or multiple arguments are specified, wraps them in a directory
@@ -154,8 +126,14 @@ function share/paths-to-name {
 function cmd/add {
   # TODO: if a share by that name already exists, re-use the hash for that share.
   # TODO: normalize trailing slash handling WRT rsync use.
-  local name=$(share/paths-to-name "$@")
+  local name=$1; shift
   local hash=$(share/hash $name)
+  if [[ ! $1 ]]; then
+    die "share add needs a name *and* some files; see 'share help add'."
+  elif [[ -e $name ]]; then
+    die "trying to create a share with a name identical to a file; did you forget the share name?"
+  fi
+
   if [[ $# == 1 && -d "$1" ]]; then
     # Add single directory
     command rsync -a --delete --info=progress2 "$1/" "$SHARE_PATH/$hash/"
@@ -241,8 +219,13 @@ function share/add-source-image {
 # GIFs and MP4 video are added to the gallery as thumbnails with a (>) overlay
 # such that clicking on it takes you to the original file.
 function cmd/add-album {
-  local name=$(share/paths-to-name "$@")
+  local name=$1; shift
   local hash=$(share/hash $name)
+  if [[ ! $1 ]]; then
+    die "share add needs a name *and* some files; see 'share help add'."
+  elif [[ -e $name ]]; then
+    die "trying to create a share with a name identical to a file; did you forget the share name?"
+  fi
 
   echo "Generating gallery files..."
   trap "rm -rf /tmp/$$ /tmp/$$.fgallery" EXIT
