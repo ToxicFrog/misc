@@ -490,9 +490,12 @@ function pretty-activity-tree {
   print ''
   print -P '%B%F{white}%K{blue}  PRIVATE MESSAGES%E%b%f%k'
   print ''
-  echo "$activity" | egrep $'^true\t.*\t$' | sort -k2 | while read unread pm; do
-    # no printing of fully read PMs
-    print -P "    %B$chan%b"
+  echo "$activity" | egrep $'^(true|false)\t.*\t$' | sort -k2 | while read unread pm; do
+    if [[ $unread != true ]]; then
+      unread=''
+    fi
+    pm="$(print "$pm" | sed -E 's/toxicfrog//; s/,+/,/g; s/^,//; s/,$//;')"
+    print -P "    ${unread/?*/%B}$pm%b"
   done
 }
 
