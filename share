@@ -253,7 +253,7 @@ function cmd/add-album {
     -- "$@"
 
   echo "Generating gallery files..."
-  trap "rm -rf /tmp/$$ /tmp/$$.fgallery" EXIT
+  trap "rm -rf /tmp/$$" EXIT
   mkdir /tmp/$$
   # TODO: this unconditionally overwrites duplicates. Option to merge instead?
   local -A replacements
@@ -268,17 +268,16 @@ function cmd/add-album {
   done
   # TODO: optional -f for face detection?
   # Generate gallery
-  fgallery -j 4 -i -d --max-full 1024x1024 /tmp/$$ /tmp/$$.fgallery
+  fgallery -j 4 -i -d --max-full 1024x1024 /tmp/$$/ "$SHARE_PATH/$hash/"
   # Replace "fake" originals with the real originals
   for original replacement in "${(@kv)replacements}"; do
     echo "Replacement: $original <-> $replacement"
-    rm "/tmp/$$.fgallery/files/$replacement"
-    install -m 644 "$original" /tmp/$$.fgallery/files/
-    sed -Ei 's,"files/'"$replacement"'","files/'"$(basename $original)"'",' /tmp/$$.fgallery/data.json
+    rm "$SHARE_PATH/$hash/files/$replacement"
+    install -m 644 "$original" "$SHARE_PATH/$hash/files/"
+    sed -Ei 's,"files/'"$replacement"'","files/'"$(basename $original)"'",' "$SHARE_PATH/$hash/data.json"
   done
   # Remove EXIF data from original JPEG files
-  exiftool -all= -overwrite_original /tmp/$$.fgallery/files/*
-  command rsync -a --delete --info=progress2 "/tmp/$$.fgallery/" "$SHARE_PATH/$hash/"
+  exiftool -all= -overwrite_original "$SHARE_PATH/$hash/files/"*
 
   printf 'Name: %s\n' $name
   printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
