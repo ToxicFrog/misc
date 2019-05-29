@@ -106,14 +106,29 @@ function share/exists {
   [[ -e "$SHARE_PATH/$(share/hash $1)" ]]
 }
 
-# share/register hash name
-function share/register {
+# share/create hash [k v] [k v]... -- [args]
+# Create the directory for the given share and the .share info file in it.
+# All k-v pairs passed as arguments are registered in the .share file; the
+# same key can be given multiple times.
+# Everything after the -- is added with the "arg" key.
+function share/create {
   local hash=$1; shift
+  install -m 0700 -d "$SHARE_PATH/$hash/"
   install -m 0600 /dev/null "$SHARE_PATH/$hash/.share"
-  while [[ $1 ]]; do
-    share/cfg-set $hash "$1" "$2"
-    shift 2
+  case "$1" in
+    "") return ;;
+    --) break ;;
+    *) share/cfg-add $hash "$1" "$2" ; shift 2 ;;
+  esac
+  for arg in "$@"; do
+    share/cfg-add $hash arg "$arg"
   done
+}
+
+# share/publish hash
+# change the permissions on the share to make it world-readable.
+function share/publish {
+  chmod 0755 "$SHARE_PATH/$1"
 }
 
 ### Command implementations ###
@@ -133,6 +148,13 @@ function cmd/add {
   elif [[ -e $name ]]; then
     die "trying to create a share with a name identical to a file; did you forget the share name?"
   fi
+
+  share/create "$hash" \
+    hash "$hash" \
+    name "$name" \
+    type "files" \
+    pwd "$PWD" \
+    -- "$@"
 
   if [[ $# == 1 && -d "$1" ]]; then
     # Add single directory
@@ -154,18 +176,14 @@ function cmd/add {
     fi
   fi
 
-  share/register "$hash" \
-    hash "$hash" \
-    name "$name" \
-    pwd "$PWD"
-  for arg in "$@"; do
-    share/cfg-add "$hash" arg "$arg"
-  done
+  share/publish "$hash"
 }
 
 # Add a source image ($2) to a gallery input directory ($1)
 # Image types supported by fgallery are symlinked in.
 # GIFs have a PNG thumbnail extracted and inserted.
+# If a replacement was made, emits on stdout the name of the replacement
+# image that was installed.
 function share/add-source-image {
   case "$(echo $2 | tr A-Z a-z)" in
     *.jpg|*.jpeg|*.png|*.tif|*.tiff)
@@ -227,6 +245,13 @@ function cmd/add-album {
     die "trying to create a share with a name identical to a file; did you forget the share name?"
   fi
 
+  share/create "$hash" \
+    hash "$hash" \
+    name "$name" \
+    type "album" \
+    pwd "$PWD" \
+    -- "$@"
+
   echo "Generating gallery files..."
   trap "rm -rf /tmp/$$ /tmp/$$.fgallery" EXIT
   mkdir /tmp/$$
@@ -257,14 +282,7 @@ function cmd/add-album {
 
   printf 'Name: %s\n' $name
   printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
-
-  share/register "$hash" \
-    hash "$hash" \
-    name "$name" \
-    pwd "$PWD"
-  for arg in "$@"; do
-    share/cfg-add "$hash" arg "$arg"
-  done
+  share/publish $hash
 }
 
 ## share add-zip <name.zip> <list of files/dirs...>
@@ -279,18 +297,18 @@ function cmd/add-zip {
     die "The first argument to add-zip must be a .zip file name with no slashes."
   fi
 
-  mkdir -p "$SHARE_PATH/$hash"
+  share/create "$hash" \
+    hash "$hash" \
+    name "$name" \
+    type "zip" \
+    pwd "$PWD" \
+    -- "$@"
+
   zip -q -0 -r - "$@" | pv > "$SHARE_PATH/$hash/$name"
   printf 'Name: %s\n' $name
   printf ' URL: %s/%s/%s\n' "$SHARE_URL" "$hash" "${name// /%20}"
 
-  share/register "$hash" \
-    hash "$hash" \
-    name "$name" \
-    pwd "$PWD"
-  for arg in "$@"; do
-    share/cfg-add "$hash" arg "$arg"
-  done
+  share/publish "$hash"
 }
 
 # share config manipulation functions
