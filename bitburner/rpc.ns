@@ -1,0 +1,92 @@
+// Libraries for RPC and remote status handling.
+// All RPC uses port 20, which is configured to hold a single mutable object
+// containing all of the channel contents, as a map from channel name to
+// channel content.
+// The special channel 0 (the actual number 0, not "0") holds status publications
+// and is a map from "script@hostname" to status.
+// Users must call rpc.init(ns) before making any calls to other RPC functions.
+// Uses 3.60GB, the same as calling peek/write/read directly.
+
+var ns;
+var RPC_PORT = 20;
+var STATUS_CHANNEL = 0;
+
+function assert(cond, msg) {
+  if (!cond) throw msg;
+}
+
+export function init(n) {
+  ns = n;
+  if (ns.peek(RPC_PORT) === "NULL PORT DATA") {
+    ns.write(RPC_PORT, {0: {}});
+  }
+}
+
+// Create a new RPC channel with the specified size (0=unlimited).
+// This must be called before any attempt to send or recv on it is made.
+// If the channel already exists, it is cleared.
+export function createChannel(channel, size=20) {
+  ns.peek(RPC_PORT)[channel] = [];
+  ns.peek(RPC_PORT)[channel].size = size;
+}
+
+// Send a message on the given channel. If the channel is full, blocks until
+// it can write the message, or until timeout (if specified) seconds expires; if
+// timeout is set, it retries every 100ms.
+// Returns true if the message was sent, false if a timeout occurred or the
+// channel doesn't exist.
+export async function send(channel, message, timeout=Infinity) {
+  let buf = ns.peek(RPC_PORT)[channel];
+  if (!buf) return false;
+
+  while (buf.length >= buf.size) {
+    await ns.sleep(100);
+    timeout -= 0.1;
+    if (timeout <= 0) return false;
+  }
+  buf.push(message);
+  return true;
+}
+
+// Receive a message from the given channel. If the channel is empty, blocks until
+// a message is received or until timeout seconds have elapsed. Returns the message,
+// or null if a timeout occurred or the channel doesn't exist.
+export async function recv(channel, timeout=Infinity) {
+  let buf = ns.peek(RPC_PORT)[channel];
+  if (!buf) return null;
+
+  while (buf.length === 0) {
+    await ns.sleep(100);
+    timeout -= 0.1;
+    if (timeout <= 0) return null;
+  }
+
+  return buf.shift();
+}
+
+// Publish a status update.
+// This is written to a special RPC "channel" that is actually a map from
+// (program,host) pairs to status.
+// The "subkey" is used as a suffix for the name of the script when writing the
+// status, so you can e.g. have multiple shards of the same program write
+// different subkeys.
+// Passing null as the status deletes it from the status table entirely.
+export function publishStatus(subkey, status) {
+  let key = sprintf("%s@%s", ns.getScriptName(), subkey);
+  if (status === null) {
+    delete ns.peek(RPC_PORT)[STATUS_CHANNEL][key];
+  } else {
+    ns.peek(RPC_PORT)[STATUS_CHANNEL][key] = status;
+  }
+}
+
+// Read a status update from another program.
+// The returned status may be mutable. Please don't mess with it.
+// With key=null, returns a map of all statii.
+export function readStatus(key) {
+  if (key) {
+    return ns.peek(RPC_PORT)[STATUS_CHANNEL][key];
+  } else {
+    return ns.peek(RPC_PORT)[STATUS_CHANNEL];
+  }
+}
