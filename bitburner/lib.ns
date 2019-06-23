@@ -42,6 +42,8 @@ export function printf(...argv) {
 // - it runs the script with as many threads as will fit on the host
 // - it passes (hostname, num_threads) as the first two arguments to the script
 export async function deploy(host, script, ...argv) {
+    ns.scp("lib.ns", ns.getHostname(), host);
+    ns.scp("rpc.ns", ns.getHostname(), host);
     ns.scp(script, ns.getHostname(), host);
     var ram = ns.getServerRam(host)[0];
     var cost = ns.getScriptRam(script);
