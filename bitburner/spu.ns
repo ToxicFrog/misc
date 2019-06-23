@@ -1,10 +1,11 @@
-// version:2
+// version:4
 // SHODAN Processing Unit
 // This runs on a machine we have root on (but are not necessarily capable of hacking).
 // It is meant to be invoked as: spu.ns hostname threads version
 // but in practice you shouldn't run it directly; it should be automatically
 // staged and executed by SHODAN.
 
+// import {tprintf} from "lib.ns";
 import * as rpc from "rpc.ns";
 
 var ns;
@@ -18,7 +19,7 @@ function mkHeartbeat(task) {
 }
 
 async function recvTask() {
-  let task = rpc.recv(TASK_CHANNEL, TIMEOUT);
+  let task = await rpc.recv(TASK_CHANNEL, TIMEOUT);
   if (task) {
     ns.print("Read task '" + task.join(" ") + "' from the controller.");
   } else {
@@ -28,7 +29,7 @@ async function recvTask() {
 }
 
 async function runTask(task, target) {
-  rpc.publishStatus(hostname, mkHeartbeat(task));
+  rpc.publishStatus(hostname, mkHeartbeat([task,target]));
   if (task == "hack") return await ns.hack(target);
   if (task == "grow") return await ns.grow(target);
   if (task == "weaken") return await ns.weaken(target);
@@ -46,11 +47,13 @@ export async function main(n) {
   TASK_CHANNEL = "SPU@" + hostname;
 
   ns.disableLog("sleep");
+  rpc.init(ns);
+  rpc.create(TASK_CHANNEL);
 
   let task = null;
   while (true) {
     ns.print("Sending heartbeat: " + hostname + " " + threads + " " + version);
-    await rpc.send(CONTROL_CHANNEL, mkHeartbeat(task));
+    await rpc.send(HEARTBEAT_CHANNEL, mkHeartbeat(task));
     task = await recvTask();
     if (task) {
       ns.print("Executing task: " + task.join(" "));
