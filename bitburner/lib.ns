@@ -1,0 +1,94 @@
+// Utility library.
+// Callers MUST import initlib() and call initlib(ns) before any other functions.
+
+let ns;
+
+export function initlib(n) {
+    ns = n;
+}
+
+// Internal helper for netwalk()
+async function netwalk_aux(fn, depth, root, seen) {
+    for (var host of ns.scan(root)) {
+        if (seen[host]) continue;
+        seen[host] = true;
+        let result = await fn(host, depth);
+        if (result) {
+            await netwalk_aux(fn, depth+1, host, seen);
+        }
+    }
+}
+
+// Call fn on every system reachable from root.
+// fn should have signature (hostname, depth) -> bool
+// return true to continue walking from that point, false to stop.
+export async function netwalk(fn, root) {
+    return await netwalk_aux(fn, 1, root, {[root]: true});
+}
+
+// printf() to the tty.
+export function tprintf(...argv) {
+    return ns.tprint(sprintf.apply(null, argv));
+}
+
+// printf() to the logs.
+export function printf(...argv) {
+    return ns.print(sprintf.apply(null, argv));
+}
+
+// deploy(script, host, args...)
+// as exec(script, host, args...), except:
+// - it automatically stages the script using scp
+// - it runs the script with as many threads as will fit on the host
+// - it passes (hostname, num_threads) as the first two arguments to the script
+export async function deploy(host, script, ...argv) {
+    ns.scp(script, ns.getHostname(), host);
+    var ram = ns.getServerRam(host)[0];
+    var cost = ns.getScriptRam(script);
+    var threads = Math.floor(ram/cost);
+    if (threads < 1) return false;
+    printf("%s: starting %s with %d threads", host, script, threads);
+    return await ns.exec.apply(null, [script, host, threads, host, threads].concat(argv));
+}
+
+// Internal helpers for tryPwn.
+let spikes = ["brutessh", "ftpcrack", "relaysmtp", "httpworm", "sqlinject"];
+function getMaxPorts() {
+    let ports = 0;
+    for (let program of spikes) {
+        if (ns.fileExists(program + ".exe")) ++ports;
+    }
+    return ports;
+}
+
+// Attempt to pwn (get a root shell on) the host.
+// Returns true if we have root on it at the end, false otherwise.
+export function tryPwn(host) {
+  if (ns.hasRootAccess(host)) return true;
+
+  let minPorts = ns.getServerNumPortsRequired(host);
+  if (minPorts > getMaxPorts()) return false;
+  if (minPorts >= 1) ns.brutessh(host);
+  if (minPorts >= 2) ns.ftpcrack(host);
+  if (minPorts >= 3) ns.relaysmtp(host);
+  if (minPorts >= 4) ns.httpworm(host);
+  if (minPorts >= 5) ns.sqlinject(host);
+
+  ns.nuke(host);
+  return ns.hasRootAccess(host);
+}
+
+// Looks for a "// version:123" comment in the given file and returns "v123".
+// Returns null if the file has no version marker.
+export function getSourceVersion(file) {
+  let match = ns.read(file).match("// version:([0-9]+)");
+  return match ? "v" + match[1] : null;
+}
+
+let epoch = 0;
+export function resetTimer() {
+    epoch = ns.getTimeSinceLastAug();
+}
+export function time() {
+    return (ns.getTimeSinceLastAug() - epoch)/1000;
+}

@@ -1,0 +1,63 @@
+// version:1
+// SHODAN Processing Unit
+// This runs on a machine we have root on (but are not necessarily capable of hacking).
+// It reports in on port 1 and listens for commands on port 0.
+// It is meant to be invoked as: spu.ns hostname threads version
+// but in practice you shouldn't run it directly; it should be automatically
+// staged and executed by SHODAN.
+
+let ns;
+let COMMAND_PORT = 1;
+let HEARTBEAT_PORT = 2;
+// We'll try this many times (seconds) to get a command from the controller
+// before we assume that it's lost track of us and re-send our heartbeat.
+let MAX_RETRIES = 60;
+
+async function sendHeartbeat(hostname, threads, version) {
+  ns.print("Sending heartbeat: " + hostname + " " + threads + " " + version);
+  while (!ns.tryWrite(HEARTBEAT_PORT, { host: hostname, threads: threads, version: version })) {
+    await ns.sleep(1000);
+  }
+}
+
+async function readCommand(hostname) {
+  for (let tries = MAX_RETRIES; tries > 0; --tries) {
+    // Guaranteed to return something because SHODAN writes to it before starting
+    // any SPUs.
+    let control = ns.peek(COMMAND_PORT);
+    if (control[hostname]) {
+      let command = control[hostname];
+      control[hostname] = false;
+      ns.print("Read command '" + command.join(" ") + "'from the controller.");
+      return command;
+    }
+    await ns.sleep(1000);
+  }
+  ns.print("Timed out waiting for commands, re-sending heartbeat.");
+  return null;
+}
+
+async function executeCommand(command, target) {
+  if (command == "hack") return await ns.hack(target);
+  if (command == "grow") return await ns.grow(target);
+  if (command == "weaken") return await ns.weaken(target);
+  if (command == "exit") return ns.exit();
+}
+
+export async function main(n) {
+  ns = n;
+  let hostname = ns.args[0] || ns.exit();
+  let threads = Number(ns.args[1]) || ns.exit();
+  let version = ns.args[2] || ns.exit();
+
+  ns.disableLog("sleep");
+
+  while (true) {
+    await sendHeartbeat(hostname, threads, version);
+    let command = await readCommand(hostname);
+    if (command) {
+      ns.print("  Executing command: " + command.join(" "));
+      await executeCommand.apply(null, command);
+    }
+  }
+}

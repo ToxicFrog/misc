@@ -1,0 +1,306 @@
+// version:1
+// SHODAN control program for SPU nodes.
+// It will:
+// - automatically discover rootable and hackable systems
+// - get root on rootable systems we don't already have root on
+// - start SPUs on idle systems we have root on
+// - select targets from hackable systems and command the SPUs to attack them
+
+import {initlib,netwalk,tprintf,tryPwn,deploy,getSourceVersion,resetTimer,time} from "lib.ns";
+
+let ns;
+let COMMAND_PORT = 1;
+let HEARTBEAT_PORT = 2;
+let SPU_NAME = "spu.ns";
+let MAX_HACK_FRACTION = 0.5;
+let MIN_MONEY_FOR_HACK = 2000000;
+let DEPTH = 5;
+let MAX_WEAKEN_THREADS = 0.2; // don't assign more than this many of our threads to weakning a single machine
+
+// Map from hostname to scanHost structure.
+let info = {};
+// Map from target hostname to desired/pending jobs for that host.
+// Also records target money level for the host before we'll try hack() again.
+// job_queue is the sorted version of the same objects, highest priority first.
+let jobs = {};
+let job_queue = [];
+// Map from worker hostname to { threads, command }
+let workers = {};
+let TOTAL_THREADS = 0;
+
+// Job assignment
+// For each host, we calculate a desired number of weaken threads, grow threads,
+// and hack threads based on security level and grows since last hack
+// COMPLICATION: if we hack with more than one thread we need to increase the
+// number of inter-hack grows accordingly
+// Idea: cap hack threads at what it would take to eat, say, 50% of the server's money
+// then set grow threads to GA(2.1) so that server money gradually increases over time
+// We then sort them based on most weaken threads, most grow threads, and most hack threads
+// This means that for each host, in addition to the host_stat_t, we need to store:
+// - desired number of weaken, grow, and hack threads
+// - pending number of weaken, grow, and hack threads
+// If we have a worker but all targets have enough threads, pick the one with
+// the most money and grow() it.
+// For each worker, we also need to store what it was working on and how many
+// threads it has, so we can update the "pending threads" counts accordingly.
+
+export async function main(n) {
+  ns = n;
+  initlib(ns);
+  resetTimer();
+  ns.disableLog("sleep");
+
+  ns.clear(HEARTBEAT_PORT);
+  ns.clear(COMMAND_PORT);
+  ns.write(COMMAND_PORT, {});
+
+  tprintf("Network map:");
+  await scanHosts(DEPTH, true);
+  await expandSwarm();
+  tprintf("Target queue:");
+  sortJobQueue();
+  for (let job of job_queue) {
+    tprintf("  %s", jobToString(job));
+  }
+  tprintf("%d targets.", job_queue.length);
+
+  while (true) {
+    // TODO: periodically scanHosts() and expandSwarm()
+    // we can use getTimeSinceLastAug() -> ms as a timer
+    await readAndProcessHeartbeat();
+    if (time() > 60) {
+      await scanHosts(DEPTH, false);
+      await expandSwarm();
+      resetTimer();
+    }
+  }
+}
+
+//// HOST SCANNING AND JOB GENERATION ////
+
+// Scan all reachable hosts out to maxdepth.
+// Roots the ones that are rootable, and populates info{} and the "target" fields
+// in jobs{}.
+async function scanHosts(maxdepth, verbose) {
+  async function checkHost(host, depth) {
+    let stat = scanHost(host);
+    updateJobForHost(host);
+    if (verbose) {
+      tprintf("%-18s %3d %s %s %3d/%-3dGB %3d/%-3dSc H:%.3f * $%.0f",
+        " ".repeat(depth) + host, stat.hack_level,
+        stat.root ? "R" : " ", ns.scriptRunning(SPU_NAME, host) ? "SPU" : "   ",
+        stat.ram_used, stat.ram,
+        stat.security, stat.min_security,
+        stat.hack_fraction,
+        stat.money);
+    }
+    return (depth < maxdepth);
+  }
+
+  await netwalk(checkHost, "home");
+}
+
+// Scan a single host. Updates its info{} entry and returns the new entry.
+function scanHost(host) {
+  let stat = {};
+  stat.name = host;
+  stat.root = tryPwn(host);
+  stat.ram = ns.getServerRam(host)[0];
+  stat.ram_used = ns.getServerRam(host)[1];
+  stat.security = ns.getServerSecurityLevel(host);
+  stat.min_security = ns.getServerMinSecurityLevel(host);
+  stat.money = ns.getServerMoneyAvailable(host);
+  stat.max_money = ns.getServerMaxMoney(host);
+  stat.hack_level = ns.getServerRequiredHackingLevel(host);
+  stat.hack_fraction = ns.hackAnalyzePercent(host)/100;
+  // stat.grows_per_hack = Math.ceil(ns.growthAnalyze(host, 1/MAX_HACK_FRACTION));
+  // // If we steal (money_start * MAX_HACK_FRACTION) -> money_left, money_left * growth_factor = money_start
+  // let growth_factor = 1 + (MAX_HACK_FRACTION / (1 - MAX_HACK_FRACTION));
+  // // Multiply growth_factor by 1.1 here so that money on the server gradually increases over time.
+  // stat.growths_per_hack = Math.ceil(ns.growthAnalyze(host, growth_factor*1.1));
+  info[host] = stat;
+  return stat;
+}
+
+// Generates a job table entry for the given host, or, if one already exists,
+// updates it based on the contents of info{}. Writes the updated job table
+// entry to jobs{} and returns it.
+function updateJobForHost(host) {
+  let stat = info[host];
+  if (!stat.root || !stat.money || stat.hack_level > ns.getHackingLevel()) {
+    jobs[host] = null;
+    return;
+  }
+  let job = jobs[host];
+  if (!job) {
+    // Create new job table entry.
+    job = {
+      host: host,
+      weaken: 0, grow: 0, hack: 0,
+      pending_weaken: 0, pending_grow: 0, pending_hack: 0,
+      target_money: Math.min(Math.max(stat.money, MIN_MONEY_FOR_HACK), stat.max_money)
+    };
+    jobs[host] = job;
+    job_queue.push(job);
+  }
+
+  if (stat.security > stat.min_security + 2) {
+    job.weaken = Math.ceil(Math.min(
+      TOTAL_THREADS * MAX_WEAKEN_THREADS,
+      (stat.security - stat.min_security) * 20));
+    job.grow = 0;
+    job.hack = 0;
+  } else if (stat.money < job.target_money) {
+    job.weaken = 0;
+    job.grow = ns.growthAnalyze(host, job.target_money/stat.money);
+    job.hack = 0;
+  } else {
+    job.weaken = 0;
+    job.grow = 0;
+    job.hack = 1;
+    job.target_money = stat.money;
+  }
+
+  return job;
+}
+
+function jobToString(job) {
+  return sprintf("%16.16s w%3d/%-3d g%3d/%-3d h%3d/%-3d  %.3e $ %-.3e",
+    job.host, job.pending_weaken, job.weaken,
+    job.pending_grow, job.grow,
+    job.pending_hack, job.hack,
+    info[job.host].money, job.target_money);
+}
+
+//// SWARM EXPANSION ////
+
+async function expandSwarm() {
+  for (let host in info) {
+    let stat = info[host];
+    if (!stat.root || stat.ram_used > 0) continue;
+    await installSPU(host);
+    scanHost(host);
+  }
+}
+
+async function installSPU(host) {
+  let version = getSourceVersion(SPU_NAME);
+  if (info[host].ram == 0) return;
+  tprintf("Installing SPU %s on idle node %s...", version, host);
+  await deploy(host, SPU_NAME, version);
+}
+
+//// HEARTBEAT HANDLING ////
+
+// Read and react to a single heartbeat.
+// - Update the host information for the target of the worker's last order
+// - Push a new SPU version to the worker if needed
+// - Send the worker a new order
+async function readAndProcessHeartbeat() {
+  let hb = await readHeartbeat();
+  tprintf("Heartbeat from %s with %d threads running SPU %s",
+    hb.host, hb.threads, hb.version);
+
+  processWorkResults(hb);
+  let updated = await maybeUpdateSPU(hb.host, hb.version);
+  if (updated) return; // It'll send a new heartbeat when it's done starting up.
+  assignWorkTo(workers[hb.host]);
+}
+
+function processWorkResults(hb) {
+  let host = hb.host;
+  if (!workers[host] || !workers[host].job) {
+    // No entry for this worker; it was previously unknown to us.
+    // Create a new default entry for it.
+    tprintf("  Creating new worker table entry for %s.", host);
+    workers[host] = hb;
+    TOTAL_THREADS += hb.threads;
+    scanHosts(DEPTH, false);
+    return;
+  }
+  // We know what job this worker was doing. Update the job table to record
+  // that it finished, then rescan its target and update the target job values.
+  let command = workers[host].job[0];
+  let target = workers[host].job[1];
+  jobs[target]["pending_" + command] -= workers[host].threads;
+  scanHost(target);
+  updateJobForHost(target);
+  workers[host].job = null;
+  tprintf(" - %s (%s×%d)", jobToString(jobs[target]), command, workers[host].threads);
+  // tprintf("  + %s", jobToString(jobs[target]));
+}
+
+async function maybeUpdateSPU(host, deployed_version) {
+  let version = getSourceVersion(SPU_NAME);
+  if (version == deployed_version) return false;
+  tprintf("Node %s is running SPU %s, updating to SPU %s...",
+    host, deployed_version, version);
+  sendCommand(host, "exit", "");
+  workers[host] = null;
+  while (ns.ps(host).length > 0) await ns.sleep(100);
+  await deploy(host, SPU_NAME, version);
+  return true;
+}
+
+function assignWorkTo(worker) {
+  sortJobQueue();
+  for (let job of job_queue) {
+    if (job.pending_weaken < job.weaken) {
+      return setJob(worker, job, "weaken");
+    }
+    if (job.pending_grow < job.grow) {
+      return setJob(worker, job, "grow");
+    }
+    if (job.pending_hack < job.hack) {
+      return setJob(worker, job, "hack");
+    }
+  }
+  // If we get this far all jobs are populated, so we throw up our hands and
+  // tell it to grow() whatever has the least target money.
+  // We'll probably want to be smarter about this later.
+  let job = job_queue.reduce(function (x,y) { return x.target_money < y.target_money ? x : y });
+  setJob(worker, job, "grow");
+}
+
+// We prioritize hack over everything, to get immediate cash flow.
+// After hacks, we focus on whatever needs the most threads.
+function sortJobQueue() {
+  job_queue.sort(function (x,y) {
+    // If only one of them is hackable, sort the hackable one first.
+    if (x.hack != !y.hack) return y.hack - x.hack;
+    // If they're both hackable, sort the one with more money first.
+    if (x.hack && y.hack) return info[y.host].money - info[x.host].money;
+    // If neither are hackable, sort the one that needs more threads first.
+    return (y.weaken + y.grow) - (x.weaken + x.grow);
+    // // If either has weaken, sort the one with the highest weaken value first.
+    // if (x.weaken || y.weaken) return y.weaken - x.weaken;
+    // // Failing that, do the same for grow.
+    // if (x.grow || y.grow) return y.grow - x.grow;
+    // // If both have weaken == grow == 0, sort highest money first to maximize income.
+    // return info[y.host].money - info[x.host].money;
+  });
+}
+
+function setJob(worker, job, command) {
+  job["pending_" + command] += worker.threads;
+  worker.job = [command, job.host];
+  sendCommand(worker.host, command, job.host);
+  tprintf(" + %s (%s×%d)", jobToString(job), command, worker.threads);
+}
+
+//// RPC ////
+
+async function readHeartbeat() {
+  while (ns.peek(HEARTBEAT_PORT) === "NULL PORT DATA") {
+    await ns.sleep(1000);
+  }
+  return ns.read(HEARTBEAT_PORT);
+}
+
+function sendCommand(host, ...command) {
+  if (ns.peek(COMMAND_PORT)[host]) {
+    tprintf("Warning: sending command '%s' to %s overwrites pending command '%s'!",
+      command.join(" "), host, ns.peek(COMMAND_PORT)[host].join(" "));
+  }
+  ns.peek(COMMAND_PORT)[host] = command;
+}
