@@ -18,50 +18,48 @@ function assert(cond, msg) {
 export function init(n) {
   ns = n;
   if (ns.peek(RPC_PORT) === "NULL PORT DATA") {
-    ns.write(RPC_PORT, {0: {}});
+    ns.write(RPC_PORT, {[STATUS_CHANNEL]: {}});
   }
 }
 
 // Create a new RPC channel with the specified size (0=unlimited).
 // This must be called before any attempt to send or recv on it is made.
 // If the channel already exists, it is cleared.
-export function createChannel(channel, size=20) {
+export function create(channel, size=20) {
   ns.peek(RPC_PORT)[channel] = [];
   ns.peek(RPC_PORT)[channel].size = size;
 }
 
-// Send a message on the given channel. If the channel is full, blocks until
-// it can write the message, or until timeout (if specified) seconds expires; if
-// timeout is set, it retries every 100ms.
-// Returns true if the message was sent, false if a timeout occurred or the
-// channel doesn't exist.
+// Send a message on the given channel. If the channel is full or missing,
+// blocks until it can write the message, or until timeout seconds have
+// elapsed; if timeout is set, it retries every 100ms.
+// Returns true if the message was sent, false if a timeout occurred.
 export async function send(channel, message, timeout=Infinity) {
-  let buf = ns.peek(RPC_PORT)[channel];
-  if (!buf) return false;
-
-  while (buf.length >= buf.size) {
+  while (timeout >= 0) {
+    let buf = ns.peek(RPC_PORT)[channel];
+    if (buf && buf.length < buf.size) {
+      buf.push(message);
+      return true;
+    }
     await ns.sleep(100);
     timeout -= 0.1;
-    if (timeout <= 0) return false;
   }
-  buf.push(message);
-  return true;
+
+  return false;
 }
 
-// Receive a message from the given channel. If the channel is empty, blocks until
-// a message is received or until timeout seconds have elapsed. Returns the message,
-// or null if a timeout occurred or the channel doesn't exist.
+// Receive a message from the given channel. If the channel is empty or missing,
+// blocks until a message is available or until timeout seconds have elapsed.
+// Returns the message, or null if a timeout occurred.
 export async function recv(channel, timeout=Infinity) {
-  let buf = ns.peek(RPC_PORT)[channel];
-  if (!buf) return null;
-
-  while (buf.length === 0) {
+  while (timeout >= 0) {
+    let buf = ns.peek(RPC_PORT)[channel];
+    if (buf && buf.length > 0) return buf.shift();
     await ns.sleep(100);
     timeout -= 0.1;
-    if (timeout <= 0) return null;
   }
 
-  return buf.shift();
+  return null;
 }
 
 // Publish a status update.
@@ -72,7 +70,7 @@ export async function recv(channel, timeout=Infinity) {
 // different subkeys.
 // Passing null as the status deletes it from the status table entirely.
 export function publishStatus(subkey, status) {
-  let key = sprintf("%s@%s", ns.getScriptName(), subkey);
+  let key = sprintf("%s%s", ns.getScriptName(), subkey ? "@" + subkey : "");
   if (status === null) {
     delete ns.peek(RPC_PORT)[STATUS_CHANNEL][key];
   } else {
