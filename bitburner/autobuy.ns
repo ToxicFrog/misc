@@ -1,0 +1,82 @@
+// version:1
+// Script to automatically purchase and upgrade hacknet nodes.
+// Prefers upgrading nodes to buying new ones.
+
+import {initlib,tprintf,printf} from "lib.ns";
+
+let ns;
+let ALLOWANCE = 0.001;
+let RAM_MAX = Math.pow(2,19);
+let RAM_MIN = 4
+
+function sizeServerToMoney(allowance) {
+  let ram = RAM_MIN;
+  if (ns.getPurchasedServerCost(ram) > allowance) return null;
+  while (ram <= RAM_MAX) {
+    // Would increasing ram past this point put us over the limit?
+    if (ns.getPurchasedServerCost(ram*2) > allowance) break;
+    ram *= 2;
+  }
+  return ram;
+}
+
+// If we have an empty server slot, just buy the biggest server we can afford
+// to fill it.
+function buyNewServer(allowance) {
+  let nservers = ns.getPurchasedServers().length;
+  if (nservers >= ns.getPurchasedServerLimit()) return false;
+
+  // Buy the biggest new server we can afford.
+  let ram = sizeServerToMoney(allowance);
+  if (!ram) return false;
+  let name = "spu" + nservers;
+  let cost = ns.getPurchasedServerCost(ram);
+
+  tprintf("Buying server %s (%dGB) for $%d", name, ram, cost);
+  ns.purchaseServer(name, ram);
+  return true;
+}
+
+function upgradeOldServer(allowance) {
+  return false;
+}
+
+function upgradeHacknet(allowance) {
+  for (let i = 0; i < ns.hacknet.numNodes(); ++i) {
+    if (ns.hacknet.getLevelUpgradeCost(i, 1) <= allowance) {
+      ns.hacknet.upgradeLevel(i, 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+function buyNewHacknet(allowance) {
+  allowance = allowance / (1 + ns.hacknet.numNodes()); // Make it more reluctant to buy new nodes the more we have.
+  let cost = ns.hacknet.getPurchaseNodeCost();
+  if (cost <= allowance) {
+    tprintf("Buying hacknet-node-%d for $%d", ns.hacknet.numNodes(), cost);
+    ns.hacknet.purchaseNode();
+    return true;
+  }
+  return false;
+}
+
+let buys = [
+  [buyNewServer, 0.01],
+  [upgradeOldServer, 0.01],
+  [upgradeHacknet, 0.001],
+  [buyNewHacknet, 0.01],
+]
+
+export async function main(n) {
+  ns = n;
+  initlib(ns);
+  while (true) {
+    for (let buy of buys) {
+      let allowance = ns.getServerMoneyAvailable('home') * buy[1];
+      if (buy[0](allowance)) break;
+    }
+    await ns.sleep(5*1000);
+  }
+}
