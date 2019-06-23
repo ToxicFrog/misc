@@ -44,11 +44,16 @@ let TOTAL_THREADS = 0;
 // For each worker, we also need to store what it was working on and how many
 // threads it has, so we can update the "pending threads" counts accordingly.
 
+var silence = [
+  "sleep", "getServerRam", "getServerNumPortsRequired", "scan",
+  "getServerSecurityLevel", "getServerMinSecurityLevel", "getServerMoneyAvailable",
+  "getServerMaxMoney", "getServerRequiredHackingLevel", "getHackingLevel",
+];
 export async function main(n) {
   ns = n;
   initlib(ns);
   resetTimer();
-  ns.disableLog("sleep");
+  for (let fn of silence) ns.disableLog(fn);
 
   ns.clear(HEARTBEAT_PORT);
   ns.clear(COMMAND_PORT);
