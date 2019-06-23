@@ -6,7 +6,7 @@
 // - start SPUs on idle systems we have root on
 // - select targets from hackable systems and command the SPUs to attack them
 
-import {initlib,netwalk,tprintf,tryPwn,deploy,getSourceVersion,resetTimer,time} from "lib.ns";
+import {initlib,netwalk,tprintf,printf,tryPwn,deploy,getSourceVersion} from "lib.ns";
 
 let ns;
 let COMMAND_PORT = 1;
@@ -15,7 +15,8 @@ let SPU_NAME = "spu.ns";
 let MAX_HACK_FRACTION = 0.5;
 let MIN_MONEY_FOR_HACK = 2000000;
 let DEPTH = 5;
-let MAX_WEAKEN_THREADS = 0.2; // don't assign more than this many of our threads to weakning a single machine
+
+let log = printf;
 
 // Map from hostname to scanHost structure.
 let info = {};
@@ -52,31 +53,26 @@ var silence = [
 export async function main(n) {
   ns = n;
   initlib(ns);
-  resetTimer();
   for (let fn of silence) ns.disableLog(fn);
+  info = {}; jobs = {}; job_queue = []; workers = {};
+  let MY_VERSION = getSourceVersion(ns.getScriptName());
 
   ns.clear(HEARTBEAT_PORT);
   ns.clear(COMMAND_PORT);
   ns.write(COMMAND_PORT, {});
 
-  tprintf("Network map:");
-  await scanHosts(DEPTH, true);
+  await scanHosts(DEPTH, false);
   await expandSwarm();
-  tprintf("Target queue:");
-  sortJobQueue();
-  for (let job of job_queue) {
-    tprintf("  %s", jobToString(job));
-  }
-  tprintf("%d targets.", job_queue.length);
+  tprintf("SHODAN startup complete.");
 
   while (true) {
-    // TODO: periodically scanHosts() and expandSwarm()
-    // we can use getTimeSinceLastAug() -> ms as a timer
     await readAndProcessHeartbeat();
-    if (time() > 60) {
-      await scanHosts(DEPTH, false);
-      await expandSwarm();
-      resetTimer();
+    await scanHosts(DEPTH, false);
+    await expandSwarm();
+    if (getSourceVersion(ns.getScriptName()) != MY_VERSION) {
+      tprintf("Version upgrade found: %s -> %s. Restarting...",
+        MY_VERSION, getSourceVersion(ns.getScriptName()));
+      ns.spawn(ns.getScriptName(), 1);
     }
   }
 }
@@ -147,12 +143,12 @@ function updateJobForHost(host) {
     };
     jobs[host] = job;
     job_queue.push(job);
+    tprintf("Target: %24s  ⌨%-3d  🔐%3d/%-3d  $%.3e",
+      host, stat.hack_level, stat.security, stat.min_security, stat.money)
   }
 
   if (stat.security > stat.min_security + 2) {
-    job.weaken = Math.ceil(Math.min(
-      TOTAL_THREADS * MAX_WEAKEN_THREADS,
-      (stat.security - stat.min_security) * 20));
+    job.weaken = Math.ceil((stat.security - stat.min_security) * 20);
     job.grow = 0;
     job.hack = 0;
   } else if (stat.money < job.target_money) {
@@ -190,8 +186,10 @@ async function expandSwarm() {
 
 async function installSPU(host) {
   let version = getSourceVersion(SPU_NAME);
-  if (info[host].ram == 0) return;
-  tprintf("Installing SPU %s on idle node %s...", version, host);
+  let cost = ns.getScriptRam(SPU_NAME);
+  let threads = Math.floor(info[host].ram/cost);
+  if (threads < 1) return;
+  tprintf("SPU: installing on %s.", host, version, threads);
   await deploy(host, SPU_NAME, version);
 }
 
@@ -203,7 +201,8 @@ async function installSPU(host) {
 // - Send the worker a new order
 async function readAndProcessHeartbeat() {
   let hb = await readHeartbeat();
-  tprintf("Heartbeat from %s with %d threads running SPU %s",
+  if (!hb) return; // timeout
+  log("Heartbeat from %s with %d threads running SPU %s",
     hb.host, hb.threads, hb.version);
 
   processWorkResults(hb);
@@ -217,7 +216,7 @@ function processWorkResults(hb) {
   if (!workers[host] || !workers[host].job) {
     // No entry for this worker; it was previously unknown to us.
     // Create a new default entry for it.
-    tprintf("  Creating new worker table entry for %s.", host);
+    tprintf("SPU: %s running SPU %s with %d threads.", host, hb.version, hb.threads);
     workers[host] = hb;
     TOTAL_THREADS += hb.threads;
     scanHosts(DEPTH, false);
@@ -231,14 +230,14 @@ function processWorkResults(hb) {
   scanHost(target);
   updateJobForHost(target);
   workers[host].job = null;
-  tprintf(" - %s (%s×%d)", jobToString(jobs[target]), command, workers[host].threads);
+  log(" - %s (%s×%d)", jobToString(jobs[target]), command, workers[host].threads);
   // tprintf("  + %s", jobToString(jobs[target]));
 }
 
 async function maybeUpdateSPU(host, deployed_version) {
   let version = getSourceVersion(SPU_NAME);
   if (version == deployed_version) return false;
-  tprintf("Node %s is running SPU %s, updating to SPU %s...",
+  tprintf("SPU: %s upgrade %s -> %s",
     host, deployed_version, version);
   sendCommand(host, "exit", "");
   workers[host] = null;
@@ -267,10 +266,16 @@ function assignWorkTo(worker) {
   setJob(worker, job, "grow");
 }
 
+function getMoneyPerTime(job) {
+  let stat = info[job.host];
+  return (job.target_money * stat.hack_fraction) / ns.getHackTime(job.host);
+}
+
 // We prioritize hack over everything, to get immediate cash flow.
 // After hacks, we focus on whatever needs the most threads.
 function sortJobQueue() {
   job_queue.sort(function (x,y) {
+    return getMoneyPerTime(y) - getMoneyPerTime(x);
     // If only one of them is hackable, sort the hackable one first.
     if (x.hack != !y.hack) return y.hack - x.hack;
     // If they're both hackable, sort the one with more money first.
@@ -290,21 +295,23 @@ function setJob(worker, job, command) {
   job["pending_" + command] += worker.threads;
   worker.job = [command, job.host];
   sendCommand(worker.host, command, job.host);
-  tprintf(" + %s (%s×%d)", jobToString(job), command, worker.threads);
+  log(" + %s (%s×%d)", jobToString(job), command, worker.threads);
 }
 
 //// RPC ////
 
 async function readHeartbeat() {
+  let retries = 60;
   while (ns.peek(HEARTBEAT_PORT) === "NULL PORT DATA") {
     await ns.sleep(1000);
+    if (--retries <= 0) return null;
   }
   return ns.read(HEARTBEAT_PORT);
 }
 
 function sendCommand(host, ...command) {
   if (ns.peek(COMMAND_PORT)[host]) {
-    tprintf("Warning: sending command '%s' to %s overwrites pending command '%s'!",
+    log("Warning: sending command '%s' to %s overwrites pending command '%s'!",
       command.join(" "), host, ns.peek(COMMAND_PORT)[host].join(" "));
   }
   ns.peek(COMMAND_PORT)[host] = command;
