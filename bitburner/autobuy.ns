@@ -1,4 +1,4 @@
-// version:1
+// version:2
 // Script to automatically purchase and upgrade hacknet nodes.
 // Prefers upgrading nodes to buying new ones.
 
@@ -30,7 +30,7 @@ function sizeServerToMoney(allowance) {
 // to fill it.
 async function buyNewServer(allowance) {
   let nservers = ns.getPurchasedServers().length;
-  allowance = allowance/(nservers || 1);
+  // allowance = allowance/(nservers || 1);
   if (nservers >= ns.getPurchasedServerLimit()) return false;
 
   // Buy the biggest new server we can afford.
@@ -48,7 +48,7 @@ async function buyNewServer(allowance) {
 // oldest one.
 async function upgradeOldServer(allowance) {
   let servers = ns.getPurchasedServers();
-  allowance = allowance/(servers.length || 1);
+  // allowance = allowance/(1 + servers.length * 0.1);
   if (servers.length < ns.getPurchasedServerLimit()) return false;
 
   let smallest = servers.map(function (hostname) {
@@ -115,8 +115,8 @@ async function buyNewHacknet(allowance) {
 }
 
 let buys = [
-  [buyNewServer, 0.01],
-  [upgradeOldServer, 0.01],
+  [buyNewServer, 0.1],
+  [upgradeOldServer, 0.1],
   [upgradeHacknet, 0.001],
   [buyNewHacknet, 0.001],
 ];
