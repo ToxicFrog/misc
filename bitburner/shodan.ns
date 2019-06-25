@@ -1,10 +1,12 @@
-// version:3
+// version:5
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
 // - get root on rootable systems we don't already have root on
 // - start SPUs on idle systems we have root on
 // - select targets from hackable systems and command the SPUs to attack them
+// TODO: automatically scan for .cct files and other interesting files on hacked
+// machines, copy them back to home, and generate a notification.
 
 import {initlib,netwalk,tprintf,printf,tryPwn,deploy,getSourceVersion} from "lib.ns";
 import * as rpc from "rpc.ns";
@@ -14,20 +16,18 @@ var HEARTBEAT_CHANNEL = "shodan";
 var SPU_NAME = "spu.ns";
 var MIN_MONEY_FOR_HACK = 2000000;
 var DEPTH = 5;
+var MAX_HACK_RATIO = 0.5;
 
 var log = printf;
 
 // Map from hostname to scanHost structure.
-var info = {};
+let info;
 // Map from target hostname to desired/pending jobs for that host.
 // Also records target money level for the host before we'll try hack() again.
 // job_queue is the sorted version of the same objects, highest priority first.
-var jobs = {};
-var job_queue = [];
-// Map from worker hostname to { threads, command }
-var workers = {};
+let jobs, job_queue;
 
-var silence = [
+let silence = [
   "sleep", "getServerRam", "getServerNumPortsRequired", "scan",
   "getServerSecurityLevel", "getServerMinSecurityLevel", "getServerMoneyAvailable",
   "getServerMaxMoney", "getServerRequiredHackingLevel", "getHackingLevel",
@@ -37,6 +37,7 @@ export async function main(n) {
   initlib(ns);
   for (let fn of silence) ns.disableLog(fn);
   let MY_VERSION = getSourceVersion(ns.getScriptName());
+  info = {}; jobs = {}; job_queue = [];
 
   rpc.init(ns);
   rpc.create(HEARTBEAT_CHANNEL);
@@ -49,7 +50,7 @@ export async function main(n) {
     await readAndProcessHeartbeat();
     await scanHosts(DEPTH, false);
     await expandSwarm();
-    rpc.publishStatus(null, {tasks: job_queue, workers: workers});
+    rpc.publishStatus(null, {tasks: job_queue});
     if (getSourceVersion(ns.getScriptName()) != MY_VERSION) {
       tprintf("New version found: %s -> %s. Restarting...",
         MY_VERSION, getSourceVersion(ns.getScriptName()));
@@ -102,10 +103,14 @@ async function scanHost(host) {
 // Generates a job table entry for the given host, or, if one already exists,
 // updates it based on the contents of info{}. Writes the updated job table
 // entry to jobs{} and returns it.
+// If the host is no longer a valid target, deletes it from the job table.
 function updateJobForHost(host) {
   let stat = info[host];
   if (!stat.root || !stat.money || stat.hack_level > ns.getHackingLevel()) {
     jobs[host] = null;
+    job_queue = job_queue.filter(function (task) {
+      return task.host != host;
+    })
     return;
   }
   let job = jobs[host];
@@ -184,29 +189,30 @@ async function readAndProcessHeartbeat() {
   await processWorkResults(hb);
   let updated = await maybeUpdateSPU(hb.host, hb.version);
   if (updated) return; // It'll send a new heartbeat when it's done starting up.
-  await assignWorkTo(workers[hb.host]);
+  await assignWorkTo(hb);
 }
 
 async function processWorkResults(hb) {
   let host = hb.host;
-  if (!workers[host] || !workers[host].job) {
-    // No entry for this worker; it was previously unknown to us.
-    // Create a new default entry for it.
-    tprintf("SPU: %s running SPU %s with %d threads.", host, hb.version, hb.threads);
-    workers[host] = hb;
-    await scanHosts(DEPTH, false);
-    return;
-  }
+  if (!hb.task) return; // SPU was previously idle, no need to collect results.
+
   // We know what job this worker was doing. Update the job table to record
   // that it finished, then rescan its target and update the target job values.
-  let command = workers[host].job[0];
-  let target = workers[host].job[1];
-  jobs[target]["pending_" + command] -= workers[host].threads;
+  let command = hb.task[0];
+  let target = hb.task[1];
   await scanHost(target);
-  updateJobForHost(target);
-  workers[host].job = null;
-  log(" - %s (%s×%d)", jobToString(jobs[target]), command, workers[host].threads);
-  // tprintf("  + %s", jobToString(jobs[target]));
+  if (!updateJobForHost(target)) {
+    // This happens if we accidentally hacked 100% of the target's money.
+    log("  Oops -- SPU %s's target, %s, was destroyed.", hb.host, hb.target);
+    return;
+  } else {
+    // Reduce the "pending threads" count for the task it was working on.
+    // Prevent it from going below 0, which happens if we just started up
+    // and SPUs are reporting in that we didn't previously know about.
+    jobs[target]["pending_" + command] = Math.max(
+      0, jobs[target]["pending_" + command] - hb.threads);
+  }
+  log(" - %s (%s×%d)", jobToString(jobs[target]), command, hb.threads);
 }
 
 async function maybeUpdateSPU(host, deployed_version) {
@@ -215,7 +221,6 @@ async function maybeUpdateSPU(host, deployed_version) {
   tprintf("SPU: %s upgrade %s -> %s",
     host, deployed_version, version);
   await rpc.send("SPU@" + host, ["exit"]);
-  workers[host] = null;
   while (ns.ps(host).length > 0) await ns.sleep(100);
   await deploy(host, SPU_NAME, version);
   return true;
@@ -231,14 +236,18 @@ async function assignWorkTo(worker) {
       return await setJob(worker, job, "grow");
     }
     if (job.pending_hack < job.hack) {
+      // Additional checks to make sure we don't nuke an entire server.
+      if (info[job.host].hack_fraction * worker.threads > MAX_HACK_RATIO) continue;
       return await setJob(worker, job, "hack");
     }
   }
   // If we get this far all jobs are populated, so we throw up our hands and
-  // tell it to grow() whatever has the least target money.
+  // tell it to grow() whatever has the lowest money:max_money ratio.
   // We'll probably want to be smarter about this later.
   let job = job_queue.reduce(function (x,y) {
-    return x.target_money < y.target_money ? x : y;
+    let xi = info[x.host];
+    let yi = info[y.host];
+    return xi.money/xi.max_money < yi.money/yi.max_money ? x : y;
   });
   await setJob(worker, job, "grow");
 }
