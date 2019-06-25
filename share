@@ -113,13 +113,17 @@ function share/exists {
 # Everything after the -- is added with the "arg" key.
 function share/create {
   local hash=$1; shift
+  umask 077
   install -m 0700 -d "$SHARE_PATH/$hash/"
   install -m 0600 /dev/null "$SHARE_PATH/$hash/.share"
-  case "$1" in
-    "") return ;;
-    --) break ;;
-    *) share/cfg-add $hash "$1" "$2" ; shift 2 ;;
-  esac
+  while [[ $1 ]]; do
+    if [[ $1 == -- ]]; then
+      shift
+      break
+    fi
+    share/cfg-add $hash "$1" "$2"
+    shift 2
+  done
   for arg in "$@"; do
     share/cfg-add $hash arg "$arg"
   done
@@ -128,7 +132,7 @@ function share/create {
 # share/publish hash
 # change the permissions on the share to make it world-readable.
 function share/publish {
-  chmod 0755 "$SHARE_PATH/$1"
+  chmod -R go+rX "$SHARE_PATH/$1"
 }
 
 ### Command implementations ###
@@ -245,13 +249,6 @@ function cmd/add-album {
     die "trying to create a share with a name identical to a file; did you forget the share name?"
   fi
 
-  share/create "$hash" \
-    hash "$hash" \
-    name "$name" \
-    type "album" \
-    pwd "$PWD" \
-    -- "$@"
-
   echo "Generating gallery files..."
   trap "rm -rf /tmp/$$" EXIT
   mkdir /tmp/$$
@@ -278,6 +275,15 @@ function cmd/add-album {
   done
   # Remove EXIF data from original JPEG files
   exiftool -all= -overwrite_original "$SHARE_PATH/$hash/files/"*
+
+  # We have to do this after calling fgallery, or fgallery will refuse to run
+  # because there's already a directory there.
+  share/create "$hash" \
+    hash "$hash" \
+    name "$name" \
+    type "album" \
+    pwd "$PWD" \
+    -- "$@"
 
   printf 'Name: %s\n' $name
   printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
