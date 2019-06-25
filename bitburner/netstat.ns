@@ -1,10 +1,5 @@
 // version:1
-// SHODAN control program for SPU nodes.
-// It will:
-// - automatically discover rootable and hackable systems
-// - get root on rootable systems we don't already have root on
-// - start SPUs on idle systems we have root on
-// - select targets from hackable systems and command the SPUs to attack them
+// Display tree of reachable network systems and information about them.
 
 import {initlib,netwalk,tprintf} from "lib.ns";
 
@@ -21,13 +16,15 @@ export async function main(n) {
 }
 
 async function scanHosts(maxdepth) {
+  tprintf("%-18s  %s %s %s  §%4s/%-4s  %s %15s",
+    "hostname", "P", "Hck", "R", "Cur", "Min", "$Ratio", "$Total");
   async function checkHost(host, depth) {
     let stat = scanHost(host);
-    tprintf("%-18s %3d %s H:%.3f %3dS $%.3e/%.3e",
-      " ".repeat(depth) + host, stat.hack_level, stat.root ? "R" : " ",
-      stat.hack_fraction,
-      stat.security - stat.min_security,
-      stat.money, stat.max_money);
+    tprintf("%-18.18s  %d %3d %s   %4d/%-4d  (%0.2f) %18s",
+      " ".repeat(depth) + host,
+      stat.ports, stat.hack_level, stat.root ? "R" : " ",
+      stat.security, stat.min_security,
+      stat.money/stat.max_money, stat.money.toLocaleString(undefined, {maximumFractionDigits:0}));
     return (depth < maxdepth);
   }
 
@@ -39,6 +36,7 @@ function scanHost(host) {
   let stat = {};
   stat.name = host;
   stat.root = ns.hasRootAccess(host);
+  stat.ports = ns.getServerNumPortsRequired(host);
   stat.ram = ns.getServerRam(host)[0];
   stat.ram_used = ns.getServerRam(host)[1];
   stat.security = ns.getServerSecurityLevel(host);
