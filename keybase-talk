@@ -368,6 +368,7 @@ function /restart {
 }
 
 function /say {
+  [[ $1 ]] || return
   keybase chat send \
     --exploding-lifetime=168h0m0s \
     ${CHAN/#%?*/--channel=$CHAN} $NET "$*"
