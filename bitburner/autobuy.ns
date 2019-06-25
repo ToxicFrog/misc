@@ -5,14 +5,20 @@
 import {initlib,tprintf,printf} from "lib.ns";
 
 let ns;
-let ALLOWANCE = 0.001;
-let RAM_MAX = Math.pow(2,19);
-let RAM_MIN = 4
+
+// Smallest size server we're willing to purchase.
+let RAM_MIN = 4;
+// Largest server the game supports.
+let RAM_MAX = Math.pow(2,20);
+// A hacknet node needs to have produced (cost of upgrade * this) money before
+// we upgrade it; a value of 2 means that each hacknet spends half of its production
+// on upgrades and leaves half for us.
+let HACKNET_COST_FACTOR = 2;
 
 function sizeServerToMoney(allowance) {
   let ram = RAM_MIN;
-  if (ns.getPurchasedServerCost(ram) > allowance) return null;
-  while (ram <= RAM_MAX) {
+  if (ns.getPurchasedServerCost(ram) > allowance) return 0;
+  while (ram < RAM_MAX) {
     // Would increasing ram past this point put us over the limit?
     if (ns.getPurchasedServerCost(ram*2) > allowance) break;
     ram *= 2;
@@ -22,8 +28,9 @@ function sizeServerToMoney(allowance) {
 
 // If we have an empty server slot, just buy the biggest server we can afford
 // to fill it.
-function buyNewServer(allowance) {
+async function buyNewServer(allowance) {
   let nservers = ns.getPurchasedServers().length;
+  allowance = allowance/(nservers || 1);
   if (nservers >= ns.getPurchasedServerLimit()) return false;
 
   // Buy the biggest new server we can afford.
@@ -37,26 +44,71 @@ function buyNewServer(allowance) {
   return true;
 }
 
-function upgradeOldServer(allowance) {
-  return false;
+// If all server slots are full, see if we can buy a bigger version than the
+// oldest one.
+async function upgradeOldServer(allowance) {
+  let servers = ns.getPurchasedServers();
+  allowance = allowance/(servers.length || 1);
+  if (servers.length < ns.getPurchasedServerLimit()) return false;
+
+  let smallest = servers.map(function (hostname) {
+    return [hostname, ns.getServerRam(hostname)[0]];
+  }).reduce(function (x, y) {
+    return (x[1] < y[1]) ? x : y;
+  });
+
+  let ram = sizeServerToMoney(allowance);
+  if (ram <= smallest[1]) return false; // can't afford anything bigger
+  let cost = ns.getPurchasedServerCost(ram);
+  let name = smallest[0];
+
+  tprintf("Upgrading server %s (%dGB) to %dGB for $%d",
+    name, smallest[1], ram, cost);
+  while (ns.ps(name).length > 0) {
+    ns.killall(name);
+    await ns.sleep(100);
+  }
+  if (!ns.deleteServer(name)) {
+    tprintf("Couldn't delete server %s, aborting upgrade.", name);
+    return false;
+  }
+  ns.purchaseServer(name, ram);
+  return true;
 }
 
-function upgradeHacknet(allowance) {
+// Array mapping hacknet index -> money at last upgrade.
+// Used to decide whether to buy a hacknet node upgrade.
+let hacknets;
+function scanHacknets() {
+  hacknets = [];
   for (let i = 0; i < ns.hacknet.numNodes(); ++i) {
-    if (ns.hacknet.getLevelUpgradeCost(i, 1) <= allowance) {
-      ns.hacknet.upgradeLevel(i, 1);
-      return true;
-    }
+    hacknets[i] = ns.hacknet.getNodeStats(i).totalProduction;
+  }
+}
+
+async function upgradeHacknet(allowance) {
+  for (let i = 0; i < ns.hacknet.numNodes(); ++i) {
+    let cost = ns.hacknet.getLevelUpgradeCost(i, 1);
+    let production = ns.hacknet.getNodeStats(i).totalProduction - hacknets[i];
+
+    if (cost > allowance || cost * HACKNET_COST_FACTOR > production) continue;
+
+    ns.hacknet.upgradeLevel(i, 1);
+    hacknets[i] = ns.hacknet.getNodeStats(i).totalProduction;
+    return true;
   }
   return false;
 }
 
-function buyNewHacknet(allowance) {
+// TODO: this should buy nodes based on how much money *all* nodes have made since
+// the last upgrade/node purchase.
+async function buyNewHacknet(allowance) {
   allowance = allowance / (1 + ns.hacknet.numNodes()); // Make it more reluctant to buy new nodes the more we have.
   let cost = ns.hacknet.getPurchaseNodeCost();
   if (cost <= allowance) {
     tprintf("Buying hacknet-node-%d for $%d", ns.hacknet.numNodes(), cost);
     ns.hacknet.purchaseNode();
+    hacknets.concat([0]);
     return true;
   }
   return false;
@@ -66,16 +118,21 @@ let buys = [
   [buyNewServer, 0.01],
   [upgradeOldServer, 0.01],
   [upgradeHacknet, 0.001],
-  [buyNewHacknet, 0.01],
-]
+  [buyNewHacknet, 0.001],
+];
 
 export async function main(n) {
   ns = n;
   initlib(ns);
+  scanHacknets();
+  ns.disableLog("sleep");
+  ns.disableLog("getServerMoneyAvailable");
+
   while (true) {
     for (let buy of buys) {
       let allowance = ns.getServerMoneyAvailable('home') * buy[1];
-      if (buy[0](allowance)) break;
+      let bought = await buy[0](allowance);
+      if (bought) break;
     }
     await ns.sleep(5*1000);
   }
