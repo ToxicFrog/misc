@@ -1,4 +1,4 @@
-// version:5
+// version:6
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
@@ -17,6 +17,7 @@ var SPU_NAME = "spu.ns";
 var MIN_MONEY_FOR_HACK = 2000000;
 var DEPTH = 5;
 var MAX_HACK_RATIO = 0.5;
+var GROWTH_FACTOR = 2.0;
 
 var log = printf;
 
@@ -140,7 +141,6 @@ function updateJobForHost(host) {
     job.weaken = 0;
     job.grow = 0;
     job.hack = 1;
-    job.target_money = stat.money;
   }
 
   return job;
@@ -211,6 +211,10 @@ async function processWorkResults(hb) {
     // and SPUs are reporting in that we didn't previously know about.
     jobs[target]["pending_" + command] = Math.max(
       0, jobs[target]["pending_" + command] - hb.threads);
+    // If we just completed a hack against this target, bump the target_money
+    // up so that the next hack is bigger.
+    if (command == "hack")
+      jobs[target].target_money = Math.min(info[target].max_money, jobs[target].target_money * GROWTH_FACTOR);
   }
   log(" - %s (%s×%d)", jobToString(jobs[target]), command, hb.threads);
 }
