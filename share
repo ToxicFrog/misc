@@ -37,7 +37,7 @@ SHARE_URL="https://ancilla.ancilla.ca/share"
 PROGNAME="$(basename $0)"
 
 missing=""
-for prog in xxd pv fgallery rsync exiftool convert; do
+for prog in xxd pv fgallery rsync exiftool convert sha256sum base64 tr; do
   if ! &>/dev/null type $prog; then
     missing="$missing $prog"
   fi
