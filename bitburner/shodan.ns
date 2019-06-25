@@ -1,4 +1,4 @@
-// version:6
+// version:9
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
@@ -107,7 +107,7 @@ async function scanHost(host) {
 // If the host is no longer a valid target, deletes it from the job table.
 function updateJobForHost(host) {
   let stat = info[host];
-  if (!stat.root || !stat.money || stat.hack_level > ns.getHackingLevel()) {
+  if (!stat.root || !stat.max_money || stat.hack_level > ns.getHackingLevel()) {
     jobs[host] = null;
     job_queue = job_queue.filter(function (task) {
       return task.host != host;
@@ -129,19 +129,9 @@ function updateJobForHost(host) {
       host, stat.hack_level, stat.security, stat.min_security, stat.money);
   }
 
-  if (stat.security > stat.min_security + 2) {
-    job.weaken = Math.ceil((stat.security - stat.min_security) * 20);
-    job.grow = 0;
-    job.hack = 0;
-  } else if (stat.money < job.target_money) {
-    job.weaken = 0;
-    job.grow = ns.growthAnalyze(host, job.target_money/stat.money);
-    job.hack = 0;
-  } else {
-    job.weaken = 0;
-    job.grow = 0;
-    job.hack = 1;
-  }
+  job.weaken = Math.ceil((stat.security - stat.min_security) * 20);
+  job.hack = stat.money >= job.target_money ? 1 : 0;
+  job.grow = Math.max(0, ns.growthAnalyze(host, job.target_money/stat.money));
 
   return job;
 }
@@ -236,13 +226,13 @@ async function assignWorkTo(worker) {
     if (job.pending_weaken < job.weaken) {
       return await setJob(worker, job, "weaken");
     }
-    if (job.pending_grow < job.grow) {
-      return await setJob(worker, job, "grow");
-    }
     if (job.pending_hack < job.hack) {
       // Additional checks to make sure we don't nuke an entire server.
       if (info[job.host].hack_fraction * worker.threads > MAX_HACK_RATIO) continue;
       return await setJob(worker, job, "hack");
+    }
+    if (job.pending_grow < job.grow) {
+      return await setJob(worker, job, "grow");
     }
   }
   // If we get this far all jobs are populated, so we throw up our hands and
@@ -258,19 +248,30 @@ async function assignWorkTo(worker) {
 
 // Attempts to estimate how quickly we can extract money from this system, based
 // on (target_money * hack_fraction)/hack_time.
-// Penalizes time if the system needs to be weakened or grown first.
+// If the system needs to be grown first, we divide this by (1+grows/swarm_size).
+// Same deal with weaken.
+// This doesn't yet take into account the fact that systems that need to be
+// weakened usually need to be grown as well afterwards, or vice versa...
 function getMoneyPerTime(job) {
   let stat = info[job.host];
   return (job.target_money * stat.hack_fraction)
-       / (ns.getHackTime(job.host) * (1 + job.weaken?1:0 + job.grow?1:0));
+       / (ns.getHackTime(job.host) * (1 + (job.weaken+job.grow)/estimateSwarmSize()));
 }
 
-// We prioritize hack over everything, to get immediate cash flow.
-// After hacks, we focus on whatever needs the most threads.
 function sortJobQueue() {
   job_queue.sort(function (x,y) {
     return getMoneyPerTime(y) - getMoneyPerTime(x);
   });
+}
+
+// Guess roughly how many cores are in the swarm based on how many things we
+// have working on tasks.
+function estimateSwarmSize() {
+  return Math.max(
+    1, // Avoid divide-by-zero, and if the swarm is empty none of this matters anyways
+    job_queue.reduce(function (val, job) {
+      return val + job.pending_hack + job.pending_grow + job.pending_weaken;
+    }, 0))
 }
 
 async function setJob(worker, job, command) {

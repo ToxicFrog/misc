@@ -22,19 +22,13 @@ function cmd_spus() {
   }
 }
 
-function taskInfo(task) {
-  for (let field of ["weaken", "grow", "hack"]) {
-    if (task[field]) return [field, task[field], task["pending_" + field]];
-  }
-  return ["???", 0, 0];
-}
-
 function cmd_tasks() {
   let tasks = rpc.readStatus("shodan.ns").tasks;
   for (let task of tasks) {
-    let [command, desired, pending] = taskInfo(task);
-    tprintf("%20.20s  %6s %6d/%-6d    %18s$",
-      task.host, command, pending, desired,
+    tprintf("%18.18s  W %4d/%-4d  H %4d/%-1d  G %4d/%-4d  %18s$",
+      task.host, task.pending_weaken, task.weaken,
+      task.pending_hack, task.hack,
+      task.pending_grow, task.grow,
       ns.getServerMoneyAvailable(task.host).toLocaleString(undefined, {maximumFractionDigits:0}));
   }
 }
