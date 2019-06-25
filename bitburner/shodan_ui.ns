@@ -1,0 +1,58 @@
+import {initlib,tprintf} from "lib.ns";
+import * as rpc from "rpc.ns";
+
+var ns;
+
+function cmd_help() {
+  tprintf("Usage: shodan (spus|tasks)");
+}
+
+function cmd_spus() {
+  tprintf("%24s  %s  %s  %s",
+    "hostname", "Thr", "Ver", "Task");
+  let statii = rpc.readStatus();
+  for (let name in statii) {
+    if (!name.match("^spu.ns")) continue;
+    let status = statii[name];
+    if (!ns.serverExists(status.host)) continue;
+    if (ns.scriptRunning("spu.ns", status.host)) {
+      tprintf("%20.20s  %4s  %3s  %s",
+        status.host, status.threads, status.version, status.task ? status.task.join(" ") : "(idle)");
+    }
+  }
+}
+
+function taskInfo(task) {
+  for (let field of ["weaken", "grow", "hack"]) {
+    if (task[field]) return [field, task[field], task["pending_" + field]];
+  }
+  return ["???", 0, 0];
+}
+
+function cmd_tasks() {
+  let tasks = rpc.readStatus("shodan.ns").tasks;
+  for (let task of tasks) {
+    let [command, desired, pending] = taskInfo(task);
+    tprintf("%20.20s  %6s %6d/%-6d    %18s$",
+      task.host, command, pending, desired,
+      ns.getServerMoneyAvailable(task.host).toLocaleString(undefined, {maximumFractionDigits:0}));
+  }
+}
+
+let commands = {
+  help: cmd_help,
+  spus: cmd_spus,
+  tasks: cmd_tasks,
+};
+
+export async function main(n) {
+  ns = n;
+  initlib(ns);
+  rpc.init(ns);
+
+  if (ns.args[0] && commands[ns.args[0]]) {
+    commands[ns.args[0]]();
+  } else {
+    commands.help();
+  }
+}
