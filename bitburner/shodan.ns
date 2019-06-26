@@ -1,4 +1,4 @@
-// version:14
+// version:16
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
@@ -26,6 +26,8 @@ var GROWTH_FACTOR = 2.0;
 var SERVER_UPGRADE_FACTOR = 0.004;
 // Time between full network rescans, seconds.
 var TIME_BETWEEN_SCANS = 60*5;
+// Maximum number of threads to run in a single SPU shard.
+var MAX_THREADS_PER_SHARD = 16;
 
 var log = printf;
 
@@ -174,8 +176,12 @@ async function installSPU(host) {
   let cost = ns.getScriptRam(SPU_NAME);
   let threads = Math.floor(info[host].ram/cost);
   if (threads < 1) return;
-  tprintf("SPU: installing on %s.", host, version, threads);
-  await deploy(host, SPU_NAME, version);
+  if (threads <= MAX_THREADS_PER_SHARD)
+    tprintf("SPU: installing %s on %s (%d threads).", version, host, threads);
+  else
+    tprintf("SPU: installing %s on %s (%d threads / %d shards).",
+      version, host, threads, Math.ceil(threads/MAX_THREADS_PER_SHARD));
+  await deploy(host, SPU_NAME, MAX_THREADS_PER_SHARD, version);
 }
 
 //// HEARTBEAT HANDLING ////
@@ -233,14 +239,29 @@ async function maybeUpgradeServer(host) {
     host);
 }
 
-async function maybeUpdateSPU(host, deployed_version) {
+// This is tricky because the SPU might be sharded, in which case "host" will
+// actually be in the format "hostname:shard". I should have named it "spu_name"
+// or something, oops.
+async function maybeUpdateSPU(spu_name, deployed_version) {
   let version = getSourceVersion(SPU_NAME);
   if (version == deployed_version) return false;
   tprintf("SPU: %s upgrade %s -> %s",
-    host, deployed_version, version);
-  await rpc.send("SPU@" + host, ["exit"]);
-  while (ns.ps(host).length > 0) await ns.sleep(100);
-  await deploy(host, SPU_NAME, version);
+    spu_name, deployed_version, version);
+
+  let [host,shard] = spu_name.split(":");
+  await rpc.send("SPU@" + spu_name, ["exit"]);
+  while (ns.scriptRunning(host).length > 0) await ns.sleep(100);
+  if (shard === undefined) {
+    // unsharded deployment
+    await deploy(host, SPU_NAME, MAX_THREADS_PER_SHARD, version);
+  } else {
+    // here's where it gets complicated -- we can't just call deploy() because it'll
+    // try to re-shard the script from scratch.
+    // For now we just leave it dead and let the whole server get upgraded once all the
+    // SPUs on it have exited.
+    printf("Warning: leaving SPU %s dead because we can't do per-shard upgrades yet.",
+      spu_name);
+  }
   return true;
 }
 

@@ -36,21 +36,47 @@ export function printf(...argv) {
     return ns.print(sprintf.apply(null, argv));
 }
 
+function installScriptWithDeps(host, script) {
+  for (let dep of ns.read(script).matchAll("import.*from \"([^\"]+)\";")) {
+    ns.scp(dep[1], ns.getHostname(), host);
+    installScriptWithDeps(host, dep[1]);
+  }
+  ns.scp(script, ns.getHostname(), host);
+}
+
 // deploy(script, host, args...)
 // as exec(script, host, args...), except:
 // - it automatically stages the script using scp
 // - it runs the script with as many threads as will fit on the host
 // - it passes (hostname, num_threads) as the first two arguments to the script
-export async function deploy(host, script, ...argv) {
-    ns.scp("lib.ns", ns.getHostname(), host);
-    ns.scp("rpc.ns", ns.getHostname(), host);
-    ns.scp(script, ns.getHostname(), host);
-    var ram = ns.getServerRam(host)[0];
+// If the script is sharded, the first argument will be the shard name, in hostname:shardnum format.
+export async function deploy(host, script, threads_per_shard, ...argv) {
+    if (threads_per_shard < 1) throw "deploy(): threads_per_shard must be positive";
+
+    installScriptWithDeps(host, script);
+    var [max_ram,used_ram] = ns.getServerRam(host);
+    var ram = max_ram - used_ram;
     var cost = ns.getScriptRam(script);
     var threads = Math.floor(ram/cost);
     if (threads < 1) return false;
-    printf("%s: starting %s with %d threads", host, script, threads);
-    return await ns.exec.apply(null, [script, host, threads, host, threads].concat(argv));
+
+    if (threads <= threads_per_shard) {
+      // Unsharded deployment.
+      printf("%s: starting %s with %d threads", host, script, threads);
+      return await ns.exec.apply(null, [script, host, threads, host, threads].concat(argv));
+    } else {
+      // Sharded deployment.
+      let nshards = Math.ceil(threads/threads_per_shard);
+      printf("%s: starting %s with %d shards of <=%d threads each",
+        host, script, nshards, threads_per_shard);
+
+      for (let i = 0; threads > 0; ++i) {
+        let shardname = sprintf("%s:%d", host, i);
+        let shardthreads = Math.min(threads, threads_per_shard);
+        await ns.exec.apply(null, [script, host, shardthreads, shardname, shardthreads].concat(argv));
+        threads -= shardthreads;
+      }
+    }
 }
 
 // Internal helpers for tryPwn.
