@@ -4,7 +4,7 @@ import * as rpc from "rpc.ns";
 var ns;
 
 function cmd_help() {
-  tprintf("Usage: shodan (spus|tasks)");
+  tprintf("Usage: shodan (spus|tasks|log|start|restart|stop)");
 }
 
 function cmd_spus() {
@@ -14,8 +14,9 @@ function cmd_spus() {
   for (let name in statii) {
     if (!name.match("^spu.ns")) continue;
     let status = statii[name];
-    if (!ns.serverExists(status.host)) continue;
-    if (ns.scriptRunning("spu.ns", status.host)) {
+    let [host,shard] = status.host.split(":");
+    if (!ns.serverExists(host)) continue;
+    if (ns.isRunning("spu.ns", host, status.host, status.threads, status.version)) {
       tprintf("%20.20s  %4s  %3s  %s",
         status.host, status.threads, status.version, status.task ? status.task.join(" ") : "(idle)");
     }
@@ -37,10 +38,42 @@ function cmd_tasks() {
   }
 }
 
+function cmd_log() {
+  for (let line of ns.getScriptLogs("shodan.ns")) {
+    ns.tprint(line);
+  }
+}
+
+async function cmd_stop() {
+  ns.kill("shodan.ns", ns.getHostname());
+  while (ns.scriptRunning("shodan.ns", ns.getHostname())) await ns.sleep(100);
+  ns.tprint("SHODAN stopped.");
+}
+
+async function cmd_start() {
+  if (ns.scriptRunning("shodan.ns", ns.getHostname())) {
+    ns.tprint("SHODAN already running.");
+  } else {
+    await ns.run("shodan.ns");
+    ns.tprint("SHODAN starting.");
+  }
+}
+
+async function cmd_restart() {
+  ns.kill("shodan.ns", ns.getHostname());
+  while (ns.scriptRunning("shodan.ns", ns.getHostname())) await ns.sleep(100);
+  await ns.run("shodan.ns");
+  ns.tprint("SHODAN restarted.");
+}
+
 let commands = {
   help: cmd_help,
   spus: cmd_spus,
   tasks: cmd_tasks,
+  log: cmd_log,
+  stop: cmd_stop,
+  restart: cmd_restart,
+  start: cmd_restart,
 };
 
 export async function main(n) {
@@ -49,7 +82,7 @@ export async function main(n) {
   rpc.init(ns);
 
   if (ns.args[0] && commands[ns.args[0]]) {
-    commands[ns.args[0]]();
+    await Promise.resolve(commands[ns.args[0]]());
   } else {
     commands.help();
   }
