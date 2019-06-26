@@ -44,6 +44,28 @@ async function buyNewServer(allowance) {
   return true;
 }
 
+export async function tryUpgradeServer(allowance, host) {
+  let current_ram = ns.getServerRam(host)[0];
+  let new_ram = sizeServerToMoney(allowance);
+  if (new_ram <= current_ram) return false; // can't afford anything bigger
+
+  let cost = ns.getPurchasedServerCost(new_ram);
+  tprintf("Upgrading %s (%dGB) to %dGB for $%d",
+    host, current_ram, new_ram, cost);
+
+  while (ns.ps(host).length > 0) {
+    ns.killall(host);
+    await ns.sleep(100);
+  }
+
+  if (!ns.deleteServer(host)) {
+    tprintf("Couldn't delete server %s, aborting upgrade.", host);
+    return false;
+  }
+
+  return ns.purchaseServer(host, new_ram) != "";
+}
+
 // If all server slots are full, see if we can buy a bigger version than the
 // oldest one.
 async function upgradeOldServer(allowance) {
@@ -57,23 +79,7 @@ async function upgradeOldServer(allowance) {
     return (x[1] < y[1]) ? x : y;
   });
 
-  let ram = sizeServerToMoney(allowance);
-  if (ram <= smallest[1]) return false; // can't afford anything bigger
-  let cost = ns.getPurchasedServerCost(ram);
-  let name = smallest[0];
-
-  tprintf("Upgrading server %s (%dGB) to %dGB for $%d",
-    name, smallest[1], ram, cost);
-  while (ns.ps(name).length > 0) {
-    ns.killall(name);
-    await ns.sleep(100);
-  }
-  if (!ns.deleteServer(name)) {
-    tprintf("Couldn't delete server %s, aborting upgrade.", name);
-    return false;
-  }
-  ns.purchaseServer(name, ram);
-  return true;
+  return await tryUpgradeServer(allowance, smallest[0]);
 }
 
 // Array mapping hacknet index -> money at last upgrade.
@@ -116,14 +122,18 @@ async function buyNewHacknet(allowance) {
 
 let buys = [
   [buyNewServer, 0.1],
-  [upgradeOldServer, 0.1],
+  // [upgradeOldServer, 0.1], // handled internally by SHODAN
   [upgradeHacknet, 0.001],
   [buyNewHacknet, 0.001],
 ];
 
-export async function main(n) {
+export function init_autobuy(n) {
   ns = n;
   initlib(ns);
+}
+
+export async function main(n) {
+  init_autobuy(n);
   scanHacknets();
   ns.disableLog("sleep");
   ns.disableLog("getServerMoneyAvailable");

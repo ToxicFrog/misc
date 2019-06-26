@@ -1,4 +1,4 @@
-// version:9
+// version:14
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
@@ -8,16 +8,24 @@
 // TODO: automatically scan for .cct files and other interesting files on hacked
 // machines, copy them back to home, and generate a notification.
 
-import {initlib,netwalk,tprintf,printf,tryPwn,deploy,getSourceVersion} from "lib.ns";
+import {initlib,netwalk,tprintf,printf,tryPwn,deploy,getSourceVersion,time,resetTimer} from "lib.ns";
+import {tryUpgradeServer,init_autobuy} from "autobuy.ns";
 import * as rpc from "rpc.ns";
 
 var ns;
 var HEARTBEAT_CHANNEL = "shodan";
 var SPU_NAME = "spu.ns";
 var MIN_MONEY_FOR_HACK = 2000000;
-var DEPTH = 5;
+// How far out to scan the network.
+var DEPTH = 10;
+// Don't hack more than this much money at a time.
 var MAX_HACK_RATIO = 0.5;
+// Grow server money by this much between hacks.
 var GROWTH_FACTOR = 2.0;
+// Don't spend more than this much money upgrading a dedicated server.
+var SERVER_UPGRADE_FACTOR = 0.004;
+// Time between full network rescans, seconds.
+var TIME_BETWEEN_SCANS = 60*5;
 
 var log = printf;
 
@@ -36,6 +44,8 @@ let silence = [
 export async function main(n) {
   ns = n;
   initlib(ns);
+  init_autobuy(ns);
+  resetTimer();
   for (let fn of silence) ns.disableLog(fn);
   let MY_VERSION = getSourceVersion(ns.getScriptName());
   info = {}; jobs = {}; job_queue = [];
@@ -49,8 +59,11 @@ export async function main(n) {
 
   while (true) {
     await readAndProcessHeartbeat();
-    await scanHosts(DEPTH, false);
-    await expandSwarm();
+    if (time() >= TIME_BETWEEN_SCANS) {
+      await scanHosts(DEPTH, false);
+      await expandSwarm();
+      resetTimer();
+    }
     rpc.publishStatus(null, {tasks: job_queue});
     if (getSourceVersion(ns.getScriptName()) != MY_VERSION) {
       tprintf("New version found: %s -> %s. Restarting...",
@@ -81,6 +94,7 @@ async function scanHosts(maxdepth, verbose) {
     return (depth < maxdepth);
   }
 
+  log("Performing full network scan of depth %d", maxdepth);
   await netwalk(checkHost, "home");
 }
 
@@ -130,7 +144,7 @@ function updateJobForHost(host) {
   }
 
   job.weaken = Math.ceil((stat.security - stat.min_security) * 20);
-  job.hack = stat.money >= job.target_money ? 1 : 0;
+  job.hack = (!job.weaken && stat.money >= job.target_money) ? 1 : 0;
   job.grow = Math.max(0, ns.growthAnalyze(host, job.target_money/stat.money));
 
   return job;
@@ -177,6 +191,8 @@ async function readAndProcessHeartbeat() {
     hb.host, hb.threads, hb.version);
 
   await processWorkResults(hb);
+  let upgraded = await maybeUpgradeServer(hb.host);
+  if (upgraded) return;
   let updated = await maybeUpdateSPU(hb.host, hb.version);
   if (updated) return; // It'll send a new heartbeat when it's done starting up.
   await assignWorkTo(hb);
@@ -207,6 +223,14 @@ async function processWorkResults(hb) {
       jobs[target].target_money = Math.min(info[target].max_money, jobs[target].target_money * GROWTH_FACTOR);
   }
   log(" - %s (%s×%d)", jobToString(jobs[target]), command, hb.threads);
+}
+
+async function maybeUpgradeServer(host) {
+  await ns.sleep(1);
+  if (!host.match("^spu[0-9]+$")) return false;
+  return await tryUpgradeServer(
+    ns.getServerMoneyAvailable("home") * SERVER_UPGRADE_FACTOR,
+    host);
 }
 
 async function maybeUpdateSPU(host, deployed_version) {
@@ -260,6 +284,7 @@ function getMoneyPerTime(job) {
 
 function sortJobQueue() {
   job_queue.sort(function (x,y) {
+    if (x.hack != y.hack) return y.hack - x.hack; // prioritize hacks over everything else
     return getMoneyPerTime(y) - getMoneyPerTime(x);
   });
 }

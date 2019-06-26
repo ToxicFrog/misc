@@ -8,7 +8,7 @@ function cmd_help() {
 }
 
 function cmd_spus() {
-  tprintf("%24s  %s  %s  %s",
+  tprintf("%20.20s  %4s  %3s  %s",
     "hostname", "Thr", "Ver", "Task");
   let statii = rpc.readStatus();
   for (let name in statii) {
@@ -24,12 +24,16 @@ function cmd_spus() {
 
 function cmd_tasks() {
   let tasks = rpc.readStatus("shodan.ns").tasks;
+  tprintf("%18.18s | %9s | %6s | %9s | %18s",
+    "hostname", " weaken  ", " hack ", "  grow   ", "   target money   ");
+  tprintf("-".repeat(18 + 3 + 9 + 3 + 6 + 3 + 9 + 3 + 18 + 1));
   for (let task of tasks) {
-    tprintf("%18.18s  W %4d/%-4d  H %4d/%-1d  G %4d/%-4d  %18s$",
+    tprintf("%18.18s | %4d/%-4d | %4d/%-1d | %4d/%-4d | %18s$",
       task.host, task.pending_weaken, task.weaken,
       task.pending_hack, task.hack,
       task.pending_grow, task.grow,
-      ns.getServerMoneyAvailable(task.host).toLocaleString(undefined, {maximumFractionDigits:0}));
+      task.target_money.toLocaleString(undefined, {maximumFractionDigits:0}));
+      // ns.getServerMoneyAvailable(task.host).toLocaleString(undefined, {maximumFractionDigits:0}));
   }
 }
 
