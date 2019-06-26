@@ -146,7 +146,7 @@ function updateJobForHost(host) {
   }
 
   job.weaken = Math.ceil((stat.security - stat.min_security) * 20);
-  job.hack = (!job.weaken && stat.money >= job.target_money) ? 1 : 0;
+  job.hack = (stat.money >= job.target_money) ? 1 : 0;
   job.grow = Math.max(0, ns.growthAnalyze(host, job.target_money/stat.money));
 
   return job;
@@ -268,8 +268,12 @@ async function maybeUpdateSPU(spu_name, deployed_version) {
 async function assignWorkTo(worker) {
   sortJobQueue();
   for (let job of job_queue) {
-    if (job.pending_weaken < job.weaken) {
-      return await setJob(worker, job, "weaken");
+    if (job.weaken) {
+      if (job.pending_weaken < job.weaken)
+        return await setJob(worker, job, "weaken");
+      // If there are any pending weakens, don't run anything else against
+      // this target.
+      continue;
     }
     if (job.pending_hack < job.hack) {
       // Additional checks to make sure we don't nuke an entire server.
@@ -296,16 +300,27 @@ async function assignWorkTo(worker) {
 // If the system needs to be grown first, we divide this by (1+grows/swarm_size).
 // Same deal with weaken.
 // This doesn't yet take into account the fact that systems that need to be
-// weakened usually need to be grown as well afterwards, or vice versa...
+// grown will need to be weakened again afterwards.
 function getMoneyPerTime(job) {
   let stat = info[job.host];
   return (job.target_money * stat.hack_fraction)
        / (ns.getHackTime(job.host) * (1 + (job.weaken+job.grow)/estimateSwarmSize()));
 }
 
+// Sort behaviour.
+// If there are machines we can hack right now (i.e. hack=1 and weaken=0), those
+// get sorted first, and sorted within themselves by moneyPerTime.
+// Everything else is just sorted by moneyPerTime.
+function canHack(task) {
+  return !task.weaken && task.hack;
+}
 function sortJobQueue() {
   job_queue.sort(function (x,y) {
-    if (x.hack != y.hack) return y.hack - x.hack; // prioritize hacks over everything else
+    if (canHack(x) != canHack(y)) {
+      // If only one of them is hackable, that one has priority.
+      return canHack(x) ? -1 : 1;
+    }
+    // Otherwise prioritize the one with the best payoff per time.
     return getMoneyPerTime(y) - getMoneyPerTime(x);
   });
 }
