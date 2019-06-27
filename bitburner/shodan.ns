@@ -1,4 +1,4 @@
-// version:16
+// version:17
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
@@ -231,8 +231,8 @@ async function processWorkResults(hb) {
   log(" - %s (%s×%d)", jobToString(jobs[target]), command, hb.threads);
 }
 
-async function maybeUpgradeServer(host) {
-  await ns.sleep(1);
+async function maybeUpgradeServer(spu_name) {
+  let host = spu_name.split(":")[0];
   if (!host.match("^spu[0-9]+$")) return false;
   return await tryUpgradeServer(
     ns.getServerMoneyAvailable("home") * SERVER_UPGRADE_FACTOR,
