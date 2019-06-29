@@ -42,7 +42,7 @@ aterror = debug.traceback
 // Create a new lua_State, load libraries, and run the initializer in it.
 export function newState(ns) {
   if (typeof(fengari) === "undefined") {
-    throw "Couldn't find fengari -- run install-lua.ns first.";
+    throw Error("Couldn't find fengari -- run install-lua.ns first.");
   }
 
   const {to_luastring} = fengari;
@@ -58,7 +58,7 @@ export function newState(ns) {
   lua_setglobal(L, "ns");
 
   if (luaL_dostring(L, to_luastring(initializer))) {
-    throw "Error running initializer: " + tojs(L, -1);
+    throw Error("Error running initializer: " + tojs(L, -1));
   }
 
   return L;
@@ -71,9 +71,9 @@ export function loadBuffer(ns, L, buf, name) {
   const {tojs} = fengari.interop;
 
   const luastr = fengari.to_luastring(buf)
-  if (!luastr) throw "Error in string conversion";
+  if (!luastr) throw Error("Error in string conversion loading " + name);
   if (luaL_loadbuffer(L, luastr, luastr.length, name)) {
-    throw "Error compiling script: " + tojs(L, -1);
+    throw Error("Error loading " + name + ": " + tojs(L, -1));
   }
 }
 
@@ -81,7 +81,7 @@ export function loadBuffer(ns, L, buf, name) {
 export function loadFile(ns, L, file) {
   const source = ns.read(file);
   if (!source) {
-    throw "Error reading source code from " + file;
+    throw Error("Error reading source code from " + file);
   }
   return loadBuffer(ns, L, source, "@"+file);
 }
