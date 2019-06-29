@@ -1,0 +1,111 @@
+// Generic launcher for lua code.
+// Installs Lua interpreter first, if needed. Note that this means it accesses
+// `document` and thus costs a shockingly large amount of memory.
+// It does not otherwise calculate or report memory usage, so if you try calling
+// memory-expensive functions inside the lua script, it will probably crash.
+// Usage: run lua.ns script.lua.txt args...
+
+function installFengari() {
+  const head = document.getElementsByTagName('head')[0];
+  const tag = document.createElement('script');
+  tag.type = 'text/javascript';
+  tag.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js";
+  head.appendChild(tag);
+}
+
+// Runs after libraries and ns are loaded, but before the main program is.
+const initializer = String.raw`
+-- Set up wrappers around async functions to turn them into coroutine yields.
+local function asyncToCoro(f)
+  return function(...)
+    local coro = assert(coroutine.running(), "execution context not in coroutine")
+    coroutine.yield(f(...))
+  end
+end
+for _,name in ipairs { "sleep", "hack", "grow", "weaken", "run", "exec", "prompt", "wget" } do
+  ns[name] = asyncToCoro(ns[name])
+end
+
+-- Make sleep take fractional seconds rather than millis.
+local _sleep = ns.sleep
+ns.sleep = function(self, time) return _sleep(self, time*1000) end
+
+-- Set up package.preload to properly load lua libraries.
+local function preloader(file)
+  return function(...)
+    ns:tprint("Loading "..file)
+    local fn,err = load(ns:read(file), "@"..file)
+    if err then
+      ns:tprint("Error loading library: ".. err)
+      return nil
+    else
+      return fn(...)
+    end
+  end
+end
+for path in js.of(ns:ls(ns:getHostname())) do
+  if path:match("%.lua%.txt$") then
+    ns:tprint("Installing preloader for " .. path)
+    package.preload[path:gsub("^/", ""):gsub("/", "."):gsub("%.lua%.txt$","")] = preloader(path)
+  end
+end
+`
+
+export async function main(ns) {
+  if (typeof(fengari) === "undefined") installFengari();
+  const lua      = fengari.lua;
+  const lauxlib  = fengari.lauxlib;
+  const interop  = fengari.interop;
+
+  const L = lauxlib.luaL_newstate();
+  fengari.lualib.luaL_openlibs(L);
+  lauxlib.luaL_requiref(L, "js", interop.luaopen_js, true);
+  interop.push(L, ns);
+  lua.lua_setglobal(L, "ns");
+
+  if (lauxlib.luaL_dostring(L, fengari.to_luastring(initializer))) {
+    ns.tprint("Error running initializer: " + interop.tojs(L, -1))
+  }
+
+  const args = ns.args.slice(1);
+  const srcfile = ns.args[0] + ".lua.txt"; // not allowed to have .lua files, so we have .lua.txt instead
+  const source = ns.read(srcfile);
+  if (!source) {
+    ns.tprint("Error reading source code from " + srcfile);
+    return;
+  }
+
+  const C = lua.lua_newthread(L);
+  if (lauxlib.luaL_loadbuffer(C, fengari.to_luastring(source), source.length, "@"+ns.args[0])) {
+      ns.tprint("Error compiling script: " + interop.tojs(L, -1));
+      return;
+  }
+  for (const arg of args) {
+      lua.lua_pushjs(C, arg);
+  }
+
+  try {
+    let ret = lua.lua_resume(C, null, args.length);
+    while (ret != lua.LUA_OK) {
+      if (ret == lua.LUA_YIELD) {
+        // It gave us a future to wait on!
+        let future = interop.tojs(C, -1);
+        let result = await future;
+        lua.lua_pop(C, 1);
+        interop.push(C, result);
+        ret = lua.lua_resume(C, null, 1);
+      } else {
+        // It gave us an error!
+        // TODO: proper error handler so we get a nice stack trace, etc.
+        ns.tprint("Error executing script: " + interop.tojs(C, -1));
+        break;
+      }
+    }
+  } catch (ex) {
+    if (ex.message === "false") {
+      // Script was interrupted with `kill` or `killall`, silently eat the error.
+    } else {
+      throw ex;
+    }
+  }
+}
