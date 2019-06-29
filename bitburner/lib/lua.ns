@@ -25,9 +25,9 @@ local function preloader(file)
   end
 end
 for path in js.of(ns:ls(ns:getHostname())) do
-  if path:match("%.lua%.txt$") then
+  if path:match("^/lib.*%.lua%.txt$") then
     ns:tprint("Installing preloader for " .. path)
-    package.preload[path:gsub("^/", ""):gsub("/", "."):gsub("%.lua%.txt$","")] = preloader(path)
+    package.preload[path:gsub("^/lib/", ""):gsub("/", "."):gsub("%.lua%.txt$","")] = preloader(path)
   end
 end
 

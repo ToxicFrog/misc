@@ -1,5 +1,4 @@
---local io = require 'lib.io'
-local log = require 'lib.log'
+local log = require 'log'
 
 -- Settings
 -- Smallest server we can buy
