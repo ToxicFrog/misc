@@ -1,4 +1,4 @@
-// version:17
+// version:20
 // SHODAN control program for SPU nodes.
 // It will:
 // - automatically discover rootable and hackable systems
@@ -9,7 +9,7 @@
 // machines, copy them back to home, and generate a notification.
 
 import {initlib,netwalk,tprintf,printf,tryPwn,deploy,getSourceVersion,time,resetTimer} from "lib.ns";
-import {tryUpgradeServer,init_autobuy} from "autobuy.ns";
+import {tryUpgradeServer,canUpgradeServer,init_autobuy} from "autobuy.ns";
 import * as rpc from "rpc.ns";
 
 var ns;
@@ -60,13 +60,13 @@ export async function main(n) {
   tprintf("SHODAN startup complete.");
 
   while (true) {
+    rpc.publishStatus(null, {tasks: job_queue});
     await readAndProcessHeartbeat();
     if (time() >= TIME_BETWEEN_SCANS) {
       await scanHosts(DEPTH, false);
       await expandSwarm();
       resetTimer();
     }
-    rpc.publishStatus(null, {tasks: job_queue});
     if (getSourceVersion(ns.getScriptName()) != MY_VERSION) {
       tprintf("New version found: %s -> %s. Restarting...",
         MY_VERSION, getSourceVersion(ns.getScriptName()));
@@ -193,14 +193,22 @@ async function installSPU(host) {
 async function readAndProcessHeartbeat() {
   let hb = await rpc.recv(HEARTBEAT_CHANNEL, 60.0);
   if (!hb) return; // timeout
-  log("Heartbeat from %s with %d threads running SPU %s",
-    hb.host, hb.threads, hb.version);
+  // log("Heartbeat from %s with %d threads running SPU %s",
+  //   hb.host, hb.threads, hb.version);
 
   await processWorkResults(hb);
   let upgraded = await maybeUpgradeServer(hb.host);
-  if (upgraded) return;
+  if (upgraded) {
+    log("%18s:  %s  ->  %s", hb.host, (hb.task || ["(idle)"]).join(" "), "UPGRADE");
+    log("HACK HACK HACK: restarting after server upgrade");
+    ns.spawn(ns.getScriptName(), 1);
+    return;
+  }
   let updated = await maybeUpdateSPU(hb.host, hb.version);
-  if (updated) return; // It'll send a new heartbeat when it's done starting up.
+  if (updated) {
+    log("%18s:  %s  ->  %s", hb.host, (hb.task || ["(idle)"]).join(" "), "UPDATE");
+    return; // It'll send a new heartbeat when it's done starting up.
+  }
   await assignWorkTo(hb);
 }
 
@@ -228,15 +236,26 @@ async function processWorkResults(hb) {
     if (command == "hack")
       jobs[target].target_money = Math.min(info[target].max_money, jobs[target].target_money * GROWTH_FACTOR);
   }
-  log(" - %s (%s×%d)", jobToString(jobs[target]), command, hb.threads);
+  // log(" - %s (%s×%d)", jobToString(jobs[target]), command, hb.threads);
 }
 
 async function maybeUpgradeServer(spu_name) {
   let host = spu_name.split(":")[0];
   if (!host.match("^spu[0-9]+$")) return false;
-  return await tryUpgradeServer(
-    ns.getServerMoneyAvailable("home") * SERVER_UPGRADE_FACTOR,
-    host);
+  let budget = ns.getServerMoneyAvailable("home") * SERVER_UPGRADE_FACTOR;
+  // if (canUpgradeServer(budget, host)) {
+    // let nps = ns.ps(host).length
+    // await rpc.send("SPU@" + spu_name, ["exit"]);
+    // while (ns.ps(host).length == nps) await ns.sleep(100);
+    // log("Shut down %s to prepare for hardware upgrade (%d shards left).",
+    //   spu_name, ns.ps(host).length);
+    // if (ns.ps(host).length == 0) {
+    //   log("Upgrading %s", host);
+     return await tryUpgradeServer(budget, host);
+    // }
+  //   return true;
+  // }
+  // return false;
 }
 
 // This is tricky because the SPU might be sharded, in which case "host" will
@@ -336,8 +355,11 @@ function estimateSwarmSize() {
 }
 
 async function setJob(worker, job, command) {
+  log("%18s:  %s  ->  %s %s (×%d)", worker.host,
+    (worker.task || ["(idle)"]).join(" "),
+    command, job.host, worker.threads);
   job["pending_" + command] += worker.threads;
   worker.job = [command, job.host];
   await rpc.send("SPU@" + worker.host, [command, job.host]);
-  log(" + %s (%s×%d)", jobToString(job), command, worker.threads);
+  // log(" + %s (%s×%d)", jobToString(job), command, worker.threads);
 }

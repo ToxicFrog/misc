@@ -44,10 +44,20 @@ async function buyNewServer(allowance) {
   return true;
 }
 
+export async function canUpgradeServer(allowance, host) {
+  let current_ram = ns.getServerRam(host)[0];
+  let new_ram = sizeServerToMoney(allowance);
+  return new_ram > current_ram;
+}
+
 export async function tryUpgradeServer(allowance, host) {
   let current_ram = ns.getServerRam(host)[0];
   let new_ram = sizeServerToMoney(allowance);
-  if (new_ram <= current_ram) return false; // can't afford anything bigger
+  if (new_ram <= current_ram) {
+    printf("Failed to upgrade server %s (%d < %d)",
+      host, new_ram, current_ram);
+    return false; // can't afford anything bigger
+  }
 
   let cost = ns.getPurchasedServerCost(new_ram);
   tprintf("Upgrading %s (%dGB) to %dGB for $%d",
