@@ -28,10 +28,10 @@ local function buyNewServer(budget)
   local ram = sizeServerToMoney(budget)
   if ram < RAM_MIN then return false end
 
-  local name = ("spu%d"):format(nservers)
+  local name = ("spu%.0f"):format(nservers)
   local cost = ns:getPurchasedServerCost(ram)
 
-  log.info("Buying server %s (%dGB) for $%d", name, ram, cost)
+  log.info("Buying server %s (%.0fGB) for $%.0f", name, ram, cost)
   ns:purchaseServer(name, ram)
   return true
 end
@@ -55,7 +55,7 @@ local function upgradeHacknet(budget)
       local cost = ns.hacknet["get"..stat.."UpgradeCost"](ns.hacknet, i, 1)
       log.debug("  Checking %s: %.2f", stat, cost)
       if cost <= budget and cost * HACKNET_COST_FACTOR <= production then
-        log.info("Upgrading %s on hacknet-node-%d for $%.0f", stat, i, cost)
+        log.info("Upgrading %s on hacknet-node-%.0f for $%.0f", stat, i, cost)
         ns.hacknet["upgrade"..stat](ns.hacknet, i, 1)
         hacknets[i] = ns.hacknet:getNodeStats(i).totalProduction
         return true
@@ -75,7 +75,7 @@ local function buyNewHacknet(budget)
   log.debug("BuyNewHacknet(budget=%.0f)", budget)
   local cost = ns.hacknet:getPurchaseNodeCost()
   if cost > budget then return false end
-  log.info("Buying hacknet-node-%d for $%d", nhacknets, cost)
+  log.info("Buying hacknet-node-%.0f for $%.0f", nhacknets, cost)
   ns.hacknet:purchaseNode()
   hacknets[nhacknets] = 0
 end
