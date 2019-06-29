@@ -1,0 +1,168 @@
+// Library functions for running Lua scripts.
+
+// Runs after libraries and ns are loaded, but before the main program is.
+const initializer = String.raw`
+-- Set up wrappers around async functions to turn them into coroutine yields.
+local function asyncToCoro(f)
+  return function(...)
+    local coro = assert(coroutine.running(), "execution context not in coroutine")
+    coroutine.yield(f(...))
+  end
+end
+for _,name in ipairs { "sleep", "hack", "grow", "weaken", "run", "exec", "prompt", "wget" } do
+  ns[name] = asyncToCoro(ns[name])
+end
+
+-- Make sleep take fractional seconds rather than millis.
+local _sleep = ns.sleep
+ns.sleep = function(self, time) return _sleep(self, time*1000) end
+
+-- Set up package.preload to properly load lua libraries.
+local function preloader(file)
+  return function(...)
+    ns:tprint("Loading "..file)
+    return assert(load(ns:read(file), "@"..file))(...)
+  end
+end
+for path in js.of(ns:ls(ns:getHostname())) do
+  if path:match("%.lua%.txt$") then
+    ns:tprint("Installing preloader for " .. path)
+    package.preload[path:gsub("^/", ""):gsub("/", "."):gsub("%.lua%.txt$","")] = preloader(path)
+  end
+end
+
+-- Error handler. Called when an error is thrown inside lua, just before the
+-- script terminates.
+-- It'll be called with the erroring thread as the first argument and the error
+-- message as the second.
+-- User code can replace this.
+aterror = debug.traceback
+`
+
+// Create a new lua_State, load libraries, and run the initializer in it.
+export function newState(ns) {
+  if (typeof(fengari) === "undefined") {
+    throw "Couldn't find fengari -- run install-lua.ns first.";
+  }
+
+  const {to_luastring} = fengari;
+  const {lua_setglobal} = fengari.lua;
+  const {luaL_newstate,luaL_requiref,luaL_dostring} = fengari.lauxlib;
+  const {luaL_openlibs} = fengari.lualib;
+  const {luaopen_js,push,tojs} = fengari.interop;
+
+  const L = luaL_newstate();
+  luaL_openlibs(L);
+  luaL_requiref(L, "js", luaopen_js, true);
+  push(L, ns);
+  lua_setglobal(L, "ns");
+
+  if (luaL_dostring(L, to_luastring(initializer))) {
+    throw "Error running initializer: " + tojs(L, -1);
+  }
+
+  return L;
+}
+
+// Compile buf (a javascript string) and push the result onto the stack
+// as a Lua function.
+export function loadBuffer(ns, L, buf, name) {
+  const {luaL_loadbuffer} = fengari.lauxlib;
+  const {tojs} = fengari.interop;
+
+  const luastr = fengari.to_luastring(buf)
+  if (!luastr) throw "Error in string conversion";
+  if (luaL_loadbuffer(L, luastr, luastr.length, name)) {
+    throw "Error compiling script: " + tojs(L, -1);
+  }
+}
+
+// Load a file from disk and push it onto the stack as a Lua function.
+export function loadFile(ns, L, file) {
+  const source = ns.read(file);
+  if (!source) {
+    throw "Error reading source code from " + file;
+  }
+  return loadBuffer(ns, L, source, "@"+file);
+}
+
+// Call the error handler in L, if defined, and then throw whatever it returns
+// as a JS error.
+function handleError(L) {
+  const {lua_checkstack,lua_newthread,lua_pop,lua_getglobal,
+         lua_xmove,lua_pushthread,lua_pcall,lua_type,
+         LUA_TFUNCTION} = fengari.lua;
+  const {luaL_typename} = fengari.lauxlib;
+  const {tojs} = fengari.interop;
+
+  // Make sure we have enough room to create the error handler thread.
+  if (!lua_checkstack(L, 1))
+    return Error("Unable to create error handling coroutine processing error:\n  "
+                + tojs(L, -1));
+
+  const E = lua_newthread(L);
+  lua_pop(L, 1);
+
+  // Push error handler.
+  lua_getglobal(E, "aterror");
+  if (lua_type(E, -1) !== LUA_TFUNCTION) {
+    // aterror is not defined or is not a function.
+    return Error(tojs(L, -1));
+  }
+
+  // Push the thread. We have to push it into itself first, then move it over to
+  // the error handling thread, since there's no lua_pushotherthread().
+  lua_pushthread(L);
+  lua_xmove(L, E, 1);
+
+  // Error message is still on top of the stack; move that over too.
+  lua_xmove(L, E, 1); // move the error message
+
+  // Try calling it.
+  const msg = tojs(E, -1);
+  if (lua_pcall(E, 2, 1, 0)) {
+    // Something went wrong calling the error handler.
+    return Error("Error calling error handler: " + tojs(E, -1)
+               + "\n(original error: " + msg + ")");
+  }
+  return Error(tojs(E, -1));
+}
+
+// Call the function on top of the stack in L, passing it args.
+// If the function yields something, awaits on it and then resumes it with the
+// results of the await.
+//
+export async function callToCompletion(ns, L, args) {
+  const {lua_resume,lua_pop,LUA_OK,LUA_YIELD} = fengari.lua;
+  const {push,tojs} = fengari.interop;
+
+  for (const arg of args) {
+      push(L, arg);
+  }
+
+  try {
+    let ret = lua_resume(L, null, args.length);
+    while (ret != LUA_OK) {
+      if (ret == LUA_YIELD) {
+        // It gave us a future to wait on!
+        let future = tojs(L, -1);
+        lua_pop(L, 1);
+        let result = await future;
+        push(L, result);
+        ret = lua_resume(L, null, 1);
+      } else {
+        // It gave us an error!
+        console.log("Error executing script: " + tojs(L, -1));
+        throw handleError(L);
+      }
+    }
+  } catch (ex) {
+    if (ex.message === "false") {
+      // Lua API check failure. Silently eat the error -- should not happen in prod
+      // except when the script is kill'd.
+    } else {
+      throw ex;
+    }
+  }
+}
+

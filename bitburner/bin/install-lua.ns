@@ -5,16 +5,12 @@
 // memory-expensive functions inside the lua script, it will probably crash.
 // Usage: run lua.ns script.lua.txt args...
 
-import {newState,loadFile,callToCompletion} from "/lib/lua.ns";
-
-function RAM_USAGE() {
-  window.console.log();
-}
-
 export async function main(ns) {
-  const srcfile = ns.args[0] + ".lua.txt"; // not allowed to have .lua files, so we have .lua.txt instead
-
-  let L = newState(ns);
-  loadFile(ns, L, srcfile);
-  await callToCompletion(ns, L, ns.args.slice(1));
+  if (typeof(fengari) !== "undefined") return;
+  const head = document.getElementsByTagName('head')[0];
+  const tag = document.createElement('script');
+  tag.type = 'text/javascript';
+  tag.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js";
+  head.appendChild(tag);
+  ns.tprint("Fengari Lua installed.");
 }
