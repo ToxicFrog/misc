@@ -1,0 +1,21 @@
+const server = "https://ancilla.ancilla.ca/share/YfuoUJO08ry5r1vso8xcMVd6ba3Gtbrv2UB_4VHEWYE=/";
+
+export async function main(ns) {
+    ns.tprint("Fetching index...");
+    await ns.wget(server+"sources.txt", "sources.txt");
+    let srcs = ns.read("sources.txt").split("\n");
+    ns.rm("sources.txt");
+
+    for (let src of srcs) {
+        // Skip blank lines
+        if (!src) continue;
+        ns.tprint("  "+src);
+
+        if (src.match(".(ns|js)$")) {
+            await ns.wget(server+src, "/"+src);
+        } else {
+            // TODO: compilation of lua files?
+            await ns.wget(server+src, "/"+src+".txt");
+        }
+    }
+}
