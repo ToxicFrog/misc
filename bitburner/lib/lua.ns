@@ -50,12 +50,15 @@ function L_tomoney(L) {
   return 1;
 }
 
+export async function luaAvailable(ns) {
+  while (typeof(fengari) === "undefined") {
+    ns.print("Lua not available yet -- sleeping until it is.");
+    await ns.sleep(5*1000);
+  }
+}
+
 // Create a new lua_State, load libraries, and run the initializer in it.
 export function newState(ns) {
-  if (typeof(fengari) === "undefined") {
-    throw Error("Couldn't find fengari -- run install-lua.ns first.");
-  }
-
   const {to_luastring} = fengari;
   const {lua_setglobal,lua_pushjsfunction} = fengari.lua;
   const {luaL_newstate,luaL_requiref,luaL_dostring} = fengari.lauxlib;

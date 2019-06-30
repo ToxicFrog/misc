@@ -5,7 +5,7 @@
 // memory-expensive functions inside the lua script, it will probably crash.
 // Usage: run lua.ns script.lua.txt args...
 
-import {newState,loadFile,callToCompletion} from "/lib/lua.ns";
+import {luaAvailable,newState,loadFile,callToCompletion} from "/lib/lua.ns";
 
 function RAM_USAGE() {
   window.console.log();
@@ -13,7 +13,7 @@ function RAM_USAGE() {
 
 export async function main(ns) {
   const srcfile = ns.args[0] + ".lua.txt"; // not allowed to have .lua files, so we have .lua.txt instead
-
+  await luaAvailable(ns);
   let L = newState(ns);
   loadFile(ns, L, srcfile);
   await callToCompletion(ns, L, ns.args.slice(1));

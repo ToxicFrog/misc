@@ -40,13 +40,14 @@ function compileStub(ns, input, output, ns_deps, lua_deps) {
   const code = `
     // Generated from ${input}.
     // Use luac.ns -s ${input} to regenerate.
-    ${_import} {newState,loadFile,callToCompletion} from ${_lualib};
+    ${_import} {luaAvailable,newState,loadFile,callToCompletion} from ${_lualib};
 
     function RAM_USAGE() {
       ${[...ns_deps].join("\n      ")}
     }
 
     export async function main(ns) {
+      await luaAvailable(ns);
       const L = newState(ns);
       loadFile(ns, L, "${input}");
       await callToCompletion(ns, L, ns.args.slice(1));
@@ -72,7 +73,7 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
   const code = `
     // Generated from ${input}.
     // Use luac.ns -i ${input} to regenerate.
-    ${_import} {newState,loadBuffer,callToCompletion} from ${_lualib};
+    ${_import} {luaAvailable,newState,loadBuffer,callToCompletion} from ${_lualib};
 
     function RAM_USAGE() {
       ${[...ns_deps].join("\n      ")}
@@ -84,6 +85,7 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
     };
 
     export async function main(ns) {
+      await luaAvailable(ns);
       const {lua_getglobal,lua_getfield,lua_setfield,lua_pop} = fengari.lua;
 
       const L = newState(ns);
