@@ -18,14 +18,18 @@
 
 export async function main(ns) {
   const [mode,file] = ns.args;
+  if (!file.match(/\.lua(\.txt)?$/)) {
+    ns.tprint("Input file must have .lua or .lua.txt extension.");
+    ns.exit();
+  }
   if (mode == "-s") {
     // stub mode
-    compileStub(ns, file, file.replace(".lua.txt", ".luaS.ns"));
+    compileStub(ns, file, file.replace(/\.lua(\.txt)?$/, ".luaS.ns"));
   } else if (mode == "-i") {
     // integrated mode
-    compileIntegrated(ns, file, file.replace(".lua.txt", ".luaI.ns"));
+    compileIntegrated(ns, file, file.replace(/\.lua(\.txt)?$/, ".luaI.ns"));
   } else {
-    ns.tprint("Usage: luac (-s|-i) input.lua.txt");
+    ns.tprint("Usage: luac (-s|-i) input.lua");
   }
 }
 
@@ -58,32 +62,49 @@ function compileStub(ns, input, output) {
 }
 
 function compileIntegrated(ns, input, output) {
-  const deps = findDependenciesOf(ns, input);
+  // Workaround for the import transformer transforming stuff inside string
+  // constants.
+  const _import = "import";
+  const _lualib = '"/lib/lua.ns"';
+  const [ns_deps,lua_deps] = findDependenciesOf(ns, input);
   ns.tprint(`NS calls: ${ns_deps.size}`);
   ns.tprint(`Lua deps: ${lua_deps.size}`);
-  let lua_sources = [
-    "__main__: `" + ns.read(input) + "`;",
-  ];
+
+  let lua_sources = [];
+  let lua_preload = "";
   for (let dep of lua_deps) {
-    lua_sources.push('"' + dep + '": `' + ns.read(dep) + "`;");
+    lua_sources.push('"' + dep + '": `' + ns.read(libToFile(dep)) + "`,");
+    lua_preload += `
+      loadBuffer(ns, L, source["${dep}"], "=embed:lib:${dep}");
+      lua_setfield(L, -2, "${dep}");`;
   }
+
   const code = `
     // Generated from ${input}.
     // Use luac.ns -i ${input} to regenerate.
-    import {newState,loadBuffer,callToCompletion} from "/lib/lua.ns";
+    ${_import} {newState,loadBuffer,callToCompletion} from ${_lualib};
 
     function RAM_USAGE() {
       ${[...ns_deps].join("\n      ")}
     }
 
     const source = {
+      __main__: \`${ns.read(input)}\`,
       ${lua_sources.join("\n      ")}
     };
 
     export async function main(ns) {
+      const {lua_getglobal,lua_getfield,lua_setfield,lua_pop} = fengari.lua;
+
       const L = newState(ns);
-      // set up package.preload
-      loadBuffer(ns, L, source.__main__, "@${input}");
+      lua_getglobal(L, "package");
+      lua_getfield(L, -1, "preload");
+      // Preloaded libraries
+      ${lua_preload}
+
+      // End preloaded libraries
+      lua_pop(L, 2);
+      loadBuffer(ns, L, source.__main__, "=embed:main:${input}");
       await callToCompletion(ns, L, ns.args.slice(1));
     }
   `;
@@ -92,18 +113,25 @@ function compileIntegrated(ns, input, output) {
   ns.tprint(`Compiled: ${output}`);
 }
 
+function libToFile(libname) {
+  return "/lib/" + libname.replace(".", "/") + ".lua.txt";
+}
+
 // Given a lua source file, find all dependencies on functions in ns and
 // all lua libraries it depends on.
 // Returns
 function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
+  ns.tprint("Checking deps of " + input);
   const source = ns.read(input);
   for (let match of source.matchAll("ns(\\.[a-zA-Z0-9_]+)*:[a-zA-Z0-9_]+")) {
+    ns.tprint("  [NS] " + match[0]);
     ns_deps.add(match[0].replace(":",".") + "();");
   }
-  for (let match of source.matchAll("require [\"']([a-zA-Z0-9_.])[\"']")) {
-    const file = "/" + match[0].replace(".", "/") + ".lua.txt";
-    if (!lua_deps.has(match[0])) {
-      lua_deps.add(match[0]);
+  for (let match of source.matchAll("require *\\(? *[\"']([a-zA-Z0-9_.]+)[\"']")) {
+    ns.tprint(" [LUA] " + match[1]);
+    const file = libToFile(match[1]);
+    if (!lua_deps.has(match[1])) {
+      lua_deps.add(match[1]);
       findDependenciesOf(ns, file, ns_deps, lua_deps);
     }
   }
