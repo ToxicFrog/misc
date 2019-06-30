@@ -1,3 +1,6 @@
+// wget https://ancilla.ancilla.ca/share/YfuoUJO08ry5r1vso8xcMVd6ba3Gtbrv2UB_4VHEWYE=/bin/fetch.ns /bin/fetch.ns
+// run /bin/fetch.ns
+
 const server = "https://ancilla.ancilla.ca/share/YfuoUJO08ry5r1vso8xcMVd6ba3Gtbrv2UB_4VHEWYE=/";
 
 export async function main(ns) {
