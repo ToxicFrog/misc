@@ -17,29 +17,26 @@
 // time any of the dependencies change.
 
 export async function main(ns) {
-  const [mode,file] = ns.args;
+  const file = ns.args[0];
+  if (!file) {
+    ns.tprint("Usage: luac input.lua");
+    return;
+  }
   if (!file.match(/\.lua(\.txt)?$/)) {
     ns.tprint("Input file must have .lua or .lua.txt extension.");
-    ns.exit();
+    return;
   }
-  if (mode == "-s") {
-    // stub mode
-    compileStub(ns, file, file.replace(/\.lua(\.txt)?$/, ".luaS.ns"));
-  } else if (mode == "-i") {
-    // integrated mode
-    compileIntegrated(ns, file, file.replace(/\.lua(\.txt)?$/, ".luaI.ns"));
-  } else {
-    ns.tprint("Usage: luac (-s|-i) input.lua");
-  }
+  const stem = file.replace(/\.lua(\.txt)?$/, "");
+  const [ns_deps,lua_deps] = findDependenciesOf(ns, file);
+  ns.tprint(
+    `Compiling ${file}: ${ns_deps.size} NS calls, ${lua_deps.size} Lua modules.`);
+  compileStub(ns, file, stem + ".luaS.ns", ns_deps, lua_deps);
+  compileIntegrated(ns, file, stem + ".luaI.ns", ns_deps, lua_deps);
 }
 
-function compileStub(ns, input, output) {
-  // Workaround for the import transformer transforming stuff inside string
-  // constants.
-  const _import = "import";
+function compileStub(ns, input, output, ns_deps, lua_deps) {
+  const _import = "import"; // Workaround on-load import resolver.
   const _lualib = '"/lib/lua.ns"';
-  const [ns_deps,lua_deps] = findDependenciesOf(ns, input);
-  ns.tprint(`NS calls: ${ns_deps.size}`);
   const code = `
     // Generated from ${input}.
     // Use luac.ns -s ${input} to regenerate.
@@ -55,21 +52,12 @@ function compileStub(ns, input, output) {
       await callToCompletion(ns, L, ns.args.slice(1));
     }
   `;
-  ns.tprint(code);
   ns.rm(output);
   ns.write(output, code, "w");
-  ns.tprint(`Compiled: ${output}`);
+  ns.tprint(` -> ${output}`);
 }
 
-function compileIntegrated(ns, input, output) {
-  // Workaround for the import transformer transforming stuff inside string
-  // constants.
-  const _import = "import";
-  const _lualib = '"/lib/lua.ns"';
-  const [ns_deps,lua_deps] = findDependenciesOf(ns, input);
-  ns.tprint(`NS calls: ${ns_deps.size}`);
-  ns.tprint(`Lua deps: ${lua_deps.size}`);
-
+function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
   let lua_sources = [];
   let lua_preload = "";
   for (let dep of lua_deps) {
@@ -79,6 +67,8 @@ function compileIntegrated(ns, input, output) {
       lua_setfield(L, -2, "${dep}");`;
   }
 
+  const _import = "import"; // Workaround on-load import resolver.
+  const _lualib = '"/lib/lua.ns"';
   const code = `
     // Generated from ${input}.
     // Use luac.ns -i ${input} to regenerate.
@@ -99,9 +89,7 @@ function compileIntegrated(ns, input, output) {
       const L = newState(ns);
       lua_getglobal(L, "package");
       lua_getfield(L, -1, "preload");
-      // Preloaded libraries
-      ${lua_preload}
-
+      // Preloaded libraries${lua_preload}
       // End preloaded libraries
       lua_pop(L, 2);
       loadBuffer(ns, L, source.__main__, "=embed:main:${input}");
@@ -110,7 +98,7 @@ function compileIntegrated(ns, input, output) {
   `;
   ns.rm(output);
   ns.write(output, code, "w");
-  ns.tprint(`Compiled: ${output}`);
+  ns.tprint(` -> ${output}`);
 }
 
 function libToFile(libname) {
@@ -121,16 +109,16 @@ function libToFile(libname) {
 // all lua libraries it depends on.
 // Returns
 function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
-  ns.tprint("Checking deps of " + input);
+  //ns.tprint("  Analyzing " + input);
   const source = ns.read(input);
   for (let match of source.matchAll("ns(\\.[a-zA-Z0-9_]+)*:[a-zA-Z0-9_]+")) {
-    ns.tprint("  [NS] " + match[0]);
+    //if (!ns_deps.has(match[0])) ns.tprint("    [NS] " + match[0]);
     ns_deps.add(match[0].replace(":",".") + "();");
   }
   for (let match of source.matchAll("require *\\(? *[\"']([a-zA-Z0-9_.]+)[\"']")) {
-    ns.tprint(" [LUA] " + match[1]);
     const file = libToFile(match[1]);
     if (!lua_deps.has(match[1])) {
+      //ns.tprint("   [LUA] " + match[1]);
       lua_deps.add(match[1]);
       findDependenciesOf(ns, file, ns_deps, lua_deps);
     }
