@@ -9,6 +9,7 @@ export async function main(ns) {
     let srcs = ns.read("sources.txt").split("\n");
     ns.rm("sources.txt");
 
+    let luas = [];
     for (let src of srcs) {
         // Skip blank lines
         if (!src) continue;
@@ -17,7 +18,15 @@ export async function main(ns) {
         let dst = src.match(".(ns|js)$") ? "/"+src : "/" + src + ".txt";
         ns.rm(dst);
         await ns.wget(server+src, dst);
-        // TODO: compile lua?
+        if (src.match("^bin/.*\\.lua$")) luas.push(dst);
     }
     ns.tprint("Download complete.");
+    if (ns.fileExists("/bin/luac.ns")) {
+        ns.tprint("Compiling all downloaded Lua scripts in /bin...");
+        for (let src of luas) {
+            await ns.run("/bin/luac.ns", 1, src);
+        }
+    } else {
+        ns.tprint("/bin/luac.ns not available, skipping precompilation of Lua scripts.");
+    }
 }
