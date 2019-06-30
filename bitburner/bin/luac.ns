@@ -1,0 +1,111 @@
+// Lua compiler. Given an input .lua.txt file, generates a .ns file that
+// launches it with correct memory declarations and minimal overhead.
+// Two operating modes.
+// luac.ns -s foo.lua.txt emits a foo.luaS.ns file, which is just a stub containing
+// memory declarations and a loader for the real file.
+// The advantage is that you don't need to recompile every time the .lua files
+// change.
+// The disadvantage is that it needs to call ns.read() to read the contents of
+// the file, which adds 1GB of memory usage. Not a big deal for large programs,
+// but for workers where you want to pack as many threads per server as possible
+// this can be a big problem if they aren't already calling read().
+// luac.ns -i foo.lua.txt emits a foo.luaI.ns file, which is an "integrated"
+// file containing foo.lua.txt and all of its dependencies as string constants,
+// and appropriate package.preload rules to load everything from memory.
+// This makes the whole program a single self-contained file and avoids any
+// overhead from calling ns.read(), but also means you need to recompile any
+// time any of the dependencies change.
+
+export async function main(ns) {
+  const [mode,file] = ns.args;
+  if (mode == "-s") {
+    // stub mode
+    compileStub(ns, file, file.replace(".lua.txt", ".luaS.ns"));
+  } else if (mode == "-i") {
+    // integrated mode
+    compileIntegrated(ns, file, file.replace(".lua.txt", ".luaI.ns"));
+  } else {
+    ns.tprint("Usage: luac (-s|-i) input.lua.txt");
+  }
+}
+
+function compileStub(ns, input, output) {
+  // Workaround for the import transformer transforming stuff inside string
+  // constants.
+  const _import = "import";
+  const _lualib = '"/lib/lua.ns"';
+  const [ns_deps,lua_deps] = findDependenciesOf(ns, input);
+  ns.tprint(`NS calls: ${ns_deps.size}`);
+  const code = `
+    // Generated from ${input}.
+    // Use luac.ns -s ${input} to regenerate.
+    ${_import} {newState,loadFile,callToCompletion} from ${_lualib};
+
+    function RAM_USAGE() {
+      ${[...ns_deps].join("\n      ")}
+    }
+
+    export async function main(ns) {
+      const L = newState(ns);
+      loadFile(ns, L, "${input}");
+      await callToCompletion(ns, L, ns.args.slice(1));
+    }
+  `;
+  ns.tprint(code);
+  ns.rm(output);
+  ns.write(output, code, "w");
+  ns.tprint(`Compiled: ${output}`);
+}
+
+function compileIntegrated(ns, input, output) {
+  const deps = findDependenciesOf(ns, input);
+  ns.tprint(`NS calls: ${ns_deps.size}`);
+  ns.tprint(`Lua deps: ${lua_deps.size}`);
+  let lua_sources = [
+    "__main__: `" + ns.read(input) + "`;",
+  ];
+  for (let dep of lua_deps) {
+    lua_sources.push('"' + dep + '": `' + ns.read(dep) + "`;");
+  }
+  const code = `
+    // Generated from ${input}.
+    // Use luac.ns -i ${input} to regenerate.
+    import {newState,loadBuffer,callToCompletion} from "/lib/lua.ns";
+
+    function RAM_USAGE() {
+      ${[...ns_deps].join("\n      ")}
+    }
+
+    const source = {
+      ${lua_sources.join("\n      ")}
+    };
+
+    export async function main(ns) {
+      const L = newState(ns);
+      // set up package.preload
+      loadBuffer(ns, L, source.__main__, "@${input}");
+      await callToCompletion(ns, L, ns.args.slice(1));
+    }
+  `;
+  ns.rm(output);
+  ns.write(output, code, "w");
+  ns.tprint(`Compiled: ${output}`);
+}
+
+// Given a lua source file, find all dependencies on functions in ns and
+// all lua libraries it depends on.
+// Returns
+function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
+  const source = ns.read(input);
+  for (let match of source.matchAll("ns(\\.[a-zA-Z0-9_]+)*:[a-zA-Z0-9_]+")) {
+    ns_deps.add(match[0].replace(":",".") + "();");
+  }
+  for (let match of source.matchAll("require [\"']([a-zA-Z0-9_.])[\"']")) {
+    const file = "/" + match[0].replace(".", "/") + ".lua.txt";
+    if (!lua_deps.has(match[0])) {
+      lua_deps.add(match[0]);
+      findDependenciesOf(ns, file, ns_deps, lua_deps);
+    }
+  }
+  return [ns_deps,lua_deps];
+}
