@@ -39,6 +39,17 @@ end
 aterror = debug.traceback
 `
 
+// JS implementation of lua function tomoney(n, [fractional_digits]).
+// Returns n in the form "$1,234,567.89".
+function L_tomoney(L) {
+  const {luaL_checknumber,luaL_optinteger} = fengari.lauxlib;
+  const {push} = fengari.interop;
+  const n = luaL_checknumber(L, 1);
+  const fdigits = luaL_optinteger(L, 2, 0);
+  push(L, "$" + n.toLocaleString(undefined, {maximumFractionDigits:fdigits}));
+  return 1;
+}
+
 // Create a new lua_State, load libraries, and run the initializer in it.
 export function newState(ns) {
   if (typeof(fengari) === "undefined") {
@@ -46,7 +57,7 @@ export function newState(ns) {
   }
 
   const {to_luastring} = fengari;
-  const {lua_setglobal} = fengari.lua;
+  const {lua_setglobal,lua_pushjsfunction} = fengari.lua;
   const {luaL_newstate,luaL_requiref,luaL_dostring} = fengari.lauxlib;
   const {luaL_openlibs} = fengari.lualib;
   const {luaopen_js,push,tojs} = fengari.interop;
@@ -56,6 +67,8 @@ export function newState(ns) {
   luaL_requiref(L, "js", luaopen_js, true);
   push(L, ns);
   lua_setglobal(L, "ns");
+  lua_pushjsfunction(L, L_tomoney);
+  lua_setglobal(L, "tomoney");
 
   if (luaL_dostring(L, to_luastring(initializer))) {
     throw Error("Error running initializer: " + tojs(L, -1));
