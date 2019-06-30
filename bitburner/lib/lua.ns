@@ -17,19 +17,19 @@ end
 local _sleep = ns.sleep
 ns.sleep = function(self, time) return _sleep(self, time*1000) end
 
--- Set up package.preload to properly load lua libraries.
-local function preloader(file)
-  return function(...)
-    ns:tprint("Loading "..file)
-    return assert(load(ns:read(file), "@"..file))(...)
-  end
-end
-for path in js.of(ns:ls(ns:getHostname())) do
-  if path:match("^/lib.*%.lua%.txt$") then
-    ns:tprint("Installing preloader for " .. path)
-    package.preload[path:gsub("^/lib/", ""):gsub("/", "."):gsub("%.lua%.txt$","")] = preloader(path)
-  end
-end
+-- Set up package searchers.
+package.searchers = {
+  package.searchers[1]; -- package.preload
+  function(name)
+    local file = "/lib/" .. name:gsub("%.", "/") .. ".lua.txt"
+    if ns:fileExists(file) then
+      return load(ns:read(file), "@"..file)
+    else
+      return "no file '"..file.."';"
+    end
+  end;
+  -- remaining searchers for lua/C files on disk removed
+}
 
 -- Error handler. Called when an error is thrown inside lua, just before the
 -- script terminates.
