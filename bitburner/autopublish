@@ -1,0 +1,12 @@
+#!/usr/bin/env zsh
+
+NEEDS_MAKE=0
+inotifywait -r -m -e modify -e create -e moved_to . | fgrep -v --line-buffered sources.txt | while true; do
+  if read -t 3 event; then
+    echo "$event"
+    NEEDS_MAKE=1
+  elif (( NEEDS_MAKE )); then
+    NEEDS_MAKE=0
+    make
+  fi
+done
