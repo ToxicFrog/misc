@@ -37,6 +37,14 @@ package.searchers = {
 -- message as the second.
 -- User code can replace this.
 aterror = debug.traceback
+
+-- Override print() to do something useful, and define printf()
+function print(...)
+  return ns:tprint(table.concat({...}, " "))
+end
+function printf(fmt, ...)
+  return print(fmt:format(...))
+end
 `
 
 // JS implementation of lua function tomoney(n, [fractional_digits]).
