@@ -136,6 +136,8 @@ function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
 let warnings = {
   ["ns(\\.[a-zA-Z0-9_]+)+ *[\"'{(]"]:
     "Possible call to $0 without :method",
+  ["js\\.global(\\.[a-zA-Z0-9_]+)+ *[\"'{(]"]:
+    "Possible call to $0 without :method",
 };
 
 function reportWarnings(ns, name, source) {
