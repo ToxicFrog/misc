@@ -12,7 +12,7 @@ local json = require 'json'
 
 local RPC_PORT = 20
 local RPCS = nil
-local STATUS_CHANNEL = 0
+local STATUS_CHANNEL = ".status"
 local RPC_RETRY_TIME = 0.1 -- seconds between retries while blocking
 
 local rpc = {}
