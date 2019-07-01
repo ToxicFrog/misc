@@ -5,8 +5,7 @@ const initializer = String.raw`
 -- Set up wrappers around async functions to turn them into coroutine yields.
 local function asyncToCoro(f)
   return function(...)
-    local coro = assert(coroutine.running(), "execution context not in coroutine")
-    coroutine.yield(f(...))
+    return coroutine.yield(f(...))
   end
 end
 for _,name in ipairs { "sleep", "hack", "grow", "weaken", "run", "exec", "prompt", "wget" } do
