@@ -5,7 +5,7 @@
 -- The special channel 0 (the actual number 0, not "0") holds status publications.
 -- Users must call rpc.init() to initialize the RPC port before making any RPC
 -- calls.
--- Uses ns:peek() and ns:write(), and thus has 2GB memory footprint.
+-- Uses ns:peek() only, for a total cost of 1GB.
 
 local log = require 'log'
 local json = require 'json'
@@ -17,22 +17,15 @@ local RPC_RETRY_TIME = 0.1 -- seconds between retries while blocking
 
 local rpc = {}
 
--- Initialize the RPC library. Creates a new RPCS object if this is the first
--- time it's been called in this session; otherwise fetches the existing one
--- out of RPC_PORT.
--- Note that we use JS Objects and Arrays throughout here, as otherwise they
--- don't make it through the Netscript port intact. As far as Lua objects go
--- we can only send strings, numbers, and booleans.
--- TODO: use ser or bitser or luatexts or sth for serialization.
+-- Wait for the RPC daemon to initialize the RPC port.
+-- Must call this before any other RPC calls or your programs will almost
+-- certainly crash on page reload.
 function rpc.init()
-  if ns:peek(RPC_PORT) == "NULL PORT DATA" then
-    RPCS = js.new(js.global.Object)
-    RPCS[STATUS_CHANNEL] = js.new(js.global.Object)
-    ns:write(RPC_PORT, RPCS)
-  else
-    RPCS = ns:peek(RPC_PORT)
+  while ns:peek(RPC_PORT) == "NULL PORT DATA" do
+    ns:sleep(RPC_RETRY_TIME)
   end
-  log.info("RPC %s initialized using port %d", RPCS, RPC_PORT)
+  RPCS = ns:peek(RPC_PORT)
+  log.info("Found RPC daemon. RPCs initialized using port %d.", RPC_PORT)
 end
 
 -- Create a new RPC channel with the specified size (0=unlimited).

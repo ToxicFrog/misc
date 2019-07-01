@@ -1,20 +1,27 @@
-// Generic launcher for lua code.
-// Installs Lua interpreter first, if needed. Note that this means it accesses
-// `document` and thus costs a shockingly large amount of memory.
-// It does not otherwise calculate or report memory usage, so if you try calling
-// memory-expensive functions inside the lua script, it will probably crash.
-// Usage: run lua.ns script.lua.txt args...
+// Setup daemon for Lua and Lua RPCs.
+// Does initial setup if needed, then sleeps forever.
+// This ensures that on page reload it'll start up, properly initializing things.
+// There's no guarantee that it runs first, so lib/lua.ns is written to block on
+// startup until lua is initialized, and rpc.init() will block until RPCs are
+// initialized.
+
+let RPC_PORT = 20
+let RPC_STATUS_CHANNEL = ".status"
 
 export async function main(ns) {
-  while (true) {
-    if (typeof(fengari) === "undefined") {
-      const head = document.getElementsByTagName('head')[0];
-      const tag = document.createElement('script');
-      tag.type = 'text/javascript';
-      tag.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js";
-      head.appendChild(tag);
-      ns.tprint("Lua Daemon running. Lua installed.");
-    }
-    await ns.sleep(60*60*1000);
+  if (typeof(fengari) === "undefined") {
+    const head = document.getElementsByTagName('head')[0];
+    const tag = document.createElement('script');
+    tag.type = 'text/javascript';
+    tag.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js";
+    head.appendChild(tag);
+    ns.tprint("Lua runtime initialized.");
   }
+  if (ns.peek(RPC_PORT) === "NULL PORT DATA") {
+    let RPCs = new Object();
+    RPCs[RPC_STATUS_CHANNEL] = new Object();
+    ns.write(RPC_PORT, RPCs);
+    ns.tprint("RPCs initialized using port " + RPC_PORT);
+  }
+  while (true) await ns.sleep(1024*1024*1024);
 }
