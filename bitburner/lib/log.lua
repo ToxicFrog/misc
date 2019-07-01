@@ -9,13 +9,13 @@ local function logger(level, depth)
     local info,prefix
     if levels[level] >= levels[log_level] then
       info = debug.getinfo(2, "Sl")
-      prefix = string.format("%1.1s %s:%d ",
+      prefix = string.format("%1.1s %s:%d\n    ",
         level, info.short_src:gsub(".txt$",""), info.currentline)
       ns:print(prefix..fmt:format(...))
     end
     if levels[level] >= levels[tty_level] then
       info = info or debug.getinfo(2, "Sl")
-      prefix = prefix or string.format("%1.1s %s:%d ",
+      prefix = prefix or string.format("%1.1s %s:%d\n    ",
         level, info.short_src:gsub(".txt$",""), info.currentline)
       ns:tprint(prefix..fmt:format(...))
     end
