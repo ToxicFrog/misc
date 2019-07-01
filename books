@@ -35,6 +35,8 @@
 #     entries
 #   - when finishing a book, if there's another book in the series, show both
 #     the book immediately finished and the next book
+#   this is implemented for "reread" and "add-series"
+#   for "add", "start", "done", "log", we need to override the existing behaviour in TW
 
 set -e
 source $(dirname $(realpath $0))/tasklib.sh
@@ -250,6 +252,9 @@ function books/add-series {
   done
 
   books/set-series _ "$series" "${uuids[@]}"
+
+  # List the books we just added.
+  main "${uuids[@]}" all
 }
 
 task/register reread ' reread$' books/reread <<EOF
