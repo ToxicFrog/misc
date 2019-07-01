@@ -50,7 +50,7 @@ function compileStub(ns, input, output, ns_deps, lua_deps) {
       await luaAvailable(ns);
       const L = newState(ns);
       loadFile(ns, L, "${input}");
-      await callToCompletion(ns, L, ns.args.slice(1));
+      await callToCompletion(ns, L, ns.args);
     }
   `;
   ns.rm(output);
@@ -62,9 +62,9 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
   let lua_sources = [];
   let lua_preload = "";
   for (let dep of lua_deps) {
-    lua_sources.push('"' + dep + '": `' + ns.read(libToFile(dep)) + "`,");
+    lua_sources.push('"' + dep + '": String.raw`' + ns.read(libToFile(dep)) + "`,");
     lua_preload += `
-      loadBuffer(ns, L, source["${dep}"], "=embed:lib:${dep}");
+      loadBuffer(ns, L, source["${dep}"], "=${libToFile(dep)}");
       lua_setfield(L, -2, "${dep}");`;
   }
 
@@ -80,7 +80,7 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
     }
 
     const source = {
-      __main__: \`${ns.read(input)}\`,
+      __main__: String.raw\`${ns.read(input)}\`,
       ${lua_sources.join("\n      ")}
     };
 
@@ -94,8 +94,8 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
       // Preloaded libraries${lua_preload}
       // End preloaded libraries
       lua_pop(L, 2);
-      loadBuffer(ns, L, source.__main__, "=embed:main:${input}");
-      await callToCompletion(ns, L, ns.args.slice(1));
+      loadBuffer(ns, L, source.__main__, "=${input}");
+      await callToCompletion(ns, L, ns.args);
     }
   `;
   ns.rm(output);
@@ -113,6 +113,11 @@ function libToFile(libname) {
 function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
   //ns.tprint("  Analyzing " + input);
   const source = ns.read(input);
+  if (!source) {
+    ns.tprint("Unable to read " + input);
+    ns.exit();
+  }
+  reportWarnings(ns, input, source);
   for (let match of source.matchAll("ns(\\.[a-zA-Z0-9_]+)*:[a-zA-Z0-9_]+")) {
     //if (!ns_deps.has(match[0])) ns.tprint("    [NS] " + match[0]);
     ns_deps.add(match[0].replace(":",".") + "();");
@@ -126,4 +131,17 @@ function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
     }
   }
   return [ns_deps,lua_deps];
+}
+
+let warnings = {
+  ["ns(\\.[a-zA-Z0-9_]+)+ *[\"'{(]"]:
+    "Possible call to $0 without :method",
+};
+
+function reportWarnings(ns, name, source) {
+  for (let pattern in warnings) {
+    for (let match of source.matchAll(pattern)) {
+      ns.tprint("Warning: " + name + ": " + warnings[pattern].replace("$0", match[0]));
+    }
+  }
 }
