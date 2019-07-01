@@ -8,6 +8,7 @@
 -- Uses ns:peek() and ns:write(), and thus has 2GB memory footprint.
 
 local log = require 'log'
+local json = require 'json'
 
 local RPC_PORT = 20
 local RPCS = nil
@@ -49,9 +50,9 @@ end
 -- elapsed; if timeout is set, it retries every 100ms.
 -- Returns true if the message was sent, false if a timeout occurred.
 function rpc.send(name, message, timeout)
-  assert(type(message) == "string", "rpc.send() expected string, got "..type(message))
+  message = json.encode(message)
   timeout = timeout or math.huge
-  log.debug("Sending %s <- %s (timeout=%f)", name, message, timeout)
+  log.debug("Sending (timeout=%f) %s <- %s", timeout, name, message)
   while timeout > 0 do
     local channel = RPCS[name]
     log.trace("channel=%s", channel)
@@ -77,7 +78,7 @@ function rpc.recv(name, timeout)
     local channel = RPCS[name]
     log.trace("channel=%s", channel)
     if channel and #channel > 0 then
-      local message = channel:shift()
+      local message = json.decode(channel:shift())
       log.trace("Message received: %s", message)
       return message
     end
@@ -97,19 +98,22 @@ end
 -- There's also no attempt to enforce that one program can't overwrite another's
 -- status, or to clean up statii on exit. Beware.
 function rpc.publish(key, status)
-  assert(type(status) == "string", "rpc.publish() expected string, got "..type(message))
   log.info("Publishing status %s <- %s", key, status)
-  RPCS[STATUS_CHANNEL][key] = status
+  RPCS[STATUS_CHANNEL][key] = json.encode(status)
 end
 
 -- Read a status update from another program.
 function rpc.read(key)
-  return RPCS[STATUS_CHANNEL][key]
+  return json.decode(RPCS[STATUS_CHANNEL][key])
 end
 
 -- Return an iterator over all (key,value) statuses.
 function rpc.readAll()
-  return pairs(RPCS[STATUS_CHANNEL])
+  return coroutine.wrap(function()
+    for k,v in pairs(RPCS[STATUS_CHANNEL]) do
+      coroutine.yield(k, json.decode(v))
+    end
+  end)
 end
 
 return rpc
