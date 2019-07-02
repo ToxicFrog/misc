@@ -1,0 +1,11 @@
+// Setup daemon for stuff that needs to be initialized on page load.
+// At the moment this just means the Lua runtime.
+// Launches a separate installer for that because it costs a massive amount
+// of memory.
+
+export async function main(ns) {
+  if (!ns.run("/bin/lua-installer.ns")) {
+    tprint("Error launching lua installer! You'll have to run it by hand.");
+  }
+  while (true) await ns.sleep(1024*1024*1024);
+}
