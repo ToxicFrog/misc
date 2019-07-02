@@ -25,7 +25,9 @@ end
 -- Scan a single host and return information about it.
 function net.stat(host)
   local stat = {}
-  stat.name = host
+  stat.host = host
+  stat.ps = ns:ps(host)
+  stat.ls = ns:ls(host)
   stat.root = ns:hasRootAccess(host)
   stat.ports = ns:getServerNumPortsRequired(host)
   stat.ram = ns:getServerRam(host)[0]
