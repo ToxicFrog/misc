@@ -34,7 +34,10 @@ package.searchers = {
 -- script terminates.
 -- It'll be called with the erroring thread as the first argument and the error
 -- message as the second.
--- User code can replace this.
+-- User code can replace this, but note that in order for Bitburner error
+-- windows to work properly:
+-- (1) the original error message should be included at the *front*
+-- (2) whatever you append to it should not include the | character
 aterror = debug.traceback
 
 -- Override print() to do something useful, and define printf()
@@ -81,7 +84,7 @@ export function newState(ns) {
   lua_setglobal(L, "tomoney");
 
   if (luaL_dostring(L, to_luastring(initializer))) {
-    throw Error("Error running initializer: " + tojs(L, -1));
+    throw "Error running initializer: " + tojs(L, -1);
   }
 
   return L;
@@ -94,9 +97,9 @@ export function loadBuffer(ns, L, buf, name) {
   const {tojs} = fengari.interop;
 
   const luastr = fengari.to_luastring(buf)
-  if (!luastr) throw Error("Error in string conversion loading " + name);
+  if (!luastr) throw "Error in string conversion loading " + name;
   if (luaL_loadbuffer(L, luastr, luastr.length, name)) {
-    throw Error("Error loading " + name + ": " + tojs(L, -1));
+    throw "Error loading " + name + ": " + tojs(L, -1);
   }
 }
 
@@ -104,13 +107,14 @@ export function loadBuffer(ns, L, buf, name) {
 export function loadFile(ns, L, file) {
   const source = ns.read(file);
   if (!source) {
-    throw Error("Error reading source code from " + file);
+    throw "Error reading source code from " + file;
   }
   return loadBuffer(ns, L, source, "@"+file);
 }
 
-// Call the error handler in L, if defined, and then throw whatever it returns
-// as a JS error.
+// Call the error handler in L, if defined. Returns an error string, which the
+// caller is expected to throw.
+//
 function handleError(L) {
   const {lua_checkstack,lua_newthread,lua_pop,lua_getglobal,
          lua_xmove,lua_pushthread,lua_pcall,lua_type,
@@ -119,9 +123,9 @@ function handleError(L) {
   const {tojs} = fengari.interop;
 
   // Make sure we have enough room to create the error handler thread.
-  if (!lua_checkstack(L, 1))
-    return Error("Unable to create error handling coroutine processing error:\n  "
-                + tojs(L, -1));
+  if (!lua_checkstack(L, 1)) {
+    return tojs(L, -1) + "<br>Also: error initializing Lua error handler.";
+  }
 
   const E = lua_newthread(L);
   lua_pop(L, 1);
@@ -130,7 +134,7 @@ function handleError(L) {
   lua_getglobal(E, "aterror");
   if (lua_type(E, -1) !== LUA_TFUNCTION) {
     // aterror is not defined or is not a function.
-    return Error(tojs(L, -1));
+    return tojs(L, -1);
   }
 
   // Push the thread. We have to push it into itself first, then move it over to
@@ -145,10 +149,13 @@ function handleError(L) {
   const msg = tojs(E, -1);
   if (lua_pcall(E, 2, 1, 0)) {
     // Something went wrong calling the error handler.
-    return Error("Error calling error handler: " + tojs(E, -1)
-               + "\n(original error: " + msg + ")");
+    let newmsg = msg + "<br>Error in Lua error handler: <br>" + tojs(E, -1);
+    console.log(newmsg);
+    return newmsg;
   }
-  return Error(tojs(E, -1));
+    console.log("Error handling complete, returning whatever's on top of the stack: "
+               + tojs(E, -1));
+  return tojs(E, -1);
 }
 
 // Call the function on top of the stack in L, passing it args.
@@ -163,28 +170,21 @@ export async function callToCompletion(ns, L, args) {
       push(L, arg);
   }
 
-  try {
-    let ret = lua_resume(L, null, args.length);
-    while (ret != LUA_OK) {
-      if (ret == LUA_YIELD) {
-        // It gave us a future to wait on!
-        let future = tojs(L, -1);
-        lua_pop(L, 1);
-        let result = await future;
-        push(L, result);
-        ret = lua_resume(L, null, 1);
-      } else {
-        // It gave us an error!
-        console.log("Error executing script: " + tojs(L, -1));
-        throw handleError(L);
-      }
-    }
-  } catch (ex) {
-    if (ex.message === "false") {
-      // Lua API check failure. Silently eat the error -- should not happen in prod
-      // except when the script is kill'd.
+  let ret = lua_resume(L, null, args.length);
+  while (ret != LUA_OK) {
+    if (ret == LUA_YIELD) {
+      // It gave us a future to wait on!
+      let future = tojs(L, -1);
+      lua_pop(L, 1);
+      let result = await future;
+      push(L, result);
+      ret = lua_resume(L, null, 1);
     } else {
-      throw ex;
+      // It gave us an error!
+      console.log("Error executing script: " + tojs(L, -1));
+      const msg = handleError(L).replace(/\n/g, "<br>").replace(/<br>( +)/, "<br><pre>$1</pre>");
+      console.log("Error handler returned: " + msg);
+      throw msg;
     }
   }
 }
