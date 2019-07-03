@@ -21,6 +21,8 @@ TODO:
 local HACK_RATIO = 0.1
 -- Server needs at least this much money before we even consider hacking it.
 local MIN_MONEY_FOR_HACK = 2e6
+-- How much we try to grow each server between hacks.
+local GROWTH_FACTOR = 2
 
 -- SPU information.
 local SPU_NAME = "/bin/spu.luaI.ns"
@@ -40,7 +42,7 @@ local log = require 'log'
 local net = require 'net'
 
 for _,fn in ipairs {
-    "sleep", "getServerRam", "getServerNumPortsRequired", "scan", "exec",
+    "sleep", "getServerRam", "getServerNumPortsRequired", "scan", "exec", "scp",
     "getServerSecurityLevel", "getServerMinSecurityLevel", "getServerMoneyAvailable",
     "getServerMaxMoney", "getServerRequiredHackingLevel", "getHackingLevel",
 } do
@@ -61,6 +63,7 @@ function main(...)
       printf("Would sleep for: %f", sleep)
       break
     else
+      log.info("Sleeping for %f seconds.", sleep)
       ns:sleep(sleep)
     end
   end
@@ -87,6 +90,7 @@ function mapNetwork()
     preTask(info)
     installSPU(info)
     network[host] = info
+    return true
   end
 
   log.debug("Performing full network scan.");
@@ -99,6 +103,7 @@ end
 -- ns:brutessh() ns:ftpcrack() ns:relaysmtp() ns:httpworm() ns:sqlinject()
 function tryPwn(host)
   if ns:hasRootAccess(host) then return end
+  log.debug("Trying to pwn %s", host)
   local ports = ns:getServerNumPortsRequired(host)
   for _,spike in ipairs { "brutessh", "ftpcrack", "relaysmtp", "httpworm", "sqlinject" } do
     if ns:fileExists(spike .. ".exe") then
@@ -266,6 +271,10 @@ function assignTasks(network, tasks)
       if info.threads <= 0 then break end -- next host
       if task.threads <= 0 then
         task = next_task() -- next task
+        if task.action == "hack" then
+          TARGET_MONEY[task.host] = math.min(
+            TARGET_MONEY[task.host] * GROWTH_FACTOR, network[task.host].max_money)
+        end
       else
         local threads = math.min(task.threads, info.threads)
         runSPU(host, threads, task.action, task.host, task.time)
