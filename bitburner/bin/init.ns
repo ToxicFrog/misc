@@ -3,9 +3,31 @@
 // Launches a separate installer for that because it costs a massive amount
 // of memory.
 
+const startup = ["/bin/lua-installer.ns"];
+const daemons = [
+  "/bin/autobuy.L.ns",
+  "/bin/shodan.L.ns",
+];
+
+const DELAY_BETWEEN_CHECKS = 5*60; // seconds
+const DELAY_AFTER_LAUNCH = 5; // seconds
+
 export async function main(ns) {
-  if (!ns.run("/bin/lua-installer.ns")) {
-    tprint("Error launching lua installer! You'll have to run it by hand.");
+  for (let prog of startup) {
+    tprint("Launching startup program " .. prog);
+    await ns.run(prog);
+    await ns.sleep(DELAY_AFTER_LAUNCH);
   }
-  while (true) await ns.sleep(1024*1024*1024);
+  while (true) {
+    const [mem_total,mem_used] = ns.getServerRam(ns.getHostname());
+    const mem_free = mem_total - mem_used;
+    for (let daemon of daemons) {
+      if (ns.isRunning(daemon, ns.getHostname())) continue;
+      if (ns.getScriptRam(daemon) > mem_free) break;
+      tprint("Launching daemon " .. daemon);
+      await ns.run(daemon);
+      await ns.sleep(DELAY_AFTER_LAUNCH);
+    }
+    await ns.sleep(DELAY_BETWEEN_CHECKS * 1000);
+  }
 }
