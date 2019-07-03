@@ -54,7 +54,7 @@ function main(...)
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
     local tasks = generateTasks(network)
-    sleep = math.min(sleep, assignTasks(network, tasks)) + 1
+    sleep = math.min(sleep, assignTasks(network, tasks)) + 0.1
     if sleep == math.huge then
       log.warn("Sleep was infinite, resetting to 5 minutes")
       sleep = 5*60
