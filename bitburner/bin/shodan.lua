@@ -10,13 +10,9 @@ Primary dataloop:
 - assign tasks, keeping track of the one that's meant to finish soonest
 - sleep until then + 1 second
 
-To handle system upgrades:
-- SHODAN needs to have its own copy of the "is this server ready for upgrade" logic,
-  or the autoupgrader needs to have some way of marking a system as "ready for upgrade",
-  either by writing a file on that system (which ls() will pick up) or by writing
-  a file on home that SHODAN will find.
-- when it is, it stops scheduling workers on that host by setting free_threads=0
-- when the host is running nothing, the autoupgrader will upgrade it
+TODO:
+- upgrade SPU software as needed
+- detect lameduck dedis and stop scheduling tasks on them
 ]]
 
 ---- Immutable setting stuff ----
@@ -54,11 +50,19 @@ end
 function main(...)
   log.setlevel("debug", "warn")
   while true do
-    local network = analyzeNetwork(mapNetwork())
+    local network,sleep = analyzeNetwork(mapNetwork())
     local tasks = generateTasks(network)
-    printf("Sleep time: %f", assignTasks(network, tasks))
-    ns:sleep(10.0)
-    break
+    sleep = math.min(sleep, assignTasks(network, tasks)) + 1
+    if sleep == math.huge then
+      log.warn("Sleep was infinite, resetting to 5 minutes")
+      sleep = 5*60
+    end
+    if ... == "once" then
+      printf("Would sleep for: %f", sleep)
+      break
+    else
+      ns:sleep(sleep)
+    end
   end
 end
 
@@ -147,6 +151,8 @@ end
 
 -- Generate ancillary data about the network that requires analyzing the whole
 -- network: the per-host priority and the pending tasks per target.
+-- Returns the annotated network map and the estimated time until the next
+-- currently running SPU task completes.
 function analyzeNetwork(network, swarm_size)
   -- First calculate priority based on the *desired* weaken/grow/hack
   -- jobs in conjunction with the swarm size.
@@ -159,16 +165,19 @@ function analyzeNetwork(network, swarm_size)
 
   -- Then calculate how much we're doing already, and thus, how much we actually
   -- want to do.
+  -- Also, find existing tasks and figure out which ones will finish soonest.
+  local next_task_completion = math.huge
   for host,info in pairs(network) do
     for _,proc in ipairs(info.ps) do
       if proc.filename == SPU_NAME then
-        local task,target = proc.args[0],proc.args[1]
+        local task,target,time = proc.args[0],proc.args[1],tonumber(proc.args[2])
         network[target][task] = math.max(0, network[target][task] - proc.threads)
+        next_task_completion = math.min(next_task_completion, time)
       end
     end
   end
 
-  return network
+  return network,math.max(0, next_task_completion - ns:getTimeSinceLastAug()/1000)
 end
 
 -- Attempt to determine the priority (i.e money-per-time) of focusing hacks
@@ -259,7 +268,7 @@ function assignTasks(network, tasks)
         task = next_task() -- next task
       else
         local threads = math.min(task.threads, info.threads)
-        runSPU(host, threads, task.action, task.host)
+        runSPU(host, threads, task.action, task.host, task.time)
         task.threads = task.threads - threads
         info.threads = info.threads - threads
         min_time = math.min(min_time, task.time)
@@ -269,9 +278,9 @@ function assignTasks(network, tasks)
   return min_time
 end
 
-function runSPU(host, threads, action, target)
+function runSPU(host, threads, action, target, time)
   log.debug("SPU: %s[%d]: %s %s", host, threads, action, target)
-  ns:exec(SPU_NAME, host, threads, action, target)
+  ns:exec(SPU_NAME, host, threads, action, target, ns:getTimeSinceLastAug()/1000 + time)
 end
 
 return main(...)
