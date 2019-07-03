@@ -84,7 +84,7 @@ export function newState(ns) {
   lua_setglobal(L, "tomoney");
 
   if (luaL_dostring(L, to_luastring(initializer))) {
-    throw "Error running initializer: " + tojs(L, -1);
+    throw Error("Error running initializer: " + tojs(L, -1));
   }
 
   return L;
@@ -99,7 +99,7 @@ export function loadBuffer(ns, L, buf, name) {
   const luastr = fengari.to_luastring(buf)
   if (!luastr) throw "Error in string conversion loading " + name;
   if (luaL_loadbuffer(L, luastr, luastr.length, name)) {
-    throw "Error loading " + name + ": " + tojs(L, -1);
+    throw Error("Error loading " + name + ": " + tojs(L, -1));
   }
 }
 
@@ -107,7 +107,7 @@ export function loadBuffer(ns, L, buf, name) {
 export function loadFile(ns, L, file) {
   const source = ns.read(file);
   if (!source) {
-    throw "Error reading source code from " + file;
+    throw Error("Error reading source code from " + file);
   }
   return loadBuffer(ns, L, source, "@"+file);
 }
@@ -184,8 +184,11 @@ export async function callToCompletion(ns, L, args) {
       console.log("Error executing script: " + tojs(L, -1));
       const msg = handleError(L).replace(/\n/g, "<br>").replace(/<br>( +)/, "<br><pre>$1</pre>");
       console.log("Error handler returned: " + msg);
-      throw msg;
+      if (msg[0] == "|") {
+        throw msg;
+      } else {
+        throw Error(msg);
+      }
     }
   }
 }
-
