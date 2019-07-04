@@ -25,7 +25,7 @@ local MIN_MONEY_FOR_HACK = 2e6
 local GROWTH_FACTOR = 2
 
 -- SPU information.
-local SPU_NAME = "/bin/spu.luaI.ns"
+local SPU_NAME = "/bin/spu.L.ns"
 local SPU_RAM = ns:getScriptRam(SPU_NAME)
 local SPU_FILES = { "/lib/lua.ns", SPU_NAME };
 
