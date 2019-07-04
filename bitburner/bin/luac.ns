@@ -18,6 +18,8 @@
 
 export async function main(ns) {
   const file = ns.args[0];
+  const mode = ns.args[1] || "integrated";
+
   if (!file) {
     ns.tprint("Usage: luac input.lua");
     return;
@@ -27,11 +29,15 @@ export async function main(ns) {
     return;
   }
   const stem = file.replace(/\.lua(\.txt)?$/, "");
+  const outfile = ns.args[2] || (mode == "integrated" ? stem + ".L.ns" : stem + ".S.ns");
   const [ns_deps,lua_deps] = findDependenciesOf(ns, file);
   ns.tprint(
     `Compiling ${file}: ${ns_deps.size} NS calls, ${lua_deps.size} Lua modules.`);
-  compileStub(ns, file, stem + ".luaS.ns", ns_deps, lua_deps);
-  compileIntegrated(ns, file, stem + ".luaI.ns", ns_deps, lua_deps);
+  if (mode == "integrated") {
+    compileIntegrated(ns, file, stem + ".L.ns", ns_deps, lua_deps);
+  } else {
+    compileStub(ns, file, stem + ".luaS.ns", ns_deps, lua_deps);
+  }
 }
 
 function compileStub(ns, input, output, ns_deps, lua_deps) {
