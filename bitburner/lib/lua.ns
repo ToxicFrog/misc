@@ -116,16 +116,11 @@ export function loadFile(ns, L, file) {
 // caller is expected to throw.
 //
 function handleError(L) {
-  const {lua_checkstack,lua_newthread,lua_pop,lua_getglobal,
+  const {lua_newthread,lua_pop,lua_getglobal,
          lua_xmove,lua_pushthread,lua_pcall,lua_type,
          LUA_TFUNCTION} = fengari.lua;
   const {luaL_typename} = fengari.lauxlib;
   const {tojs} = fengari.interop;
-
-  // Make sure we have enough room to create the error handler thread.
-  if (!lua_checkstack(L, 1)) {
-    return tojs(L, -1) + "<br>Also: error initializing Lua error handler.";
-  }
 
   const E = lua_newthread(L);
   lua_pop(L, 1);
@@ -163,8 +158,8 @@ function handleError(L) {
 // results of the await.
 //
 export async function callToCompletion(ns, L, args) {
-  const {lua_resume,lua_pop,LUA_OK,LUA_YIELD} = fengari.lua;
-  const {push,tojs} = fengari.interop;
+  const {lua_checkstack,lua_resume,lua_pop,LUA_OK,LUA_YIELD} = fengari.lua;
+  const {push,tojs,testjs} = fengari.interop;
 
   for (const arg of args) {
       push(L, arg);
@@ -181,6 +176,21 @@ export async function callToCompletion(ns, L, args) {
       ret = lua_resume(L, null, 1);
     } else {
       // It gave us an error!
+      // Before we do anything, we need to allocate some stack space, since both
+      // the error handler and testjs() need a free stack slot even if they
+      // don't keep using it.
+      if (!lua_checkstack(L, 2)) {
+        throw "Error initializing the Lua error handler.";
+      }
+
+      // If it's a JS object, that probably means it threw the WorkerScript,
+      // which means script termination e.g. by kill(1). We can't safely run
+      // error handlers or do anything else except re-throw it.
+      let thrown = testjs(L, -1);
+      if (thrown) throw thrown;
+
+      // Otherwise it's a Lua object that the error handler can at least attempt
+      // to make sense of.
       console.log("Error executing script: " + tojs(L, -1));
       const msg = handleError(L).replace(/\n/g, "<br>").replace(/<br>( +)/, "<br><pre>$1</pre>");
       console.log("Error handler returned: " + msg);
