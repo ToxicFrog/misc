@@ -14,7 +14,7 @@ const DELAY_AFTER_LAUNCH = 5; // seconds
 
 export async function main(ns) {
   for (let prog of startup) {
-    tprint("Launching startup program " .. prog);
+    ns.tprint("Launching startup program " + prog);
     await ns.run(prog);
     await ns.sleep(DELAY_AFTER_LAUNCH);
   }
@@ -24,7 +24,7 @@ export async function main(ns) {
     for (let daemon of daemons) {
       if (ns.isRunning(daemon, ns.getHostname())) continue;
       if (ns.getScriptRam(daemon) > mem_free) break;
-      tprint("Launching daemon " .. daemon);
+      ns.tprint("Launching daemon " + daemon);
       await ns.run(daemon);
       await ns.sleep(DELAY_AFTER_LAUNCH);
     }
