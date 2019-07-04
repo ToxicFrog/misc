@@ -1,0 +1,16 @@
+bin/shodan.lua
+bin/autobuy.lua
+bin/shodan-ui.lua
+bin/init.ns
+bin/netrun.lua
+bin/luac.ns
+bin/rpc-test.lua
+bin/netstat.lua
+bin/lua-installer.ns
+bin/spu.lua
+bin/fetch.ns
+lib/rpc.lua
+lib/net.lua
+lib/json.lua
+lib/lua.ns
+lib/log.lua
