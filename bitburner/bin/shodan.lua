@@ -226,7 +226,7 @@ function generateTasksForHost(tasks, info)
     if info[action] > 0 then
       local task = { host=info.host; action=action; threads=info[action];
                      rank=rank; priority=info.priority; time=info[action.."_time"] }
-      log.debug("Task: %s %s (x%d) t=%f P=%d/%f", task.action, task.host, task.threads,
+      log.debug("Task: %s %s (x%f) t=%f P=%d/%f", task.action, task.host, task.threads,
                 task.time, task.rank, task.priority)
       table.insert(tasks, task)
       rank = rank - 1
