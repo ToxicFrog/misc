@@ -138,7 +138,7 @@ function preTask(info)
     info.hack = info.money >= TARGET_MONEY[host] and math.ceil(HACK_RATIO/info.hack_fraction) or 0
     log.debug("%s T=%d WGH %f/%f/%f %s/%s",
       info.host, info.threads, info.weaken, info.grow, info.hack,
-      tomoney(info.money), TARGET_MONEY[host])
+      tomoney(info.money), tomoney(TARGET_MONEY[host]))
   else
     TARGET_MONEY[host] = nil
   end
@@ -267,10 +267,13 @@ function assignTasks(network, tasks)
   local task = next_task()
   local min_time = math.huge
   for host,info in pairs(network) do
+    log.debug("Scheduling tasks on %s", host)
     while task do
+      log.debug("Scheduling task %s %s [%d]", task.action, task.host, task.threads)
       if info.threads <= 0 then break end -- next host
       if task.threads <= 0 then
         task = next_task() -- next task
+        if not task then break end -- ran out of tasks before running out of hosts!
         if task.action == "hack" then
           TARGET_MONEY[task.host] = math.min(
             TARGET_MONEY[task.host] * GROWTH_FACTOR, network[task.host].max_money)
