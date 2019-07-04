@@ -54,6 +54,7 @@ function main(...)
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
     local tasks = generateTasks(network)
+    recordTaskState(tasks)
     sleep = math.min(sleep, assignTasks(network, tasks)) + 0.1
     if sleep == math.huge then
       log.warn("Sleep was infinite, resetting to 5 minutes")
@@ -294,5 +295,33 @@ function runSPU(host, threads, action, target, time)
   log.debug("SPU: %s[%d]: %s %s", host, threads, action, target)
   ns:exec(SPU_NAME, host, threads, action, target, ns:getTimeSinceLastAug()/1000 + time)
 end
+
+---- State file writing ----
+
+-- At minimum we want:
+-- the set of assigned tasks
+-- the set of pending tasks
+-- the set of nodes we can run tasks on (that might go entirely in the UI)
+-- the set of nodes we can run hacks against (same)
+-- the set of currently running SPUs
+
+function writeTSV(file, data, fields)
+  local buf = {}
+  for _,field in ipairs(fields) do table.insert(buf, field) end
+  buf = {table.concat(buf, "\t")}
+  for _,item in ipairs(data) do
+    local line = {}
+    for _,field in ipairs(fields) do table.insert(line, tostring(item[field])) end
+    table.insert(buf, table.concat(line, "\t"))
+  end
+  ns:write(file, table.concat(buf, "\n"), "w")
+end
+
+function recordTaskState(tasks)
+  writeTSV("/run/shodan/tasks.txt", tasks,
+    {"threads", "action", "host", "time"})
+end
+
+---- Entry point ----
 
 return main(...)
