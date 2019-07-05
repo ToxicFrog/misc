@@ -4,8 +4,9 @@
 const server = "https://raw.githubusercontent.com/ToxicFrog/misc/master/bitburner/";
 
 export async function main(ns) {
+    let ts = ns.getTimeSinceLastAug(); // appended to URLs to defeat cache
     ns.tprint("Fetching index...");
-    await ns.wget(server+"sources.txt", "sources.txt");
+    await ns.wget(server+"sources.txt?" + ts, "sources.txt");
     let srcs = ns.read("sources.txt").split("\n");
     ns.rm("sources.txt");
 
@@ -17,7 +18,7 @@ export async function main(ns) {
 
         let dst = src.match(".(ns|js)$") ? "/"+src : "/" + src + ".txt";
         ns.rm(dst);
-        await ns.wget(server+src, dst);
+        await ns.wget(server+src+"?"+ts, dst);
         if (src.match("^bin/.*\\.lua$")) luas.push(dst);
     }
     ns.tprint("Download complete.");
