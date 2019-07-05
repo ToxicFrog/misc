@@ -1,13 +1,16 @@
-// Setup daemon for stuff that needs to be initialized on page load.
-// At the moment this just means the Lua runtime.
-// Launches a separate installer for that because it costs a massive amount
-// of memory.
+// Setup daemon for stuff that needs to be initialized on page load, and
+// stuff that should be kept running at all time.
+// At the moment the former just means the Lua runtime, for which it launches
+// a separate installer because it costs a lot of memory.
+// The programs in `daemons` are started in the order they are listed; if it
+// doesn't have enough free RAM on home to start one of them, it waits until
+// it does rather than skipping it and trying the next one.
 
 const startup = ["/bin/lua-installer.ns"];
 const daemons = [
-  "/bin/autobuy.L.ns",
-  "/bin/shodan.L.ns",
-  "/bin/cct-solver.L.ns",
+  "/bin/autobuy.L.ns",    // Buy Hacknet nodes and dedicated servers.
+  "/bin/shodan.L.ns",     // Root and hack all reachable systems.
+  "/bin/cct-solver.L.ns", // Find and solve CCTs.
 ];
 
 const DELAY_BETWEEN_CHECKS = 5*60; // seconds
