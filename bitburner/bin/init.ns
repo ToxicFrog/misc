@@ -7,6 +7,7 @@ const startup = ["/bin/lua-installer.ns"];
 const daemons = [
   "/bin/autobuy.L.ns",
   "/bin/shodan.L.ns",
+  "/bin/cct-solver.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 5*60; // seconds
