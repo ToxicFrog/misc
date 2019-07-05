@@ -23,6 +23,9 @@ local HACK_RATIO = 0.1
 local MIN_MONEY_FOR_HACK = 2e6
 -- How much we try to grow each server between hacks.
 local GROWTH_FACTOR = 2
+-- What the shortest time we're willing to sleep is. Small values can adversely
+-- affect performance once we have a very large swarm.
+local MIN_SLEEP_TIME = 4.0
 
 -- SPU information.
 local SPU_NAME = "/bin/spu.L.ns"
@@ -45,17 +48,18 @@ for _,fn in ipairs {
     "sleep", "getServerRam", "getServerNumPortsRequired", "scan", "exec", "scp",
     "getServerSecurityLevel", "getServerMinSecurityLevel", "getServerMoneyAvailable",
     "getServerMaxMoney", "getServerRequiredHackingLevel", "getHackingLevel",
+    "brutessh", "ftpcrack", "httpworm", "sqlinject", "relaysmtp",
 } do
   ns:disableLog(fn)
 end
 
 function main(...)
-  log.setlevel("debug", "warn")
+  log.setlevel("info", "warn")
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
     local tasks = generateTasks(network)
     recordTaskState(tasks)
-    sleep = math.min(sleep, assignTasks(network, tasks)) + 0.1
+    sleep = math.max(math.min(sleep, assignTasks(network, tasks)) + 0.1, MIN_SLEEP_TIME)
     if sleep == math.huge then
       log.warn("Sleep was infinite, resetting to 5 minutes")
       sleep = 5*60
@@ -264,7 +268,14 @@ end
 -- tasks, most important at the end, attempts to run SPUs to attack as many of
 -- the tasks as possible.
 function assignTasks(network, tasks)
-  local function next_task() return table.remove(tasks) end
+  local done_tasks = {}
+  local function next_task()
+    local task = table.remove(tasks)
+    if not task then return nil end
+    task.othreads = task.threads
+    table.insert(done_tasks, task)
+    return task
+  end
   local task = next_task()
   local min_time = math.huge
   for host,info in pairs(network) do
