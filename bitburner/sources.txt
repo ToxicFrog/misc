@@ -1,5 +1,6 @@
 bin/shodan.lua
 bin/autobuy.lua
+bin/cct-solver.lua
 bin/shodan-ui.lua
 bin/init.ns
 bin/netrun.lua
@@ -13,4 +14,8 @@ lib/rpc.lua
 lib/net.lua
 lib/json.lua
 lib/lua.ns
+lib/cct.lua
+lib/cct/triangle-paths.lua
+lib/cct/valid-expressions.lua
+lib/cct/prime-factors.lua
 lib/log.lua
