@@ -10,6 +10,7 @@ bin/netstat.lua
 bin/lua-installer.ns
 bin/spu.lua
 bin/fetch.ns
+lib/__init__.lua
 lib/rpc.lua
 lib/net.lua
 lib/json.lua

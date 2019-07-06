@@ -65,8 +65,11 @@ function compileStub(ns, input, output, ns_deps, lua_deps) {
 }
 
 function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
-  let lua_sources = [];
-  let lua_preload = "";
+  let lua_sources = ['"__init__": String.raw`' + ns.read("/lib/__init__.lua.txt") + "`,"];
+  let lua_preload = `
+    loadBuffer(ns, L, source.__init__, "=__init__");
+    lua_call(L, 0, 0);
+  `;
   for (let dep of lua_deps) {
     lua_sources.push('"' + dep + '": String.raw`' + ns.read(libToFile(dep)) + "`,");
     lua_preload += `
@@ -92,7 +95,7 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
 
     export async function main(ns) {
       await luaAvailable(ns);
-      const {lua_getglobal,lua_getfield,lua_setfield,lua_pop} = fengari.lua;
+      const {lua_getglobal,lua_getfield,lua_setfield,lua_pop,lua_call} = fengari.lua;
 
       const L = newState(ns);
       lua_getglobal(L, "package");
