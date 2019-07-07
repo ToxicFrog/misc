@@ -4,7 +4,7 @@ local log = require 'log'
 
 local solvers = {
   ["Find Largest Prime Factor"] = require 'cct.prime-factors';
-  ["Subarray with Maximum Sum "] = nil;
+  ["Subarray with Maximum Sum"] = require 'cct.subarray-sum';
   ["Total Ways to Sum"] = nil;
   ["Spiralize Matrix"] = nil;
   ["Array Jumping Game"] = nil;

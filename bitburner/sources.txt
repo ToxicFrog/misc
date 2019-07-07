@@ -17,6 +17,7 @@ lib/json.lua
 lib/lua.ns
 lib/cct.lua
 lib/cct/ip-addresses.lua
+lib/cct/subarray-sum.lua
 lib/cct/triangle-paths.lua
 lib/cct/valid-expressions.lua
 lib/cct/unique-paths-1.lua
