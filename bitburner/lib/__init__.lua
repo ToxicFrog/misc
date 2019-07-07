@@ -15,6 +15,15 @@ end
 local _sleep = ns.sleep
 ns.sleep = function(self, time) return _sleep(self, time*1000) end
 
+-- Add convenient table-to-generic-Object creator.
+function js.Object(t)
+  local obj = js.new(js.global.Object)
+  for k,v in pairs(t) do
+    obj[k] = v
+  end
+  return obj
+end
+
 -- Set up package searchers.
 package.searchers = {
   package.searchers[1]; -- package.preload

@@ -8,6 +8,7 @@ bin/luac.ns
 bin/rpc-test.lua
 bin/netstat.lua
 bin/lua-installer.ns
+bin/shellcommand.lua
 bin/spu.lua
 bin/fetch.ns
 lib/__init__.lua
