@@ -19,5 +19,7 @@ lib/cct.lua
 lib/cct/ip-addresses.lua
 lib/cct/triangle-paths.lua
 lib/cct/valid-expressions.lua
+lib/cct/unique-paths-1.lua
 lib/cct/prime-factors.lua
+lib/cct/unique-paths-2.lua
 lib/log.lua
