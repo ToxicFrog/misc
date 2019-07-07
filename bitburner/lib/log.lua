@@ -1,3 +1,5 @@
+ns:disableLog 'ALL'
+
 local levels = {
   "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
 }; for k,v in pairs(levels) do levels[v] = k end
