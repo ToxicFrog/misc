@@ -25,7 +25,8 @@ export async function main(ns) {
     if (ns.fileExists("/bin/luac.ns")) {
         ns.tprint("Compiling all downloaded Lua scripts in /bin...");
         for (let src of luas) {
-            await ns.run("/bin/luac.ns", 1, src);
+            let success = await ns.run("/bin/luac.ns", 1, src);
+            if (!success) tprint("Error compiling " + src + " -- do you have enough free RAM?");
         }
     } else {
         ns.tprint("/bin/luac.ns not available, skipping precompilation of Lua scripts.");
