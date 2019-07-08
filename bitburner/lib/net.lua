@@ -3,23 +3,39 @@
 local net = {}
 
 -- helper for net.walk
-local function walkOne(fn, host, depth, seen)
+local function walkOne(fn, host, depth, seen, ...)
   seen[host] = true
-  if not fn(host, depth) then return end
+  if not fn(host, depth, ...) then return end
   for peer in js.of(ns:scan(host)) do
     if not seen[peer] then
-      walkOne(fn, peer, depth+1, seen)
+      walkOne(fn, peer, depth+1, seen, peer, ...)
     end
   end
 end
 
--- Traverse the net, starting at root, and call fn(hostname, depth) on each
+-- Traverse the net, starting at root, and call fn(hostname, depth, path...) on each
 -- host reachable from it. Depth is the number of hops away from root the given
--- host is; it is 0 for root.
+-- host is; it is 0 for root. Path is the path from this node back to the root,
+-- and can be reversed to get the path from the root to this node.
 -- The fn should return true if traversal should continue through that host,
 -- false to stop traversal.
 function net.walk(fn, root)
-  return walkOne(fn, root, 0, {})
+  return walkOne(fn, root, 0, {}, root)
+end
+
+-- Return the path from src to dst, i.e. the sequence of hostnames you'd have to
+-- feed to 'connect' to get from src to dst.
+function net.path(src, dst)
+  local path
+  local function findPath(host, depth, ...)
+    if host == src then
+      path = { ... }
+    end
+    if path then return false end
+    return true
+  end
+  net.walk(findPath, dst)
+  return path
 end
 
 local function totable(arr)
