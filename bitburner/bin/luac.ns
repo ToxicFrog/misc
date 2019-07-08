@@ -73,7 +73,7 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
   for (let dep of lua_deps) {
     lua_sources.push('"' + dep + '": String.raw`' + ns.read(libToFile(dep)) + "`,");
     lua_preload += `
-      loadBuffer(ns, L, source["${dep}"], "=${libToFile(dep)}");
+      loadBuffer(ns, L, source["${dep}"], "=${libToFile(dep).replace(".txt","")}");
       lua_setfield(L, -2, "${dep}");`;
   }
 
@@ -103,7 +103,7 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
       // Preloaded libraries${lua_preload}
       // End preloaded libraries
       lua_pop(L, 2);
-      loadBuffer(ns, L, source.__main__, "=${input}");
+      loadBuffer(ns, L, source.__main__, "=${input.replace(".txt", "")}");
       await callToCompletion(ns, L, ns.args);
     }
   `;
