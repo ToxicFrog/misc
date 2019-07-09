@@ -1,4 +1,5 @@
 bin/shodan.lua
+bin/buy-hacknet.lua
 bin/autobuy.lua
 bin/cct-solver.lua
 bin/shodan-ui.lua
@@ -7,10 +8,13 @@ bin/netrun.lua
 bin/luac.ns
 bin/netpath.lua
 bin/rpc-test.lua
+bin/buy-programs.lua
 bin/netstat.lua
 bin/lua-installer.ns
 bin/spu.lua
 bin/fetch.ns
+bin/buy-servers.lua
+bin/buy-ram.lua
 lib/__init__.lua
 lib/rpc.lua
 lib/net.lua

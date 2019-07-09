@@ -9,12 +9,14 @@
 const startup = ["/bin/lua-installer.ns"];
 const daemons = [
   "/bin/shodan.L.ns",     // Root and hack all reachable systems.
+  "/bin/buy-ram.L.ns",
+  "/bin/buy-programs.L.ns",
   "/bin/buy-servers.L.ns",
   "/bin/cct-solver.L.ns", // Find and solve CCTs.
   "/bin/buy-hacknet.L.ns",
 ];
 
-const DELAY_BETWEEN_CHECKS = 5*60; // seconds
+const DELAY_BETWEEN_CHECKS = 60; // seconds
 const DELAY_AFTER_LAUNCH = 5; // seconds
 
 export async function main(ns) {
