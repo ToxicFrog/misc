@@ -32,7 +32,7 @@ export async function main(ns) {
   const outfile = ns.args[2] || (mode == "integrated" ? stem + ".L.ns" : stem + ".S.ns");
   const [ns_deps,lua_deps] = findDependenciesOf(ns, file);
   ns.tprint(
-    `Compiling ${file}: ${ns_deps.size} NS calls, ${lua_deps.size} Lua modules.`);
+    `${stem}.lua: ${ns_deps.size} NS calls, ${lua_deps.size} Lua modules.`);
   if (mode == "integrated") {
     compileIntegrated(ns, file, stem + ".L.ns", ns_deps, lua_deps);
   } else {
@@ -61,7 +61,6 @@ function compileStub(ns, input, output, ns_deps, lua_deps) {
   `;
   ns.rm(output);
   ns.write(output, code, "w");
-  ns.tprint(` -> ${output}`);
 }
 
 function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
@@ -109,7 +108,6 @@ function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
   `;
   ns.rm(output);
   ns.write(output, code, "w");
-  ns.tprint(` -> ${output}`);
 }
 
 function libToFile(libname) {
@@ -131,7 +129,7 @@ function findDependenciesOf(ns, input, ns_deps=new Set(), lua_deps=new Set()) {
     //if (!ns_deps.has(match[0])) ns.tprint("    [NS] " + match[0]);
     ns_deps.add(match[0].replace(":",".") + "();");
   }
-  for (let match of source.matchAll("require *\\(? *[\"']([a-zA-Z0-9_.]+)[\"']")) {
+  for (let match of source.matchAll("require *\\(? *[\"']([-a-zA-Z0-9_.]+)[\"']")) {
     const file = libToFile(match[1]);
     if (!lua_deps.has(match[1])) {
       //ns.tprint("   [LUA] " + match[1]);
