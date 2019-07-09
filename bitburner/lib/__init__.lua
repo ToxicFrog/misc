@@ -23,6 +23,14 @@ function js.Object(t)
   end
   return obj
 end
+-- Same for arrays
+function js.Array(t)
+  local arr = js.new(js.global.Array)
+  for i,v in ipairs(t) do
+    arr:push(v)
+  end
+  return arr
+end
 
 -- Set up package searchers.
 package.searchers = {
