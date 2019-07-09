@@ -8,9 +8,10 @@
 
 const startup = ["/bin/lua-installer.ns"];
 const daemons = [
-  "/bin/autobuy.L.ns",    // Buy Hacknet nodes and dedicated servers.
   "/bin/shodan.L.ns",     // Root and hack all reachable systems.
+  "/bin/buy-servers.L.ns",
   "/bin/cct-solver.L.ns", // Find and solve CCTs.
+  "/bin/buy-hacknet.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 5*60; // seconds
@@ -30,7 +31,7 @@ export async function main(ns) {
       if (ns.getScriptRam(daemon) > mem_free) break;
       ns.tprint("Launching daemon " + daemon);
       await ns.run(daemon);
-      await ns.sleep(DELAY_AFTER_LAUNCH);
+      await ns.sleep(DELAY_AFTER_LAUNCH * 1000);
     }
     await ns.sleep(DELAY_BETWEEN_CHECKS * 1000);
   }
