@@ -1,6 +1,5 @@
 bin/shodan.lua
 bin/buy-hacknet.lua
-bin/autobuy.lua
 bin/cct-solver.lua
 bin/shodan-ui.lua
 bin/init.ns
@@ -30,4 +29,5 @@ lib/cct/unique-paths-1.lua
 lib/cct/spiralize-matrix.lua
 lib/cct/prime-factors.lua
 lib/cct/unique-paths-2.lua
+lib/cct/interval-merge.lua
 lib/log.lua

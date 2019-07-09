@@ -8,12 +8,19 @@
 
 const startup = ["/bin/lua-installer.ns"];
 const daemons = [
-  "/bin/shodan.L.ns",     // Root and hack all reachable systems.
+  // Bootstrap sequence. SHODAN gets me money and hack XP. Buying RAM lets me
+  // bring up the rest of these daemons, and buying programs lets SHODAN expand
+  // faster than buying servers does, in the early game.
+  "/bin/shodan.L.ns",
   "/bin/buy-ram.L.ns",
   "/bin/buy-programs.L.ns",
-  "/bin/buy-servers.L.ns",
-  "/bin/cct-solver.L.ns", // Find and solve CCTs.
+  // This isn't all that useful, but it is very inexpensive and will fit in the
+  // starting 32GB when the other two won't.
   "/bin/buy-hacknet.L.ns",
+  // Expanding SHODAN's available SPU capacity is probably worth more than
+  // solving CCTs, and is a lot less RAM-heavy.
+  "/bin/buy-servers.L.ns",
+  "/bin/cct-solver.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 60; // seconds
