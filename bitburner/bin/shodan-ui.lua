@@ -55,12 +55,13 @@ end
 -- Print contents of last task allocation table and which tasks are being worked on.
 function cmd.tasks()
   local tasks = readTSV("/run/shodan/tasks.txt")
-  printf("<u>%6s  %-39s %9s</u>", "threads", "    command", "duration")
+  printf("<u>%6s  %-27s %9s</u>", "threads", "    command", "duration")
   for _,task in ipairs(tasks) do
     task.threads = tonumber(task.threads)
     task.time = tonumber(task.time)
-    printf("%5d×  %6s %-32s  %8.3fs",
+    printf("%5d×%4s  %6s %-20s  %8.3fs",
       task.threads,
+      task.pending > 0 and string.format("%3.0f%%", task.pending/task.threads*100) or "",
       task.action,
       task.host,
       task.time)
@@ -86,7 +87,16 @@ end
 
 -- Print information about all nodes SHODAN can target for hacks.
 function cmd.targets()
-  printf("Not implemented yet.")
+  local nodes = readTSV("/run/shodan/network.txt")
+  table.sort(nodes, function(x,y) return (x.priority or 0) < (y.priority or 0) end)
+  printf("<u>%20s  %4s %4s %4s  %6s  %16s</u>",
+    "Host", "Wkn", "Grw", "Hck", "$Ratio", "$Total")
+  for _,node in ipairs(nodes) do
+    if node.priority then
+      printf("%20s  %4d %4d %4d  (%4.2f)  %16s",
+        node.host, node.weaken, node.grow, node.hack, node.money/node.max_money, tomoney(node.money))
+    end
+  end
 end
 
 function cmd.log()
@@ -132,21 +142,3 @@ else
   printf("Unknown command: %s", command)
   cmd.help()
 end
-
---[[
-function cmd.spus() {
-  tprintf("%20.20s  %4s  %3s  %s",
-    "hostname", "Thr", "Ver", "Task");
-  let statii = rpc.readStatus();
-  for (let name in statii) {
-    if (!name.match("^spu.ns")) continue;
-    let status = statii[name];
-    let [host,shard] = status.host.split(":");
-    if (!ns.serverExists(host)) continue;
-    if (ns.isRunning("spu.ns", host, status.host, status.threads, status.version)) {
-      tprintf("%20.20s  %4s  %3s  %s",
-        status.host, status.threads, status.version, status.task ? status.task.join(" ") : "(idle)");
-    }
-  }
-}
-]]

@@ -57,7 +57,8 @@ function main(...)
   log.setlevel("info", "warn")
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
-    writeTSV("/run/shodan/network.txt", network, {"host", "max_threads", "weaken", "grow", "hack", "priority", "money"})
+    writeTSV("/run/shodan/network.txt", network,
+      {"host", "max_threads", "weaken", "grow", "hack", "priority", "money", "max_money"})
     local tasks = generateTasks(network)
     sleep = math.max(math.min(sleep, assignTasks(network, tasks)) + 0.1, MIN_SLEEP_TIME)
     if sleep == math.huge then
@@ -83,7 +84,18 @@ function mapNetwork()
   local swarm_size = 0
 
   local function scanHost(host, depth)
-    if host == "home" then return true end
+    if host == "home" then
+      do return true end
+      -- We special-case home such that, if it has less than 50% memory load, we
+      -- can run SPUs on the other half, but will not attempt to hack it.
+      local info = net.stat(host)
+      info.max_threads = math.floor(info.ram/2/SPU_RAM)
+      info.threads = math.floor((info.ram/2 - info.ram_used)/SPU_RAM)
+      -- if info.ram_used <= info.ram/2 then
+      --   info.max_threads = math.floor(info.ram/2/SPU_RAM)
+      --   info.
+      -- return true
+    end
     tryPwn(host)
     local info = net.stat(host)
     if not info.root then
@@ -134,6 +146,9 @@ function preTask(info)
   local host = info.host
   if isHackable(info) then
     TARGET_MONEY[host] = TARGET_MONEY[host] or math.max(info.money, MIN_MONEY_FOR_HACK)
+    info.hack_pending = 0
+    info.weaken_pending = 0
+    info.grow_pending = 0
     info.weaken = math.ceil((info.security - info.min_security) / 0.05)
     if info.money > 0 then
       info.grow = math.ceil(math.max(0, ns:growthAnalyze(host, TARGET_MONEY[host]/info.money)))
@@ -183,7 +198,7 @@ function analyzeNetwork(network, swarm_size)
     for _,proc in ipairs(info.ps) do
       if proc.filename == SPU_NAME then
         local task,target,time = proc.args[0],proc.args[1],tonumber(proc.args[2])
-        network[target][task] = math.max(0, network[target][task] - proc.threads)
+        network[target][task.."_pending"] = network[target][task.."_pending"] + proc.threads
         next_task_completion = math.min(next_task_completion, time)
       end
     end
@@ -232,6 +247,7 @@ function generateTasksForHost(tasks, info)
   for _,action in ipairs {"weaken", "grow", "hack"} do
     if info[action] > 0 then
       local task = { host=info.host; action=action; threads=info[action];
+                     pending=math.min(info[action.."_pending"], info[action]);
                      rank=rank; priority=info.priority; time=info[action.."_time"] }
       log.debug("Task: %s %s (x%f) t=%f P=%d/%f", task.action, task.host, task.threads,
                 task.time, task.rank, task.priority)
@@ -244,6 +260,7 @@ function generateTasksForHost(tasks, info)
   local fallback_grow = math.ceil(ns:growthAnalyze(info.host, info.max_money/(math.max(info.money, 0.01)))) - info.grow
   if fallback_grow > 0 then
     local task = { host=info.host; action="grow"; threads=fallback_grow;
+                   pending=math.max(0, info.grow_pending - info.grow);
                    rank=0; priority=-fallback_grow; time=info.grow_time }
     log.debug("Fallback: %s %s (x%d) t=%f P=%d/%f", task.action, task.host, task.threads,
               task.time, task.rank, task.priority)
@@ -284,17 +301,17 @@ function assignTasks(network, tasks)
     while task do
       log.debug("Scheduling task %s %s [%d]", task.action, task.host, task.threads)
       if info.threads <= 0 then break end -- next host
-      if task.threads <= 0 then
-        task = next_task() -- next task
+      if task.pending >= task.threads then -- next task
+        task = next_task()
         if not task then break end -- ran out of tasks before running out of hosts!
         if task.action == "hack" then
           TARGET_MONEY[task.host] = math.min(
             TARGET_MONEY[task.host] * GROWTH_FACTOR, network[task.host].max_money)
         end
       else
-        local threads = math.min(task.threads, info.threads)
+        local threads = math.min(task.threads - task.pending, info.threads)
         runSPU(host, threads, task.action, task.host, task.time)
-        task.threads = task.threads - threads
+        task.pending = task.pending + threads
         info.threads = info.threads - threads
         min_time = math.min(min_time, task.time)
       end
