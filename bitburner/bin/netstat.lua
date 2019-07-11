@@ -6,7 +6,7 @@ local maxdepth = tonumber((...)) or 5
 
 local function showHost(host, depth)
   local stat = net.stat(host)
-  printf("%-24.24s  %d %4d %s  %3.0f/%-3.0f  (%0.2f) %18s",
+  printf("%-26.26s  %d %4d %s  %3.0f/%-3.0f  (%0.2f) %16s",
     (" "):rep(depth) ..  host,
     stat.ports, stat.hack_level, stat.root and "R" or " ",
     stat.security, stat.min_security,
