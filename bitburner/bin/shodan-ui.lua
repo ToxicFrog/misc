@@ -34,7 +34,13 @@ local function readTSV(file)
   for line in lines do
     local record = {}
     for i,v in ipairs{line:split("\t")} do
-      record[fields[i]] = v
+      if tonumber(v) then
+        record[fields[i]] = tonumber(v)
+      elseif v == "nil" then
+        record[fields[i]] = nil
+      else
+        record[fields[i]] = v
+      end
     end
     table.insert(records, record)
   end
@@ -49,15 +55,33 @@ end
 -- Print contents of last task allocation table and which tasks are being worked on.
 function cmd.tasks()
   local tasks = readTSV("/run/shodan/tasks.txt")
+  printf("<u>%6s  %-39s %9s</u>", "threads", "    command", "duration")
   for _,task in ipairs(tasks) do
-    printf("%5d× %6s %-32s (%.3fs)",
-      task.threads, task.action, task.host, task.time)
+    task.threads = tonumber(task.threads)
+    task.time = tonumber(task.time)
+    printf("%5d×  %6s %-32s  %8.3fs",
+      task.threads,
+      task.action,
+      task.host,
+      task.time)
   end
 end
 
 -- Print information about all nodes SHODAN can schedule SPUs on.
 function cmd.nodes()
-  printf("Not implemented yet.")
+  local nodes = readTSV("/run/shodan/network.txt")
+  local nrof_nodes,nrof_threads = 0,0
+  table.sort(nodes, function(x,y) return x.max_threads < y.max_threads end)
+  printf("<u>%8s  %s</u>", "Threads", "Host")
+  for _,node in ipairs(nodes) do
+    if node.max_threads > 0 then
+      nrof_nodes = nrof_nodes + 1
+      nrof_threads = nrof_threads + node.max_threads
+      printf("%8d  %s", node.max_threads, node.host)
+    end
+  end
+  printf("%d nodes (of %d scanned) with %d total threads available for SPUs.",
+    nrof_nodes, #nodes, nrof_threads)
 end
 
 -- Print information about all nodes SHODAN can target for hacks.
@@ -125,20 +149,4 @@ function cmd.spus() {
     }
   }
 }
-
-function cmd.tasks() {
-  let tasks = rpc.readStatus("shodan.ns").tasks;
-  tprintf("%18.18s | %9s | %6s | %9s | %18s",
-    "hostname", " weaken  ", " hack ", "  grow   ", "   target money   ");
-  tprintf("-".repeat(18 + 3 + 9 + 3 + 6 + 3 + 9 + 3 + 18 + 1));
-  for (let task of tasks) {
-    tprintf("%18.18s | %4d/%-4d | %4d/%-1d | %4d/%-4d | %18s$",
-      task.host, task.pending_weaken, task.weaken,
-      task.pending_hack, task.hack,
-      task.pending_grow, task.grow,
-      task.target_money.toLocaleString(undefined, {maximumFractionDigits:0}));
-      // ns.getServerMoneyAvailable(task.host).toLocaleString(undefined, {maximumFractionDigits:0}));
-  }
-}
-
 ]]

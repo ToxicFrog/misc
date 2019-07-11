@@ -57,8 +57,8 @@ function main(...)
   log.setlevel("info", "warn")
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
+    writeTSV("/run/shodan/network.txt", network, {"host", "max_threads", "weaken", "grow", "hack", "priority", "money"})
     local tasks = generateTasks(network)
-    recordTaskState(tasks)
     sleep = math.max(math.min(sleep, assignTasks(network, tasks)) + 0.1, MIN_SLEEP_TIME)
     if sleep == math.huge then
       log.warn("Sleep was infinite, resetting to 5 minutes")
@@ -87,8 +87,10 @@ function mapNetwork()
     tryPwn(host)
     local info = net.stat(host)
     if not info.root then
+      info.max_threads = 0
       info.threads = 0
     else
+      info.max_threads = math.floor(info.ram/SPU_RAM)
       info.threads = math.floor((info.ram - info.ram_used)/SPU_RAM)
       swarm_size = swarm_size + math.floor(info.ram/SPU_RAM)
     end
@@ -268,12 +270,11 @@ end
 -- tasks, most important at the end, attempts to run SPUs to attack as many of
 -- the tasks as possible.
 function assignTasks(network, tasks)
-  local done_tasks = {}
+  local idx = #tasks
   local function next_task()
-    local task = table.remove(tasks)
-    if not task then return nil end
-    task.othreads = task.threads
-    table.insert(done_tasks, task)
+    if idx == 0 then return nil end
+    local task = tasks[idx]
+    idx = idx - 1
     return task
   end
   local task = next_task()
@@ -299,6 +300,7 @@ function assignTasks(network, tasks)
       end
     end
   end
+  recordTaskState(tasks)
   return min_time
 end
 
@@ -325,12 +327,20 @@ function writeTSV(file, data, fields)
     for _,field in ipairs(fields) do table.insert(line, tostring(item[field])) end
     table.insert(buf, table.concat(line, "\t"))
   end
+  for k,item in pairs(data) do
+    if type(k) ~= "number" then
+      local line = {}
+      for _,field in ipairs(fields) do table.insert(line, tostring(item[field])) end
+      table.insert(buf, table.concat(line, "\t"))
+    end
+  end
   ns:write(file, table.concat(buf, "\n"), "w")
 end
 
 function recordTaskState(tasks)
+  log.info("Recording %d tasks", #tasks)
   writeTSV("/run/shodan/tasks.txt", tasks,
-    {"threads", "action", "host", "time"})
+    {"threads", "pending", "action", "host", "time"})
 end
 
 ---- Entry point ----
