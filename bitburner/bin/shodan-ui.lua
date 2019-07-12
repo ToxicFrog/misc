@@ -112,7 +112,7 @@ function cmd.stop()
 end
 
 function cmd.start()
-  if ns:scriptRunning(SHODAN_NAME, ns.getHostname()) then
+  if ns:scriptRunning(SHODAN_NAME, ns:getHostname()) then
     printf("SHODAN already running.");
   else
     ns:run(SHODAN_NAME)
