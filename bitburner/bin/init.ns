@@ -34,14 +34,13 @@ export async function main(ns) {
     await ns.sleep(DELAY_AFTER_LAUNCH);
   }
   while (true) {
-    const [mem_total,mem_used] = ns.getServerRam(ns.getHostname());
-    const mem_free = mem_total*0.75 - mem_used;
-    for (let daemon of daemons) {
+    for (const daemon of daemons) {
+      const [mem_total,mem_used] = ns.getServerRam(ns.getHostname());
+      const mem_free = mem_total*0.75 - mem_used;
       if (ns.isRunning(daemon, ns.getHostname())) continue;
       if (ns.getScriptRam(daemon) > mem_free) break;
       ns.tprint("Launching daemon " + daemon);
       await ns.run(daemon);
-      await ns.sleep(DELAY_AFTER_LAUNCH * 1000);
     }
     await ns.sleep(DELAY_BETWEEN_CHECKS * 1000);
   }
