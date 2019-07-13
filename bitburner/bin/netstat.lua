@@ -15,6 +15,6 @@ local function showHost(host, depth)
   return depth < maxdepth
 end
 
-printf("%24s  %s %s %s  %3s/%-3s  %s %15s",
+printf("<u>%26s  %s %s %s  %3s/%-3s  %s %15s</u>",
   "hostname", "P", "Hack", "R", "Sec", "Min", "$Ratio", "$Total");
 net.walk(showHost, ns:getHostname())
