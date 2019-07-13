@@ -12,8 +12,7 @@ const daemons = [
   // bring up the rest of these daemons, and buying programs lets SHODAN expand
   // faster than buying servers does, in the early game.
   "/bin/shodan.L.ns",
-  "/bin/buy-ram.L.ns",
-  "/bin/buy-programs.L.ns",
+  "/bin/buy-upgrades.L.ns",
   // This isn't all that useful, but it is very inexpensive and will fit in the
   // starting 32GB when the other two won't.
   "/bin/buy-hacknet.L.ns",

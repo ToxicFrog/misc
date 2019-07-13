@@ -4,10 +4,11 @@ local spikes = {
   "BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe", "HTTPWorm.exe", "SQLInject.exe",
 }
 local utils = {
-  "AutoLink.exe", "DepscanV1.exe", "DeepscanV2.exe",
+  "AutoLink.exe", "DeepscanV1.exe", "DeepscanV2.exe",
   "ServerProfiler.exe"
 }
 
+local MAX_RAM = 256
 local TIME_BETWEEN_BUYS = 5.0
 local BUDGET = 0.9
 
@@ -36,7 +37,20 @@ local function buyUtilities(budget)
   return false
 end
 
+local function buyRam(budget)
+  if ns:getServerRam('home')[0] >= MAX_RAM then
+    -- If we've hit our RAM target, only upgrade when it's cheap to do so.
+    budget = budget * 0.1
+  end
+  local cost = ns:getUpgradeHomeRamCost()
+  if cost <= budget then
+    ns:upgradeHomeRam()
+    return true
+  end
+end
+
 local BUYS = {
+  {buyRam, 1.0};
   {buyTor, 0.9};
   {buySpikes, 0.9};
   {buyUtilities, 0.05};
