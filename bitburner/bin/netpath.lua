@@ -1,10 +1,10 @@
 local net = require 'net'
 local sh = require 'shell'
 
-local src,dst = ...
-if not dst then
-  src,dst = "home",src
-end
-local path = net.path(src, dst)
+local argv = {...}
+local dst = table.remove(argv, 1)
+
+local path = net.path("home", dst)
 table.remove(path,1)
-sh.execute("connect " .. table.concat(path, "; connect "))
+sh.execute("connect " .. table.concat(path, "; connect ")
+           .. '; '..table.concat(argv, "; "))
