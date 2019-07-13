@@ -21,6 +21,8 @@ const daemons = [
   // solving CCTs, and is a lot less RAM-heavy.
   "/bin/buy-servers.L.ns",
   "/bin/cct-solver.L.ns",
+  // Not ready yet
+  // "/bin/autofaction.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 60; // seconds
@@ -34,7 +36,7 @@ export async function main(ns) {
   }
   while (true) {
     const [mem_total,mem_used] = ns.getServerRam(ns.getHostname());
-    const mem_free = mem_total - mem_used;
+    const mem_free = mem_total*0.75 - mem_used;
     for (let daemon of daemons) {
       if (ns.isRunning(daemon, ns.getHostname())) continue;
       if (ns.getScriptRam(daemon) > mem_free) break;
