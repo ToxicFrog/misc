@@ -64,3 +64,7 @@ function printf(fmt, ...)
   return print(fmt:format(...))
 end
 
+-- Use strict
+setmetatable(_ENV, {__index = function(self, key)
+  error("Attempt to read undeclared global: "..tostring(key), 2)
+end})
