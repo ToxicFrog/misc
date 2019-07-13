@@ -26,6 +26,8 @@ local GROWTH_FACTOR = 2
 -- What the shortest time we're willing to sleep is. Small values can adversely
 -- affect performance once we have a very large swarm.
 local MIN_SLEEP_TIME = 4.0
+-- How much memory do we reserve on home for user scripts.
+local HOME_RAM_RESERVED = 512
 
 -- SPU information.
 local SPU_NAME = "/bin/spu.L.ns"
@@ -77,6 +79,20 @@ end
 
 ---- Network mapping and host analysis ----
 
+-- We special-case home by reserving HOME_RAM_RESERVED memory on it for the
+-- user and allocating the rest to SPUs.
+function scanHome()
+  local info = net.stat('home')
+  info.max_threads = math.floor(math.max(0, info.ram - HOME_RAM_RESERVED)/SPU_RAM)
+  info.threads = 0
+  for _,proc in ipairs(info.ps) do
+    if proc.filename == SPU_NAME then
+      info.threads = info.threads + 1
+    end
+  end
+  return info
+end
+
 -- Return a hostname => host_stat_t map with information about everything we
 -- can reach on the network.
 function mapNetwork()
@@ -85,16 +101,10 @@ function mapNetwork()
 
   local function scanHost(host, depth)
     if host == "home" then
-      do return true end
-      -- We special-case home such that, if it has less than 50% memory load, we
-      -- can run SPUs on the other half, but will not attempt to hack it.
-      local info = net.stat(host)
-      info.max_threads = math.floor(info.ram/2/SPU_RAM)
-      info.threads = math.floor((info.ram/2 - info.ram_used)/SPU_RAM)
-      -- if info.ram_used <= info.ram/2 then
-      --   info.max_threads = math.floor(info.ram/2/SPU_RAM)
-      --   info.
-      -- return true
+      local info = scanHome()
+      swarm_size = swarm_size + info.max_threads
+      network[host] = info
+      return true
     end
     tryPwn(host)
     local info = net.stat(host)
@@ -104,7 +114,7 @@ function mapNetwork()
     else
       info.max_threads = math.floor(info.ram/SPU_RAM)
       info.threads = math.floor((info.ram - info.ram_used)/SPU_RAM)
-      swarm_size = swarm_size + math.floor(info.ram/SPU_RAM)
+      swarm_size = swarm_size + info.max_threads
     end
     preTask(info)
     installSPU(info)
@@ -355,7 +365,6 @@ function writeTSV(file, data, fields)
 end
 
 function recordTaskState(tasks)
-  log.info("Recording %d tasks", #tasks)
   writeTSV("/run/shodan/tasks.txt", tasks,
     {"threads", "pending", "action", "host", "time"})
 end
