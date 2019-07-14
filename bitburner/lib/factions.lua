@@ -15,6 +15,7 @@ local function manualHack(server, faction)
     sh.execute('hack')
     ns:sleep(5)
   end
+  sh.execute('home')
 end
 
 local function Hackers(name, server)
