@@ -108,8 +108,9 @@ function state.donate_for_rep(target, rep)
 end
 
 local function buyAugmentation(faction, aug)
+  if haveAug(aug) then return true end
   for prereq in js.of(ns:getAugmentationPrereq(aug)) do
-    if not haveAug(prereq) and not buyAugmentation(faction, prereq) then
+    if not not buyAugmentation(faction, prereq) then
       log.info("Couldn't buy prerequisite augmentation %s for %s", prereq, aug)
       return false
     end
@@ -127,6 +128,7 @@ local function totable(arr)
 end
 
 function state.loot_augs(target, rep)
+  ns:stopAction()
   log.info("Buy all augs from %s", target)
   local faction_augs = totable(ns:getAugmentationsFromFaction(target))
   for i,aug in ipairs(faction_augs) do
@@ -141,6 +143,7 @@ function state.loot_augs(target, rep)
   end
   log.info("Done buying primary augs, spending the rest on NFGs.")
   while ns:getAugmentationCost("NeuroFlux Governor")[1] <= ns:getServerMoneyAvailable 'home' do
+    log.info("Buying NeuroFlux Governor for %s", tomoney(ns:getAugmentationCost("NeuroFlux Governor")[1]))
     if not ns:purchaseAugmentation(target, "NeuroFlux Governor") then
       log.error("Failed to buy NeuroFlux Governor from %s, cost=%.0f rep=%.0f",
         target, ns:getAugmentationCost("NeuroFlux Governor")[1],
