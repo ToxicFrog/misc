@@ -20,8 +20,8 @@ const daemons = [
   // solving CCTs, and is a lot less RAM-heavy.
   "/bin/buy-servers.L.ns",
   "/bin/cct-solver.L.ns",
-  // Not ready yet
-  // "/bin/autofaction.L.ns",
+  // Uses a huge amount of RAM.
+  "/bin/autofaction.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 60; // seconds

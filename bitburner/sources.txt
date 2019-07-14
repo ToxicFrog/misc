@@ -7,17 +7,18 @@ bin/netrun.lua
 bin/luac.ns
 bin/netpath.lua
 bin/rpc-test.lua
-bin/buy-programs.lua
+bin/buy-upgrades.lua
 bin/netstat.lua
 bin/lua-installer.ns
+bin/autofaction.lua
 bin/spu.lua
 bin/fetch.ns
 bin/buy-servers.lua
-bin/buy-ram.lua
 lib/__init__.lua
 lib/rpc.lua
 lib/net.lua
 lib/json.lua
+lib/factions.lua
 lib/shell.lua
 lib/lua.ns
 lib/cct.lua
@@ -31,3 +32,5 @@ lib/cct/prime-factors.lua
 lib/cct/unique-paths-2.lua
 lib/cct/interval-merge.lua
 lib/log.lua
+lib/wait.lua
+lib/augs.lua
