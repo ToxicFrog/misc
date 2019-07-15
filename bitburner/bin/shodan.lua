@@ -27,7 +27,7 @@ local GROWTH_FACTOR = 2
 -- affect performance once we have a very large swarm.
 local MIN_SLEEP_TIME = 4.0
 -- How much memory do we reserve on home for user scripts.
-local HOME_RAM_RESERVED = 512
+local HOME_RAM_RESERVED = 128
 
 -- SPU information.
 local SPU_NAME = "/bin/spu.L.ns"
@@ -59,10 +59,10 @@ function main(...)
   log.setlevel("info", "warn")
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
-    writeTSV("/run/shodan/network.txt", network,
-      {"host", "max_threads", "weaken", "grow", "hack", "priority", "money", "max_money"})
     local tasks = generateTasks(network)
     sleep = math.max(math.min(sleep, assignTasks(network, tasks)) + 0.1, MIN_SLEEP_TIME)
+    writeTSV("/run/shodan/network.txt", network,
+      {"host", "max_threads", "threads", "weaken", "grow", "hack", "priority", "money", "max_money"})
     if sleep == math.huge then
       log.warn("Sleep was infinite, resetting to 5 minutes")
       sleep = 5*60
@@ -84,10 +84,10 @@ end
 function scanHome()
   local info = net.stat('home')
   info.max_threads = math.floor(math.max(0, info.ram - HOME_RAM_RESERVED)/SPU_RAM)
-  info.threads = 0
+  info.threads = info.max_threads
   for _,proc in ipairs(info.ps) do
     if proc.filename == SPU_NAME then
-      info.threads = info.threads + 1
+      info.threads = info.threads - 1
     end
   end
   return info

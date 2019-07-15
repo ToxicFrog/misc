@@ -73,12 +73,12 @@ function cmd.nodes()
   local nodes = readTSV("/run/shodan/network.txt")
   local nrof_nodes,nrof_threads = 0,0
   table.sort(nodes, function(x,y) return x.max_threads < y.max_threads end)
-  printf("<u>%8s  %s</u>", "Threads", "Host")
+  printf("<u>%16s  %s</u>", "    Threads    ", "Host")
   for _,node in ipairs(nodes) do
     if node.max_threads > 0 then
       nrof_nodes = nrof_nodes + 1
       nrof_threads = nrof_threads + node.max_threads
-      printf("%8d  %s", node.max_threads, node.host)
+      printf("%8d/%-8d  %s", node.max_threads-node.threads, node.max_threads, node.host)
     end
   end
   printf("%d nodes (of %d scanned) with %d total threads available for SPUs.",
