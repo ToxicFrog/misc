@@ -20,3 +20,19 @@ Notes:
 - `ns` functions (and all other Javascript functions) must be called as methods, e.g. `ns:ls()` or `ns.codingcontract:attempt()`. `luac` will attempt to warn you if you get it wrong.
 - All async `ns` functions have been wrapped in `coroutine.yield()` calls, and the entire program runs inside a coroutine, so you can simply call them normally and your program will be suspended until they complete. More generally, anytime you have a JS `Promise` you can `yield()` it and when your program is resumed you'll get back whatever the `Promise` evaluated to.
 
+## Compared to Netscript2
+
+_Advantages_
+
+- No need to manually annotate functions as `async` or `await` calls to them. Just `yield` a JS Promise and your program will be automatically resumed when the Promise is resolved. Async `ns` functions come pre-wrapped to do this for you.
+- Total process isolation. Each program runs in a separate VM; globals don't leak between different instances of the same script as they do in NS2.
+- Watchdog timer will interrupt infinite loops. No more locking up your bitburner tab!
+- `atexit`, `aterror`, and `atwatchdog` handlers can be defined to provide custom handlers for program exit, uncaught exceptions, and the watchdog timer firing.
+- (Mostly) seamless JS/Lua interoperability. Call JS functions and access JS variables from Lua. Access to both JS and Lua libraries from the same code.
+
+_Disadvantages_
+
+- It's about 7-8x slower than NS2 (which makes it still much faster than NS1).
+- You need about 25GB of RAM to install the Lua runtime in the first place, so it's not usable in the very early game.
+- Scripts need to be compiled before use.
+- JS data structures need to be handled differently from Lua ones (`js.of(obj)` rather than `pairs(obj)`, `array.length` and 0-indexing rather than `#array` and 1-indexing, etc), which means you need to be diligent about either standardizing on one or the other, or remembering which ones you use where.
