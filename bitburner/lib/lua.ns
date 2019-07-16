@@ -1,5 +1,8 @@
 // Library functions for running Lua scripts.
 
+// How many opcodes the lua VM is allowed to execute before the watchdog timer fires.
+const WATCHDOG_TIMEOUT = 1000000
+
 // JS implementation of lua function tomoney(n, [fractional_digits]).
 // Returns n in the form "$1,234,567.89".
 function L_tomoney(L) {
@@ -61,7 +64,6 @@ export function loadFile(ns, L, file) {
 
 // Call the error handler in L, if defined. Returns an error string, which the
 // caller is expected to throw.
-//
 function handleError(L) {
   const {lua_newthread,lua_pop,lua_getglobal,
          lua_xmove,lua_pushthread,lua_pcall,lua_type,
@@ -100,27 +102,70 @@ function handleError(L) {
   return tojs(E, -1);
 }
 
+// Debug hook used to implement the watchdog timer.
+// Deliberately extremely simple. callToCompletion() will see that the coroutine
+// yielded nothing and interpret that as the watchdog firing.
+function watchdogHook(L, ar) {
+  return fengari.lua.lua_yield(L, 0);
+}
+
+// Call the global watchdog handler atwatchdog().
+// Note that it's called in a separate thread from the actual code that
+// watchdogged.
+function handleWatchdog(L) {
+  const {lua_getglobal,lua_type,LUA_TFUNCTION,lua_call,lua_newthread,lua_pop} = fengari.lua;
+  const {luaL_optnumber,luaL_checkstack} = fengari.lauxlib;
+
+  // Call lua-side watchdog handler.
+  let delay = 1.0;
+  luaL_checkstack(L, 1);
+  const E = lua_newthread(L);
+
+  lua_getglobal(E, "atwatchdog");
+  if (lua_type(E, -1) === LUA_TFUNCTION) {
+    lua_call(E, 0, 1);
+    delay = Math.max(delay, luaL_optnumber(E, -1, 1.0));
+    lua_pop(E, 1);
+  }
+  lua_pop(L, 1);
+
+  return delay;
+}
+
 // Call the function on top of the stack in L, passing it args.
 // If the function yields something, awaits on it and then resumes it with the
 // results of the await.
 //
 export async function callToCompletion(ns, L, args) {
-  const {lua_checkstack,lua_resume,lua_pop,LUA_OK,LUA_YIELD} = fengari.lua;
-  const {push,tojs,testjs} = fengari.interop;
+  const {lua_checkstack,lua_resume,lua_pop,LUA_OK,LUA_YIELD,lua_gettop,
+         lua_sethook,LUA_MASKCOUNT} = fengari.lua;
+  const {push,tojs,testjs,checkjs} = fengari.interop;
 
   for (const arg of args) {
       push(L, arg);
   }
 
+  lua_sethook(L, watchdogHook, LUA_MASKCOUNT, WATCHDOG_TIMEOUT);
   let ret = lua_resume(L, null, args.length);
   while (ret != LUA_OK) {
-    if (ret == LUA_YIELD) {
-      // It gave us a future to wait on!
-      let future = tojs(L, -1);
+    if (ret == LUA_YIELD && lua_gettop(L) > 0) {
+      // It yielded something. We assume that this is a JS Promise.
+      let promise = checkjs(L, -1);
       lua_pop(L, 1);
-      let result = await future;
+      let result = await promise;
       push(L, result);
+      lua_sethook(L, watchdogHook, LUA_MASKCOUNT, WATCHDOG_TIMEOUT); // Reset the watchdog.
       ret = lua_resume(L, null, 1);
+    } else if (ret == LUA_YIELD) {
+      // It yielded nothing. Maybe they just called coroutine.yield(), or maybe
+      // the watchdog timer fired. In either case, call the watchdog handler
+      // and then sleep for a bit before resuming.
+      let delay = handleWatchdog(L);
+      // console.log("Watchdog timer fired! delay="+delay);
+      // At this point a bunch of functions in ns have been wrapped by lua, so
+      // we have to call the original using _.
+      await ns._sleep(delay*1000);
+      ret = lua_resume(L, null, 0);
     } else {
       // It gave us an error!
       // Before we do anything, we need to allocate some stack space, since both

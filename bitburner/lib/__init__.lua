@@ -1,6 +1,11 @@
 -- Lua runtime startup code.
 -- Runs after libraries and ns are loaded, but before the main program is.
 
+-- Use strict
+setmetatable(_ENV, {__index = function(self, key)
+  error("Attempt to read undeclared global: "..tostring(key), 2)
+end})
+
 -- Set up wrappers around async functions to turn them into coroutine yields.
 local function asyncToCoro(f)
   return function(...)
@@ -8,6 +13,7 @@ local function asyncToCoro(f)
   end
 end
 for _,name in ipairs { "sleep", "hack", "grow", "weaken", "run", "exec", "prompt", "wget" } do
+  ns['_'..name] = ns[name]
   ns[name] = asyncToCoro(ns[name])
 end
 
@@ -62,6 +68,15 @@ package.searchers = {
 -- (2) whatever you append to it should not include the | character
 aterror = debug.traceback
 
+-- Watchdog timer handler. Called when a script executes for too long without
+-- yielding.
+-- This is invoked from a JS debug hook, and as soon as it returns the hook
+-- will yield via ns:sleep(); the only way to avoid this is by not returning,
+-- e.g. by calling ns:exit() or by throwing.
+-- The watchdog handler should return the number of seconds to sleep. If it
+-- returns nil, 1 will be assumed. Numbers <1 will be clamped at 1.
+atwatchdog = function() ns:tprint("watchdog fired") return 1 end
+
 -- Override print() to do something useful, and define printf()
 function print(...)
   return ns:tprint(table.concat({...}, " "))
@@ -70,7 +85,3 @@ function printf(fmt, ...)
   return print(fmt:format(...))
 end
 
--- Use strict
-setmetatable(_ENV, {__index = function(self, key)
-  error("Attempt to read undeclared global: "..tostring(key), 2)
-end})
