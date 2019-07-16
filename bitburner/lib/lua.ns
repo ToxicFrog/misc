@@ -138,7 +138,8 @@ function handleWatchdog(L) {
 //
 export async function callToCompletion(ns, L, args) {
   const {lua_checkstack,lua_resume,lua_pop,LUA_OK,LUA_YIELD,lua_gettop,
-         lua_sethook,LUA_MASKCOUNT} = fengari.lua;
+         lua_sethook,LUA_MASKCOUNT,lua_call,lua_getglobal,LUA_TFUNCTION,
+         lua_type} = fengari.lua;
   const {push,tojs,testjs,checkjs} = fengari.interop;
 
   for (const arg of args) {
@@ -192,5 +193,11 @@ export async function callToCompletion(ns, L, args) {
         throw Error(msg);
       }
     }
+  }
+
+  lua_checkstack(L, 1);
+  lua_getglobal(L, "atexit");
+  if (lua_type(L, -1) === LUA_TFUNCTION) {
+    lua_call(L, 0, 0);
   }
 }

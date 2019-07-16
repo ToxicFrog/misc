@@ -21,6 +21,10 @@ end
 local _sleep = ns.sleep
 ns.sleep = function(self, time) return _sleep(self, time*1000) end
 
+-- Make exit call atexit() first
+ns._exit = ns.exit
+ns.exit = function(self) atexit(); return ns:_exit() end
+
 -- Add convenient table-to-generic-Object creator.
 function js.Object(t)
   local obj = js.new(js.global.Object)
@@ -67,6 +71,13 @@ package.searchers = {
 -- (1) the original error message should be included at the *front*
 -- (2) whatever you append to it should not include the | character
 aterror = debug.traceback
+
+-- Exit handler. Called when ns:exit() is called, or just after the top level
+-- returns.
+-- In case of error this is NOT called, as (depending on where the error occurred)
+-- it may not be safe to do so, e.g. the lua VM may be inconsistent.
+-- Error handlers can call atexit() manually if they want to take that chance.
+atexit = function() end
 
 -- Watchdog timer handler. Called when a script executes for too long without
 -- yielding.
