@@ -151,7 +151,7 @@ function state.loot_augs(target, rep)
       log.error("Failed to buy NeuroFlux Governor from %s, cost=%.0f rep=%.0f",
         target, ns:getAugmentationCost("NeuroFlux Governor")[1],
         ns:getAugmentationCost("NeuroFlux Governor")[0])
-      ns:exit()
+      break
     end
   end
   log.info("Sleeping before installing augmentations. This is your chance to bail.")
