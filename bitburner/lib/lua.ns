@@ -117,14 +117,14 @@ function handleWatchdog(L) {
   const {luaL_optnumber,luaL_checkstack} = fengari.lauxlib;
 
   // Call lua-side watchdog handler.
-  let delay = 1.0;
+  let delay = 0.0;
   luaL_checkstack(L, 1);
   const E = lua_newthread(L);
 
   lua_getglobal(E, "atwatchdog");
   if (lua_type(E, -1) === LUA_TFUNCTION) {
     lua_call(E, 0, 1);
-    delay = Math.max(delay, luaL_optnumber(E, -1, 1.0));
+    delay = Math.max(delay, luaL_optnumber(E, -1, 0.0));
     lua_pop(E, 1);
   }
   lua_pop(L, 1);
