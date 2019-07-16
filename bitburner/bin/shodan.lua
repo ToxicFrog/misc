@@ -27,7 +27,7 @@ local GROWTH_FACTOR = 2
 -- affect performance once we have a very large swarm.
 local MIN_SLEEP_TIME = 4.0
 -- How much memory do we reserve on home for user scripts.
-local HOME_RAM_RESERVED = 128
+local HOME_RAM_RESERVED = 144
 
 -- SPU information.
 local SPU_NAME = "/bin/spu.L.ns"
