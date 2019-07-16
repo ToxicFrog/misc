@@ -104,13 +104,16 @@ end
 
 function state.donate_for_rep(target, rep)
   log.info("Donate to %s for %d reputation", target, rep)
+  local cost = (rep - ns:getFactionRep(target)) * 1e6 / ns:getCharacterInformation().mult.factionRep;
+  w.waitUntil(w.haveMoney(cost))
+  ns:donateToFaction(target, cost)
   return state.loot_augs(target, rep)
 end
 
 local function buyAugmentation(faction, aug)
   if haveAug(aug) then return true end
   for prereq in js.of(ns:getAugmentationPrereq(aug)) do
-    if not not buyAugmentation(faction, prereq) then
+    if not buyAugmentation(faction, prereq) then
       log.info("Couldn't buy prerequisite augmentation %s for %s", prereq, aug)
       return false
     end
@@ -151,6 +154,13 @@ function state.loot_augs(target, rep)
       ns:exit()
     end
   end
+  log.info("Sleeping before installing augmentations. This is your chance to bail.")
+  -- write out logs for later debugging
+  ns:rm("/run/autofaction.log.txt")
+  for line in js.of(ns:getScriptLogs()) do
+    ns:write("/run/autofaction.log.txt", line.."\n")
+  end
+  ns:sleep(60)
   ns:installAugmentations("/bin/init.ns")
 end
 
