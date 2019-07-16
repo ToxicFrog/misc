@@ -65,16 +65,18 @@ function compileStub(ns, input, output, ns_deps, lua_deps) {
 
 function compileIntegrated(ns, input, output, ns_deps, lua_deps) {
   let lua_sources = ['"__init__": String.raw`' + ns.read("/lib/__init__.lua.txt") + "`,"];
-  let lua_preload = `
-    loadBuffer(ns, L, source.__init__, "=__init__");
-    lua_call(L, 0, 0);
-  `;
+  let lua_preload = '';
+  findDependenciesOf(ns, '/lib/__init__.lua', ns_deps, lua_deps);
   for (let dep of lua_deps) {
     lua_sources.push('"' + dep + '": String.raw`' + ns.read(libToFile(dep)) + "`,");
     lua_preload += `
       loadBuffer(ns, L, source["${dep}"], "=${libToFile(dep).replace(".txt","")}");
       lua_setfield(L, -2, "${dep}");`;
   }
+  lua_preload += `
+      loadBuffer(ns, L, source.__init__, "=__init__");
+      lua_call(L, 0, 0);
+  `;
 
   const _import = "import"; // Workaround on-load import resolver.
   const _lualib = '"/lib/lua.ns"';

@@ -1,4 +1,4 @@
 
 all:
-	find bin lib -type f > sources.txt
+	find bin lib -name '*.lua' -or -name '*.ns' > sources.txt
 	share add bitburner sources.txt bin lib

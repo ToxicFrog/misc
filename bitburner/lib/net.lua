@@ -38,18 +38,12 @@ function net.path(src, dst)
   return path
 end
 
-local function totable(arr)
-  local T = {}
-  for v in js.of(arr) do T[#T+1] = v end
-  return T
-end
-
 -- Scan a single host and return information about it.
 function net.stat(host)
   local stat = {}
   stat.host = host
-  stat.ps = totable(ns:ps(host))
-  stat.ls = totable(ns:ls(host))
+  stat.ps = js.totable(ns:ps(host))
+  stat.ls = js.totable(ns:ls(host))
   stat.root = ns:hasRootAccess(host)
   stat.ports = ns:getServerNumPortsRequired(host)
   stat.ram = ns:getServerRam(host)[0]

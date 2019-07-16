@@ -33,5 +33,9 @@ lib/cct/prime-factors.lua
 lib/cct/unique-paths-2.lua
 lib/cct/interval-merge.lua
 lib/log.lua
+lib/util/string.lua
+lib/util/js.lua
+lib/util/ns.lua
+lib/util/math.lua
 lib/wait.lua
 lib/augs.lua

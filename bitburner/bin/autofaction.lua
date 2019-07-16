@@ -124,16 +124,10 @@ local function buyAugmentation(faction, aug)
   return ns:purchaseAugmentation(faction, aug)
 end
 
-local function totable(arr)
-  local T = {}
-  for v in js.of(arr) do T[#T+1] = v end
-  return T
-end
-
 function state.loot_augs(target, rep)
   ns:stopAction()
   log.info("Buy all augs from %s", target)
-  local faction_augs = totable(ns:getAugmentationsFromFaction(target))
+  local faction_augs = js.totable(ns:getAugmentationsFromFaction(target))
   for i,aug in ipairs(faction_augs) do
     local cost = ns:getAugmentationCost(aug)
     faction_augs[i] = { name = aug, rep = cost[0], price = cost[1] }

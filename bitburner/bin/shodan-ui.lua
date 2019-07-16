@@ -2,30 +2,6 @@ local SHODAN_NAME = "/bin/shodan.L.ns"
 
 local cmd = {}
 
--- string... split(string, pattern. max) - break up string on pattern
--- default value for pattern is to split on whitespace
--- default value for max is infinity
-function string.split(s, pat, max)
-  pat = pat or "%s+"
-  max = max or nil
-  local count = 0
-  local i = 1
-  local result = { 1 }
-
-  local function splitter(sof, eof)
-    result[#result] = s:sub(result[#result], sof-1)
-    result[#result+1] = eof
-  end
-
-  if pat == "" then return s end
-
-  s:gsub("()"..pat.."()", splitter, max)
-
-  result[#result] = s:sub(result[#result], #s)
-
-  return table.unpack(result)
-end
-
 local function readTSV(file)
   local buf = ns:read(file)
   local lines = buf:gmatch("[^\n]+")
