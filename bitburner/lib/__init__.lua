@@ -38,6 +38,12 @@ package.searchers = {
   function(name)
     local file = "/lib/" .. name:gsub("%.", "/") .. ".lua.txt"
     if ns:fileExists(file) then
+      -- Note that this will bring in RAM usage for ns:read, which will in turn
+      -- cause the script to OOM if it doesn't use read elsewhere, since __init__
+      -- is not subject to compile-time RAM usage checking.
+      -- This is a fallback mostly used for testing, and should not be relied
+      -- on in production.
+      ns:tprint("Warning: performing runtime load of "..file)
       return load(ns:read(file), "@"..file)
     else
       return "no file '"..file.."';"
