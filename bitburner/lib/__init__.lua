@@ -12,7 +12,7 @@ local function asyncToCoro(f)
     return coroutine.yield(f(...))
   end
 end
-for _,name in ipairs { "sleep", "hack", "grow", "weaken", "run", "exec", "prompt", "wget" } do
+for _,name in ipairs { "sleep", "hack", "grow", "weaken", "prompt", "wget" } do
   ns['_'..name] = ns[name]
   ns[name] = asyncToCoro(ns[name])
 end
@@ -86,7 +86,9 @@ atexit = function() end
 -- e.g. by calling ns:exit() or by throwing.
 -- The watchdog handler should return the number of seconds to sleep. If it
 -- returns nil, 1 will be assumed. Numbers <1 will be clamped at 1.
-atwatchdog = function() ns:tprint("watchdog fired") return 1 end
+atwatchdog = function()
+  error 'Watchdog timer fired.'
+end
 
 -- Override print() to do something useful, and define printf()
 function print(...)
