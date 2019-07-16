@@ -160,9 +160,9 @@ function preTask(info)
     info.weaken_pending = 0
     info.grow_pending = 0
     info.weaken = math.ceil((info.security - info.min_security) / 0.05)
-    if info.money > 0 then
+    if info.money > 0 and TARGET_MONEY[host] > info.money then
       info.grow = math.ceil(math.max(0, ns:growthAnalyze(host, TARGET_MONEY[host]/info.money)))
-    else
+    elseif info.money == 0 then
       -- If the target has no money, only generate a "probing" grow to generate
       -- *some* money so that growthAnalyze will work the next time.
       info.grow = 1
