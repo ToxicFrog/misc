@@ -56,7 +56,7 @@ for _,fn in ipairs {
 end
 
 function main(...)
-  log.setlevel("info", "warn")
+  -- log.setlevel("debug", "warn")
   while true do
     local network,sleep = analyzeNetwork(mapNetwork())
     local tasks = generateTasks(network)
@@ -87,7 +87,7 @@ function scanHome()
   info.threads = info.max_threads
   for _,proc in ipairs(info.ps) do
     if proc.filename == SPU_NAME then
-      info.threads = info.threads - 1
+      info.threads = info.threads - proc.threads
     end
   end
   return info
@@ -124,7 +124,7 @@ function mapNetwork()
 
   log.debug("Performing full network scan.");
   net.walk(scanHost, ns:getHostname())
-  log.info("Network scan complete. %d threads available for SPUs.", swarm_size);
+  log.debug("Network scan complete. %d threads available for SPUs.", swarm_size);
   return network,swarm_size
 end
 
@@ -160,9 +160,10 @@ function preTask(info)
     info.weaken_pending = 0
     info.grow_pending = 0
     info.weaken = math.ceil((info.security - info.min_security) / 0.05)
-    if info.money > 0 and TARGET_MONEY[host] > info.money then
-      info.grow = math.ceil(math.max(0, ns:growthAnalyze(host, TARGET_MONEY[host]/info.money)))
-    elseif info.money == 0 then
+    if info.money > 0 then
+      info.grow = math.ceil(math.max(0,
+        ns:growthAnalyze(host, math.max(1.0, TARGET_MONEY[host]/info.money))))
+    else
       -- If the target has no money, only generate a "probing" grow to generate
       -- *some* money so that growthAnalyze will work the next time.
       info.grow = 1
@@ -307,9 +308,8 @@ function assignTasks(network, tasks)
   local task = next_task()
   local min_time = math.huge
   for host,info in pairs(network) do
-    log.debug("Scheduling tasks on %s", host)
+    log.debug("Scheduling tasks on %s (%d/%d threads)", host, info.threads, info.max_threads)
     while task do
-      log.debug("Scheduling task %s %s [%d]", task.action, task.host, task.threads)
       if info.threads <= 0 then break end -- next host
       if task.pending >= task.threads then -- next task
         task = next_task()
@@ -319,11 +319,14 @@ function assignTasks(network, tasks)
             TARGET_MONEY[task.host] * GROWTH_FACTOR, network[task.host].max_money)
         end
       else
+        log.debug("Scheduling task %s %s [%.0f]", task.action, task.host, task.threads)
         local threads = math.min(task.threads - task.pending, info.threads)
         runSPU(host, threads, task.action, task.host, task.time)
         task.pending = task.pending + threads
         info.threads = info.threads - threads
         min_time = math.min(min_time, task.time)
+        log.debug("Deployed SPU [%s %s]×%d on %s, %d threads left",
+          task.action, task.host, threads, host, info.threads)
       end
     end
   end
