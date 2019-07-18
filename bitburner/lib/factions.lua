@@ -54,8 +54,8 @@ Faction 'Tian Di Hui' {
   getInvite = function()
     w.waitUntil(w.allOf(w.haveMoney(1e6), w.haveHackingLevel(50)))
     local city = ns:getCharacterInformation().city
-    if city ~= 'Chonqing' or city ~= 'New Tokyo' or city ~= 'Ishima' then
-      ns:travelToCity('Chonqing')
+    if city ~= 'Chongqing' and city ~= 'New Tokyo' and city ~= 'Ishima' then
+      ns:travelToCity('Chongqing')
     end
     w.waitUntil(w.haveInvite('Tian Di Hui'))
   end;
