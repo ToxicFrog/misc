@@ -26,6 +26,7 @@ const daemons = [
 
 const DELAY_BETWEEN_CHECKS = 60; // seconds
 const DELAY_AFTER_LAUNCH = 5; // seconds
+const RESERVED_RAM = 10;
 
 export async function main(ns) {
   for (let prog of startup) {
@@ -36,7 +37,7 @@ export async function main(ns) {
   while (true) {
     for (const daemon of daemons) {
       const [mem_total,mem_used] = ns.getServerRam(ns.getHostname());
-      const mem_free = mem_total*0.75 - mem_used;
+      const mem_free = mem_total - mem_used - RESERVED_RAM;
       if (ns.isRunning(daemon, ns.getHostname())) continue;
       if (ns.getScriptRam(daemon) > mem_free) break;
       ns.tprint("Launching daemon " + daemon);
