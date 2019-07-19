@@ -107,9 +107,10 @@ function state.donate_for_rep(target, rep)
   w.waitUntil(function()
     local earned = ns:getCharacterInformation().workRepGain + ns:getFactionRep(target)
     local cost = (rep - earned) * 1e6 / ns:getCharacterInformation().mult.factionRep;
-    log.info("Donating %s to %s for %d reputation", tomoney(cost), target, rep - earned)
+    log.info("Donating %s to %s for %.0f reputation", tomoney(cost), target, rep - earned)
     return w.haveMoney(cost)()
   end)
+  local earned = ns:getCharacterInformation().workRepGain + ns:getFactionRep(target)
   local cost = (rep - earned) * 1e6 / ns:getCharacterInformation().mult.factionRep;
   ns:donateToFaction(target, cost)
   return state.loot_augs(target, rep)
