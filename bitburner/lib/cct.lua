@@ -24,6 +24,7 @@ local solvers = {
 local cct = {}
 
 function cct.solve(host, path)
+  -- log.setlevel("info", "info")
   local t = ns.codingcontract:getContractType(path, host)
   local solver = solvers[t]
   if not solver then
@@ -35,7 +36,9 @@ function cct.solve(host, path)
     -- local opts = js.Object { returnReward = true }
     local opts = js.new(js.global.Object)
     opts.returnReward = true
-    local answer = solver(ns.codingcontract:getData(path, host))
+    local data = ns.codingcontract:getData(path, host)
+    log.info("Contract gave us data: %s", js.global.JSON:stringify(data))
+    local answer = solver(data)
     log.info("Solver returned answer: %s", js.global.JSON:stringify(answer))
     local reward = ns.codingcontract:attempt(answer, path, host, opts)
     if reward ~= "" then
