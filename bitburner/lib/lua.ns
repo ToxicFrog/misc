@@ -1,7 +1,7 @@
 // Library functions for running Lua scripts.
 
 // How many opcodes the lua VM is allowed to execute before the watchdog timer fires.
-const WATCHDOG_TIMEOUT = 1000000
+const WATCHDOG_TIMEOUT = 10000000
 
 // JS implementation of lua function tomoney(n, [fractional_digits]).
 // Returns n in the form "$1,234,567.89".
