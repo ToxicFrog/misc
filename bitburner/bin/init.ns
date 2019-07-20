@@ -37,7 +37,7 @@ export async function main(ns) {
   while (true) {
     for (const daemon of daemons) {
       const [mem_total,mem_used] = ns.getServerRam(ns.getHostname());
-      const mem_free = mem_total - mem_used - RESERVED_RAM;
+      const mem_free = mem_total - mem_used - (mem_total <= 32 and 0 or RESERVED_RAM);
       if (ns.isRunning(daemon, ns.getHostname())) continue;
       if (ns.getScriptRam(daemon) > mem_free) break;
       ns.tprint("Launching daemon " + daemon);
