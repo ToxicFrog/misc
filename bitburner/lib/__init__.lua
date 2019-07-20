@@ -10,6 +10,8 @@ require 'util.ns'
 require 'util.js'
 require 'util.math'
 require 'util.string'
+require 'util.misc'
+
 
 -- Error handler. Called when an error is thrown inside lua, just before the
 -- script terminates.
