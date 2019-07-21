@@ -8,6 +8,7 @@ bin/luac.ns
 bin/netpath.lua
 bin/rpc-test.lua
 bin/buy-upgrades.lua
+bin/activity.lua
 bin/netstat.lua
 bin/lua-installer.ns
 bin/autofaction.lua
@@ -19,6 +20,10 @@ lib/rpc.lua
 lib/net.lua
 lib/json.lua
 lib/factions.lua
+lib/intent/faction-common.lua
+lib/intent/city-factions.lua
+lib/intent/write-program.lua
+lib/intent/hacker-factions.lua
 lib/shell.lua
 lib/lua.ns
 lib/cct.lua
