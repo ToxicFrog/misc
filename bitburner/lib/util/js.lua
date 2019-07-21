@@ -22,3 +22,8 @@ function js.totable(arr)
   for v in js.of(arr) do T[#T+1] = v end
   return T
 end
+
+-- Convert JS array to List (table with metatable attached)
+function js.List(arr)
+  return table.List(js.totable(arr))
+end

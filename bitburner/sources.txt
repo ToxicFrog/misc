@@ -33,6 +33,7 @@ lib/cct/prime-factors.lua
 lib/cct/unique-paths-2.lua
 lib/cct/interval-merge.lua
 lib/log.lua
+lib/util/table.lua
 lib/util/misc.lua
 lib/util/string.lua
 lib/util/js.lua
