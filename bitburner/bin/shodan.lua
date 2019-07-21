@@ -27,7 +27,7 @@ local GROWTH_FACTOR = 2
 -- affect performance once we have a very large swarm.
 local MIN_SLEEP_TIME = 4.0
 -- How much memory do we reserve on home for user scripts.
-local HOME_RAM_RESERVED = 144
+local HOME_RAM_RESERVED = 256
 
 -- SPU information.
 local SPU_NAME = "/bin/spu.L.ns"
@@ -112,12 +112,12 @@ function mapNetwork()
       info.max_threads = 0
       info.threads = 0
     else
+      installSPU(info)
       info.max_threads = math.floor(info.ram/SPU_RAM)
       info.threads = math.floor((info.ram - info.ram_used)/SPU_RAM)
       swarm_size = swarm_size + info.max_threads
     end
     preTask(info)
-    installSPU(info)
     network[host] = info
     return true
   end
@@ -177,13 +177,13 @@ function preTask(info)
   end
 end
 
+local SPU_INSTALLED = {}
 function installSPU(info)
-  for _,file in ipairs(info.ls) do
-    if file == SPU_NAME then return end
-  end
+  if SPU_INSTALLED[info.host] then return end
   for _,file in ipairs(SPU_FILES) do
     ns:scp(file, info.host)
   end
+  SPU_INSTALLED[info.host] = true
   log.info("SPU software installed on %s", info.host)
 end
 
