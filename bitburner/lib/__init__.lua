@@ -11,7 +11,7 @@ require 'util.js'
 require 'util.math'
 require 'util.string'
 require 'util.misc'
-
+require 'util.table'
 
 -- Error handler. Called when an error is thrown inside lua, just before the
 -- script terminates.
@@ -46,17 +46,14 @@ package.searchers = {
   package.searchers[1]; -- package.preload
   function(name)
     local file = "/lib/" .. name:gsub("%.", "/") .. ".lua.txt"
-    if ns:fileExists(file) then
-      -- Note that this will bring in RAM usage for ns:read, which will in turn
-      -- cause the script to OOM if it doesn't use read elsewhere, since __init__
-      -- is not subject to compile-time RAM usage checking.
-      -- This is a fallback mostly used for testing, and should not be relied
-      -- on in production.
-      ns:tprint("Warning: performing runtime load of "..file)
-      return load(ns:read(file), "@"..file)
-    else
-      return "no file '"..file.."';"
-    end
+    error("Attempt to perform runtime load of %s", file)
+    -- Currently disabled due to RAM cost of fileExists and read
+    -- if ns_fileExists(file) then
+    --   ns:tprint("Warning: performing runtime load of "..file)
+    --   return load(ns_read(file), "@"..file)
+    -- else
+    --   return "no file '"..file.."';"
+    -- end
   end;
   -- remaining searchers for lua/C files on disk removed
 }
