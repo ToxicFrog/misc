@@ -1,12 +1,11 @@
 -- Assorted global functions that don't belong in their own file.
 
 -- 5.3 compatibility
-local unpack = unpack or table.unpack
-local loadstring = loadstring or load
+local unpack = table.unpack
 
 -- fast one-liner lambda creation
 function f(src)
-  return assert(loadstring(
+  return assert(load(
     "return function(" .. src:gsub(" => ", ") return ", 1) .. " end"
   ))()
 end
@@ -40,7 +39,7 @@ do
     if select('#', ...) > 0 and not exp then
       return _error(err:format(...))
     end
-    return exp,err,...
+    return _assert(exp,err,...)
   end
 
   function error(err, ...)
