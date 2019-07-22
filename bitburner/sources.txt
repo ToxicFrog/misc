@@ -21,7 +21,9 @@ lib/net.lua
 lib/json.lua
 lib/factions.lua
 lib/intent/faction-common.lua
+lib/intent/plot-factions.lua
 lib/intent/city-factions.lua
+lib/intent/corp-factions.lua
 lib/intent/write-program.lua
 lib/intent/hacker-factions.lua
 lib/shell.lua
