@@ -128,6 +128,7 @@ function watchdogHook(L, ar) {
     if (lua_type(E, -1) === LUA_TNIL) return 0; // continue execution
     if (lua_type(E, -1) === LUA_TSTRING) throw Error(tojs(E, -1));
     if (testjs(E, -1) instanceof Promise) {
+      console.log("Storing promise and yielding...");
       lua_setfield(E, LUA_REGISTRYINDEX, "watchdog.promise");
       return lua_yield(L, 0);
     }

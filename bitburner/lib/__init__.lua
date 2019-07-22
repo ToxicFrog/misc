@@ -40,8 +40,8 @@ atexit = function() end
 --    THIS IS NOT SAFE TO USE IN SCRIPTS THAT MAKE USE OF COROUTINES.
 -- If the script does anything else, an error will be raised.
 atwatchdog = function(thread)
-  return ns:_sleep(1000)
-  -- return debug.traceback(thread, "watchdog timer fired")
+  -- return ns:_sleep(1000)
+  return debug.traceback(thread, "watchdog timer fired")
 end
 
 -- Set up package searchers.
