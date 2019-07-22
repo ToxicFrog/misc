@@ -21,7 +21,8 @@ const daemons = [
   "/bin/buy-servers.L.ns",
   "/bin/cct-solver.L.ns",
   // Uses a huge amount of RAM.
-  "/bin/autofaction.L.ns",
+  // "/bin/autofaction.L.ns",
+  "/bin/activity.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 60; // seconds
