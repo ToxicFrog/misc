@@ -12,8 +12,8 @@ return function()
        and ns:getHackingLevel() >= spike.hack
        and ns:getServerMoneyAvailable('home') < spike.cost/2
     then
-      return { name = 'write '..spike.name; command = 'createProgram'; spike.name }
+      return { source = "write programs"; priority = 10; activity = 'createProgram'; spike.name }
     end
   end
-  return nil
+  return { source = "write programs"; priority = -1; activity = 'IDLE' }
 end

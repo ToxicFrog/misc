@@ -21,6 +21,15 @@ function fc.haveMoney(money)
   return ns:getServerMoneyAvailable('home') >= money
 end
 
+function fc.haveHackingLevel(hack)
+  return ns:getHackingLevel() >= hack
+end
+
+function fc.haveCombatLevel(combat)
+  local stats = ns:getStats()
+  return math.min(stats.strength, stats.defense, stats.dexterity, stats.agility) >= combat
+end
+
 -- This is meant to be used as part of a table.filter() on a list of faction
 -- structs. The only requirement is that each faction have a 'name' field.
 -- For factions that are not valid targets, it returns false.
@@ -38,8 +47,8 @@ local function prioritize(faction)
     end
   end
   if rep > 0 then
-    faction.reputation = rep
-    faction.priority = pri/rep
+    faction.reputation = rep + (faction.invite_rep or 0)
+    faction.priority = pri/faction.reputation
     return true
   else
     return false
@@ -52,23 +61,22 @@ function fc.chooseTarget(factions)
   return table.remove(targets)
 end
 
-function fc.getFactionRep(faction, target)
-  if ns:getFactionRep(faction) >= target then
+function fc.getFactionRep(faction, rep, priority)
+  if ns:getFactionRep(faction) >= rep then
     -- Requirement already met
     return nil
   elseif ns:getFactionFavor(faction) >= ns:getFavorToDonate() then
     -- Donate for reputation
-    return fc.donateForReputation(faction, target)
+    return fc.donateForReputation(faction, rep, priority)
   elseif ns:getFactionFavor(faction) + ns:getFactionFavorGain(faction) >= ns:getFavorToDonate() then
     -- We'll have enough favor to donate if we reset.
-    -- FIXME priorities here are wrong
-    return { activity = 'BUY_AUGS_AND_RESET'; priority = 1; faction }
+    return { activity = 'BUY_AUGS_AND_RESET'; faction }
   else
-    return { activity = 'workForFaction'; priority = 1; faction, 'hacking' }
+    return { activity = 'workForFaction'; faction, 'hacking' }
   end
 end
 
-function fc.donateForReputation(faction, target)
+function fc.donateForReputation(faction, target, priority)
   local earned = ns:getFactionRep(target)
   local cost = (rep - earned) * 1e6 / ns:getCharacterInformation().mult.factionRep;
 
@@ -76,7 +84,7 @@ function fc.donateForReputation(faction, target)
     ns:donateToFaction(faction, cost)
     return nil
   else
-    return { activity = 'workForFaction', faction, 'hacking' }
+    return { activity = 'workForFaction', priority = priority, faction, 'hacking' }
   end
 end
 

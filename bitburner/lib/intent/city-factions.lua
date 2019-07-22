@@ -19,33 +19,34 @@ local factions = {
 
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
-      ns:joinFaction(target.name)
+    return { activity = "joinFaction", target.name }
   end
 
   if fc.inFaction(target.name) then
     return nil
   elseif not fc.haveMoney(target.money + TRAVEL_COST) then
-    return { activity = 'GRIND_MONEY'; priority = target.priority }
+    return { activity = 'GRIND_MONEY'; priority = 0 }
   elseif ns:getHackingLevel() < (target.hack or 0) then
-    return { activity = 'GRIND_HACK'; priority = target.priority }
+    return { activity = 'GRIND_HACK'; priority = 0 }
   else
     ns:travelToCity(target.city or target.name)
     repeat ns:sleep(5) until fc.haveInvite(target.name)
-    return joinFaction(target)
+    return { activity = "joinFaction", target.name }
   end
 end
 
 return function()
   local target = fc.chooseTarget(factions)
-  if not target then return nil end
+  if not target then
+    return { activity = 'IDLE'; priority = -1; source = "city factions" }
+  end
 
   local intent = joinFaction(target)
               or fc.getFactionRep(target.name, target.reputation)
               or fc.getAugs(target.name)
+              or { activity = 'IDLE'; priority = -1 }
 
-  if not intent then
-    log.error('Targeting faction %s: no intent subgenerator returned an intent.', target.name)
-  end
-  intent.priority = target.priority
+  intent.priority = intent.priority or target.priority
+  intent.source = intent.source or "city faction: %s" % target.name
   return intent
 end
