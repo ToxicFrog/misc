@@ -32,13 +32,16 @@ atexit = function() end
 
 -- Watchdog timer handler. Called when a script executes for too long without
 -- yielding.
--- This is invoked from a JS debug hook, and as soon as it returns the hook
--- will yield via ns:sleep(); the only way to avoid this is by not returning,
--- e.g. by calling ns:exit() or by throwing.
--- The watchdog handler should return the number of seconds to sleep. If it
--- returns nil, 1 will be assumed. Numbers <1 will be clamped at 1.
-atwatchdog = function()
-  error 'Watchdog timer fired.'
+-- A watchdog handler can do one of three things:
+--  * Return a string. This will raise an error containing that string.
+--  * Return nothing or nil. Execution continues as normal.
+--  * Return a JS Promise. The script will be suspended until the promise is
+--    resolved, then resume from the point where the watchdog timer fired.
+--    THIS IS NOT SAFE TO USE IN SCRIPTS THAT MAKE USE OF COROUTINES.
+-- If the script does anything else, an error will be raised.
+atwatchdog = function(thread)
+  return ns:_sleep(1000)
+  -- return debug.traceback(thread, "watchdog timer fired")
 end
 
 -- Set up package searchers.
