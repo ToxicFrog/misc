@@ -20,7 +20,7 @@ ns.exit = function(self) atexit(); return ns:_exit() end
 -- Override print() to do something useful, and define printf() as a formatting
 -- alias for ns:tprint().
 function print(...)
-  return ns:tprint(table.concat({...}, " "))
+  return ns:tprint(table.concat(table.List({...}):map(tostring), " "))
 end
 function printf(fmt, ...)
   return print(fmt:format(...))
