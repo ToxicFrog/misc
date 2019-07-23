@@ -78,7 +78,7 @@ function fc.getFactionRep(faction, rep, priority)
 end
 
 function fc.donateForReputation(faction, rep, priority)
-  local earned = ns:getFactionRep(rep)
+  local earned = ns:getFactionRep(faction)
   local cost = (rep - earned) * 1e6 / ns:getCharacterInformation().mult.factionRep;
 
   if fc.haveMoney(cost) then
@@ -114,6 +114,7 @@ function fc.getAugs(faction)
       return { name = aug, rep = cost[0], cost = cost[1] }
     end)
     :sort(f'x,y => x.cost > y.cost')
+    :map(f'x => x.name')
     :some(partial(buyAugmentation, faction))
   if intent then
     -- We couldn't buy one of the augmentations and it returned an intent to
