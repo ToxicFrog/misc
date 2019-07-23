@@ -6,16 +6,15 @@ function merge(dst, src) {
 }
 
 export async function main(ns) {
-  if (window.fixUI !== undefined) return;
+  if (window.restoreUI !== undefined) return;
   const wip_container = document.getElementById("work-in-progress-container");
   const wip_text = document.getElementById("work-in-progress-text");
-  const char_container = document.getElementById('character-overview-container');
   const main_menu = document.getElementById('mainmenu-container');
 
   merge(wip_container.style, {
     position: 'fixed', right: 0, bottom: 0,
-    maxWidth: '280px', maxHeight: '100%',
-    height: '100%', width: '280px',
+    maxWidth: '280px', maxHeight: '60%',
+    height: 'auto', width: '280px',
     overflowY: 'auto',
     border: '2px solid #FFFFFF',
     padding: '10px',
@@ -27,16 +26,32 @@ export async function main(ns) {
     fontSize: '80%',
   });
 
-  window.fixUI = function() {
-    if (wip_text.innerText.trim().length == 0) {
-      // No current activity.
-      char_container.style.display = 'block';
-      return;
+  window.restoreUI = function(restore_active_pane) {
+    if (wip_text.innerText.trim().length > 0) {
+      wip_container.style.display = 'block';
+    } else {
+      wip_container.style.display = 'none';
     }
-    char_container.style.display = 'none';
-    wip_container.style.display = 'block';
     main_menu.style.visibility = 'visible';
+    if (window.active_button && restore_active_pane) {
+      window.active_button.click();
+    }
   }
 
-  window.addEventListener('click', window.fixUI);
+  wip_container.addEventListener('click', window.restoreUI);
+
+  // Saves the currently active tab, and calls restoreUI to redisplay the WIP panel if needed.
+  window.saveUI = function() {
+    window.active_button = this;
+    window.restoreUI(false);
+  }
+
+  for (let button of document.getElementById('mainmenu').getElementsByTagName('button')) {
+    if (!button.classList.contains('mainmenu-accordion-header')) {
+      button.addEventListener('click', window.saveUI);
+    }
+  }
+
+  document.getElementById('work-in-progress-cancel-button').addEventListener(
+    'click', window.restoreUI);
 }
