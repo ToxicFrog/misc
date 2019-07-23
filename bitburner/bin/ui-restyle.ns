@@ -26,19 +26,15 @@ export async function main(ns) {
     fontSize: '80%',
   });
 
-  window.restoreUI = function(restore_active_pane) {
-    if (wip_text.innerText.trim().length > 0) {
-      wip_container.style.display = 'block';
-    } else {
-      wip_container.style.display = 'none';
-    }
+  window.restoreUI = function(restore_active_pane, force_wip_display) {
     main_menu.style.visibility = 'visible';
     if (window.active_button && restore_active_pane) {
       window.active_button.click();
     }
+    if (wip_text.innerText.trim().length > 0 || force_wip_display) {
+      wip_container.style.display = 'block';
+    }
   }
-
-  wip_container.addEventListener('click', window.restoreUI);
 
   // Saves the currently active tab, and calls restoreUI to redisplay the WIP panel if needed.
   window.saveUI = function() {
@@ -46,12 +42,19 @@ export async function main(ns) {
     window.restoreUI(false);
   }
 
+  // Save the current UI state when clicking on one of the main menu buttons.
   for (let button of document.getElementById('mainmenu').getElementsByTagName('button')) {
     if (!button.classList.contains('mainmenu-accordion-header')) {
       button.addEventListener('click', window.saveUI);
     }
   }
 
+  // Restore UI when clicking anywhere inside the WIP panel, or on the "cancel work" button.
   document.getElementById('work-in-progress-cancel-button').addEventListener(
     'click', window.restoreUI);
+  wip_container.addEventListener('click', window.restoreUI);
+  // Do the same for the "create program" buttons.
+  [...document.getElementById('create-program-list').getElementsByTagName('a')].forEach(
+    elem => elem.addEventListener('click', function() { window.restoreUI(true, true) }));
+  // TODO: also handle the do crimes/do work buttons.
 }
