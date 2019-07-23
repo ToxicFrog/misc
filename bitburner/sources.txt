@@ -13,6 +13,7 @@ bin/netstat.lua
 bin/lua-installer.ns
 bin/autofaction.lua
 bin/spu.lua
+bin/ui-restyle.ns
 bin/fetch.ns
 bin/buy-servers.lua
 lib/__init__.lua

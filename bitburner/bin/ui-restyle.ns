@@ -1,0 +1,42 @@
+function merge(dst, src) {
+  Object.keys(src).forEach(function(key) {
+    dst[key] = src[key];
+  });
+  return dst;
+}
+
+export async function main(ns) {
+  if (window.fixUI !== undefined) return;
+  const wip_container = document.getElementById("work-in-progress-container");
+  const wip_text = document.getElementById("work-in-progress-text");
+  const char_container = document.getElementById('character-overview-container');
+  const main_menu = document.getElementById('mainmenu-container');
+
+  merge(wip_container.style, {
+    position: 'fixed', right: 0, bottom: 0,
+    maxWidth: '280px', maxHeight: '100%',
+    height: '100%', width: '280px',
+    overflowY: 'auto',
+    border: '2px solid #FFFFFF',
+    padding: '10px',
+  });
+
+  merge(wip_text.style, {
+    width: '100%',
+    margin: '0px',
+    fontSize: '80%',
+  });
+
+  window.fixUI = function() {
+    if (wip_text.innerText.trim().length == 0) {
+      // No current activity.
+      char_container.style.display = 'block';
+      return;
+    }
+    char_container.style.display = 'none';
+    wip_container.style.display = 'block';
+    main_menu.style.visibility = 'visible';
+  }
+
+  window.addEventListener('click', window.fixUI);
+}

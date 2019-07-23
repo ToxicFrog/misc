@@ -6,7 +6,10 @@
 // doesn't have enough free RAM on home to start one of them, it waits until
 // it does rather than skipping it and trying the next one.
 
-const startup = ["/bin/lua-installer.ns"];
+const startup = [
+  "/bin/lua-installer.ns",
+  "/bin/ui-restyle.ns",
+];
 const daemons = [
   // Bootstrap sequence. SHODAN gets me money and hack XP. Buying RAM lets me
   // bring up the rest of these daemons, and buying programs lets SHODAN expand
