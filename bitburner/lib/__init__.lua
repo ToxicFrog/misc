@@ -12,6 +12,7 @@ require 'util.math'
 require 'util.string'
 require 'util.misc'
 require 'util.table'
+require 'util.ui-wrappers'
 
 -- Error handler. Called when an error is thrown inside lua, just before the
 -- script terminates.
