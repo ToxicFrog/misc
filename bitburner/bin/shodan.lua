@@ -168,7 +168,11 @@ function preTask(info)
       -- *some* money so that growthAnalyze will work the next time.
       info.grow = 1
     end
-    info.hack = info.money >= TARGET_MONEY[host] and math.ceil(HACK_RATIO/info.hack_fraction) or 0
+    if info.hack_fraction > 0 then
+      info.hack = info.money >= TARGET_MONEY[host] and math.ceil(HACK_RATIO/info.hack_fraction) or 0
+    else
+      info.hack = 0
+    end
     log.debug("%s T=%d WGH %f/%f/%f %s/%s",
       info.host, info.threads, info.weaken, info.grow, info.hack,
       tomoney(info.money), tomoney(TARGET_MONEY[host]))
