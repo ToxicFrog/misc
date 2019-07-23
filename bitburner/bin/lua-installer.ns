@@ -4,8 +4,9 @@
 
 export async function main(ns) {
   if (typeof(fengari) === "undefined") {
-    const head = document.getElementsByTagName('head')[0];
-    const tag = document.createElement('script');
+    const doc = parent['document'];
+    const head = doc.getElementsByTagName('head')[0];
+    const tag = doc.createElement('script');
     tag.type = 'text/javascript';
     tag.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.min.js";
     head.appendChild(tag);
