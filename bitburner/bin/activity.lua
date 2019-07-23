@@ -40,7 +40,10 @@ local function executeIntent(intent)
     current = name
   end
   if intent_handlers[intent.activity] then
-    intent_handlers[intent.activity](table.unpack(intent))
+    local next_intent = intent_handlers[intent.activity](table.unpack(intent))
+    if next_intent then
+      return executeIntent(next_intent)
+    end
   else
     ns[intent.activity](ns, table.unpack(intent))
   end

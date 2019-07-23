@@ -1,4 +1,5 @@
 local augs = require 'augs'
+local log = require 'log'
 
 local fc = {}
 
@@ -76,8 +77,8 @@ function fc.getFactionRep(faction, rep, priority)
   end
 end
 
-function fc.donateForReputation(faction, target, priority)
-  local earned = ns:getFactionRep(target)
+function fc.donateForReputation(faction, rep, priority)
+  local earned = ns:getFactionRep(rep)
   local cost = (rep - earned) * 1e6 / ns:getCharacterInformation().mult.factionRep;
 
   if fc.haveMoney(cost) then
@@ -123,7 +124,7 @@ function fc.getAugs(faction)
   -- We bought all the 'real' augs. Spend the rest on NFGs.
   while fc.haveMoney(ns:getAugmentationCost("NeuroFlux Governor")[1]) do
     log.info("Buying NeuroFlux Governor for %s", tomoney(ns:getAugmentationCost("NeuroFlux Governor")[1]))
-    if not ns:purchaseAugmentation(target, "NeuroFlux Governor") then
+    if not ns:purchaseAugmentation(faction, "NeuroFlux Governor") then
       break
     end
   end

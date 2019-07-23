@@ -24,6 +24,6 @@ function js.totable(arr)
 end
 
 -- Convert JS array to List (table with metatable attached)
-function js.List(arr)
+function js.toList(arr)
   return table.List(js.totable(arr))
 end
