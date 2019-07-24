@@ -1,8 +1,11 @@
 -- Intents for corp factions, which require us to grind rep working for the corp first.
 
 local log = require 'log'
-local sh = require 'shell'
 local fc = require 'intent.faction-common'
+
+-- appease ram checker
+-- ns:joinFaction()
+-- ns:workForCompany()
 
 local function CorpFaction(t)
   t.corp = t.corp or t.name
@@ -11,7 +14,7 @@ local function CorpFaction(t)
   -- it's doubled because we're not going to work 8-hour shifts, which means all
   -- corporate reputation gains are halved.
   t.invite_rep = ((t.invite_rep or 200e3) - ns:getCompanyRep(t.corp)):max(0) * 2.0
-  t.job = t.job or "it"
+  t.job = t.job or "software"
   return t
 end
 
@@ -45,15 +48,15 @@ end
 
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
-    return { activity = "joinFaction", target.name }
+    return { activity = "joinFaction", delay = 1, target.name }
   end
 
   if fc.inFaction(target.name) then
     return nil
   elseif ns:getCompanyRep(target.corp) < target.invite_rep then
     -- We don't have enough reputation with the corresponding company to get an invite.
-    ns:applyToCompany(target.corp, "it")
-    if ns:getCharacterInformation().jobs:includes(target.corp) then
+    ns:applyToCompany(target.corp, target.job)
+    if fc.haveJobAt(target.corp) then
       return { activity = "workForCompany", target.corp }
     else
       return { activity = "GRIND_HACK"; priority = 0 }
@@ -63,8 +66,7 @@ local function joinFaction(target)
     if not not canHack(target.server) then
       return { activity = "GRIND_HACK"; priority = 0 }
     else
-      manualHack(target)
-      return { activity = "joinFaction", target.name }
+      return { activity = 'HACK_SERVER', delay = 1, target.server }
     end
   end
   -- We meet the requirements but don't have an invite yet. Go back to working I guess.

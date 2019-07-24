@@ -2,7 +2,6 @@
 -- a server to join them.
 
 local log = require 'log'
-local sh = require 'shell'
 local fc = require 'intent.faction-common'
 
 local factions = {
@@ -17,15 +16,6 @@ local function canHack(host)
      and ns:getServerRequiredHackingLevel(host) <= ns:getHackingLevel()
 end
 
-local function manualHack(target)
-  sh.execute('netpath '..target.server)
-  while not fc.haveInvite(target.name) do
-    sh.execute('hack')
-    ns:sleep(5)
-  end
-  sh.execute('home')
-end
-
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
     return { activity = "joinFaction", target.name }
@@ -36,8 +26,7 @@ local function joinFaction(target)
   elseif not canHack(target.server) then
     return { activity = "GRIND_HACK"; priority = 0 }
   else
-    manualHack(target)
-    return { activity = "joinFaction", target.name }
+    return { activity = 'HACK_SERVER'; delay = 1; target.server; }
   end
 end
 

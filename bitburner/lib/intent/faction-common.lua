@@ -26,6 +26,10 @@ function fc.haveHackingLevel(hack)
   return ns:getHackingLevel() >= hack
 end
 
+function fc.haveJobAt(corp)
+  return ns:getCharacterInformation().jobs:includes(corp)
+end
+
 function fc.haveCombatLevel(combat)
   local stats = ns:getStats()
   return math.min(stats.strength, stats.defense, stats.dexterity, stats.agility) >= combat
@@ -48,8 +52,9 @@ local function prioritize(faction)
     end
   end
   if rep > 0 then
+    rep_remaining = math.max(0.1, rep - ns:getFactionRep(faction.name))
     faction.reputation = rep + (faction.invite_rep or 0)
-    faction.priority = pri/faction.reputation
+    faction.priority = pri/rep_remaining
     return true
   else
     return false
@@ -80,6 +85,9 @@ end
 function fc.donateForReputation(faction, rep, priority)
   local earned = ns:getFactionRep(faction)
   local cost = (rep - earned) * 1e6 / ns:getCharacterInformation().mult.factionRep;
+
+  -- printf("donateForReputation: target=%.0f, earned=%.0f, cost=%s",
+  --   rep, earned, tomoney(cost))
 
   if fc.haveMoney(cost) then
     ns:donateToFaction(faction, cost)
@@ -129,7 +137,7 @@ function fc.getAugs(faction)
       break
     end
   end
-  log.info("Sleeping before installing augmentations. This is your chance to bail.")
+  log.warn("Sleeping before installing augmentations. This is your chance to bail.")
   ns:sleep(60)
   ns:installAugmentations("/bin/init.ns")
 end

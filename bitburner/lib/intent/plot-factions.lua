@@ -1,5 +1,8 @@
 -- Intents for plot/endgame factions.
 
+-- appease ram checker
+-- ns:joinFaction()
+
 local log = require 'log'
 local fc = require 'intent.faction-common'
 
@@ -14,7 +17,7 @@ local factions = table.List {
 
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
-    return { activity = "joinFaction"; priority = target.priority; target.name }
+    return { activity = "joinFaction"; priority = target.priority; delay = 1; target.name }
   elseif fc.inFaction(target.name) then
     return nil
   end

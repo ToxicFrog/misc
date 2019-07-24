@@ -19,7 +19,7 @@ local factions = {
 
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
-    return { activity = "joinFaction", target.name }
+    return { activity = "joinFaction", delay = 1, target.name }
   end
 
   if fc.inFaction(target.name) then
@@ -31,7 +31,7 @@ local function joinFaction(target)
   else
     ns:travelToCity(target.city or target.name)
     repeat ns:sleep(5) until fc.haveInvite(target.name)
-    return { activity = "joinFaction", target.name }
+    return { activity = "joinFaction", delay = 1, target.name }
   end
 end
 

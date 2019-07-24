@@ -10,8 +10,12 @@ If the highest priority intent does not match whatever we're currently doing,
 it cancels the current activity and replaces it with the new one.
 ]]
 
+-- appease ram checker
+-- ns:workForCompany()
+
 local fc = require 'intent.faction-common'
 local log = require 'log'
+local sh = require 'shell'
 
 local intent_generators = table.List {
   require 'intent.write-program';
@@ -19,14 +23,52 @@ local intent_generators = table.List {
   require 'intent.city-factions';
   require 'intent.plot-factions';
   require 'intent.corp-factions';
-  -- requir 'intent.gang';
+  require 'intent.escape';
 }
 
+local function jobGrinder(jobs)
+  return function()
+    for job=#jobs,1,-1 do
+      local job_name = jobs[job].job
+      for corp=#jobs[job],1,-1 do
+        local corp = jobs[job][corp]
+        ns:applyToCompany(corp, job_name)
+        if fc.haveJobAt(corp) then
+          return { activity = 'workForCompany', corp }
+        end
+      end
+    end
+    return { activity = 'IDLE' }
+  end
+end
+
+local function manualHack(host)
+  sh.execute('netpath '..host)
+  sh.execute('hack')
+  ns:sleep(ns:getHackTime(host))
+  sh.execute('home')
+end
+
+-- TODO: should favour corps that we can get augs from here
+-- Ideally, we should pick whichever of MegaCorp or ECorp has the least favour,
+-- if we have the prerequisites
+-- If we don't, pick Blade
+-- If we don't have the prereqs for that either, give up
 local intent_handlers = {
-  GRIND_HACK = function() end; -- TODO
-  GRIND_COMBAT = function() end; -- TODO
-  GRIND_MONEY = function() end; -- Assume SHODAN will get us money. May need to rewrite for other BNs.
+  GRIND_HACK = jobGrinder {
+    { job='waiter', 'Noodle Bar' };
+    { job='software', 'Rho Construction', 'Lexo Corp', 'Universal Energy', 'Blade Industries', 'MegaCorp' };
+  };
+  GRIND_COMBAT = jobGrinder {
+    { job='waiter', 'Noodle Bar' };
+    { job='agent', 'Carmichael Security', 'Watchdog Security', 'NSA' };
+  };
+  GRIND_MONEY = jobGrinder {
+    { job='waiter', 'Noodle Bar' };
+    { job='software', 'Rho Construction', 'Lexo Corp', 'Universal Energy', 'Blade Industries', 'MegaCorp' };
+  };
   BUY_AUGS_AND_RESET = fc.getAugs;
+  HACK_SERVER = manualHack;
   IDLE = function() end;
 }
 
@@ -35,21 +77,25 @@ local SLEEP_TIME = 60
 local current = ''
 local function executeIntent(intent)
   local name = ("%s(%s)"):format(intent.activity, table.concat(intent, ", "))
-  if name ~= current then
-    printf("Activity: %s", name)
-    current = name
-  end
   if intent_handlers[intent.activity] then
     local next_intent = intent_handlers[intent.activity](table.unpack(intent))
     if next_intent then
+      next_intent.source = intent.source .. ' -> ' .. intent.activity
+      next_intent.priority = intent.priority
       return executeIntent(next_intent)
     end
   else
     ns[intent.activity](ns, table.unpack(intent))
   end
+  if name ~= current then
+    log.info("Activity: %s [%s] (%f)", name, intent.source or '???', intent.priority)
+    current = name
+  end
+  return intent.delay
 end
 
 function main(...)
+  log.setlevel('debug', 'info')
   while true do
     -- This ensures that faction/corp reputation levels are correctly updated
     -- based on the work we've been doing. Ideally we'd read workRepGain from
@@ -61,17 +107,17 @@ function main(...)
       intent_generators:map(f'f => f()')
       :sort(f'x,y => x.priority < y.priority')
       :map(function(intent)
-        printf("%2.6f %s(%s)  [%s]",
+        log.debug("%2.6f %s(%s)  [%s]",
           intent.priority, intent.activity, table.concat(intent, ", "), intent.source or "???")
         return intent
       end)
       :remove()
     if intent then
-      executeIntent(intent)
+      ns:sleep(executeIntent(intent) or SLEEP_TIME)
     else
       log.warn('No generator produced an intent.')
+      ns:sleep(SLEEP_TIME)
     end
-    ns:sleep(SLEEP_TIME)
   end
 end
 
