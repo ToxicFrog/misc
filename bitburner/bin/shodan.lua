@@ -183,7 +183,9 @@ end
 
 local SPU_INSTALLED = {}
 function installSPU(info)
-  if SPU_INSTALLED[info.host] then return end
+  for _,file in ipairs(info.ls) do
+    if file == '/bin/spu.L.ns' and SPU_INSTALLED[info.host] then return end
+  end
   for _,file in ipairs(SPU_FILES) do
     ns:scp(file, info.host)
   end
