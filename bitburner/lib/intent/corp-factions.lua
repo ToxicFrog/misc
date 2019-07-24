@@ -59,12 +59,12 @@ local function joinFaction(target)
     if fc.haveJobAt(target.corp) then
       return { activity = "workForCompany", target.corp }
     else
-      return { activity = "GRIND_HACK"; priority = 0 }
+      return { activity = "GRIND_HACK" }
     end
   elseif target.server then
     -- We have enough reputation, but we haven't hacked the faction's server.
     if not not canHack(target.server) then
-      return { activity = "GRIND_HACK"; priority = 0 }
+      return { activity = "GRIND_HACK", goal = 'ℍ'..ns:getServerRequiredHackingLevel(target.server) }
     else
       return { activity = 'HACK_SERVER', delay = 1, target.server }
     end

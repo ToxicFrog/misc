@@ -18,13 +18,13 @@ end
 
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
-    return { activity = "joinFaction", target.name }
+    return { activity = "joinFaction", target.name, delay = 1 }
   end
 
   if fc.inFaction(target.name) then
     return nil
   elseif not canHack(target.server) then
-    return { activity = "GRIND_HACK"; priority = 0 }
+    return { activity = "GRIND_HACK"; goal = "ℍ"..ns:getServerRequiredHackingLevel(target.server) }
   else
     return { activity = 'HACK_SERVER'; delay = 1; target.server; }
   end

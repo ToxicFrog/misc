@@ -25,9 +25,9 @@ local function joinFaction(target)
   if fc.inFaction(target.name) then
     return nil
   elseif not fc.haveMoney(target.money + TRAVEL_COST) then
-    return { activity = 'GRIND_MONEY'; priority = 0 }
+    return { activity = 'GRIND_MONEY', goal = tomoney(target.money) }
   elseif ns:getHackingLevel() < (target.hack or 0) then
-    return { activity = 'GRIND_HACK'; priority = 0 }
+    return { activity = 'GRIND_HACK', goal = "ℍ"..target.hack }
   else
     ns:travelToCity(target.city or target.name)
     repeat ns:sleep(5) until fc.haveInvite(target.name)

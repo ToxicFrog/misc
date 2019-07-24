@@ -49,23 +49,22 @@ local function manualHack(host)
   sh.execute('home')
 end
 
--- TODO: should favour corps that we can get augs from here
--- Ideally, we should pick whichever of MegaCorp or ECorp has the least favour,
--- if we have the prerequisites
--- If we don't, pick Blade
--- If we don't have the prereqs for that either, give up
+-- When jobgrinding, we always prefer Blade, ECorp, or MegaCorp, because those have
+-- the best payouts and give us augments, so grinding favour with them is worthwhile.
+-- If we don't meet the prerequisites, we pick whatever gives the best XP.
 local intent_handlers = {
   GRIND_HACK = jobGrinder {
     { job='waiter', 'Noodle Bar' };
-    { job='software', 'Rho Construction', 'Lexo Corp', 'Universal Energy', 'Blade Industries', 'MegaCorp' };
+    { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'MegaCorp' };
   };
   GRIND_COMBAT = jobGrinder {
     { job='waiter', 'Noodle Bar' };
     { job='agent', 'Carmichael Security', 'Watchdog Security', 'NSA' };
+    { job='security', 'Blade Industries', 'MegaCorp' };
   };
   GRIND_MONEY = jobGrinder {
     { job='waiter', 'Noodle Bar' };
-    { job='software', 'Rho Construction', 'Lexo Corp', 'Universal Energy', 'Blade Industries', 'MegaCorp' };
+    { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'ECorp' };
   };
   BUY_AUGS_AND_RESET = fc.getAugs;
   HACK_SERVER = manualHack;
@@ -76,19 +75,23 @@ local SLEEP_TIME = 60
 
 local current = ''
 local function executeIntent(intent)
-  local name = ("%s(%s)"):format(intent.activity, table.concat(intent, ", "))
   if intent_handlers[intent.activity] then
     local next_intent = intent_handlers[intent.activity](table.unpack(intent))
     if next_intent then
       next_intent.source = intent.source .. ' -> ' .. intent.activity
       next_intent.priority = intent.priority
+      next_intent.goal = intent.goal
       return executeIntent(next_intent)
     end
   else
     ns[intent.activity](ns, table.unpack(intent))
   end
+  local name = ("%s(%s)%s [%s]"):format(
+    intent.activity, table.concat(intent, ", "),
+      intent.goal and " -> "..intent.goal or "",
+      intent.source or '???')
   if name ~= current then
-    log.info("Activity: %s [%s] (%f)", name, intent.source or '???', intent.priority)
+    log.info("Activity: %s", name)
     current = name
   end
   return intent.delay

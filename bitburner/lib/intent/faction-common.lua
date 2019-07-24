@@ -53,6 +53,7 @@ local function prioritize(faction)
   end
   if rep > 0 then
     rep_remaining = math.max(0.1, rep - ns:getFactionRep(faction.name))
+                  / (1 + ns:getFactionFavor(faction.name)/100)
     faction.reputation = rep + (faction.invite_rep or 0)
     faction.priority = pri/rep_remaining
     return true
@@ -78,7 +79,7 @@ function fc.getFactionRep(faction, rep, priority)
     -- We'll have enough favor to donate if we reset.
     return { activity = 'BUY_AUGS_AND_RESET'; faction }
   else
-    return { activity = 'workForFaction'; faction, 'hacking' }
+    return { activity = 'workForFaction'; goal = "ℝ"..rep, faction, 'hacking' }
   end
 end
 
@@ -93,7 +94,7 @@ function fc.donateForReputation(faction, rep, priority)
     ns:donateToFaction(faction, cost)
     return nil
   else
-    return { activity = 'workForFaction', priority = priority, faction, 'hacking' }
+    return { activity = 'workForFaction', goal = tomoney(cost), priority = priority, faction, 'hacking' }
   end
 end
 
@@ -106,12 +107,17 @@ local function buyAugmentation(faction, aug)
       return intent
     end
   end
-  local cost = ns:getAugmentationCost(aug)[1]
-  if fc.haveMoney(cost) then
-    log.info("Buying %s from %s for %s", aug, faction, tomoney(cost))
+  local cost = ns:getAugmentationCost(aug)
+  if ns:getFactionRep(faction) < cost[0] then
+    -- aug is in the list but we don't have the rep to buy it.
+    -- means it's a P0 aug with higher rep cost than any P1 aug and should be skipped.
+    return
+  elseif fc.haveMoney(cost[1]) then
+    log.info("Buying %s from %s for %s", aug, faction, tomoney(cost[1]))
     ns:purchaseAugmentation(faction, aug)
   else
-    return { activity = 'GRIND_MONEY'; }
+    log.debug("Grinding %s to buy %s from %s", tomoney(cost[1]), aug, faction)
+    return { activity = 'GRIND_MONEY'; goal = tomoney(cost[1]) }
   end
 end
 
@@ -123,6 +129,7 @@ function fc.getAugs(faction)
     end)
     :sort(f'x,y => x.cost > y.cost')
     :map(f'x => x.name')
+    :filter(function(name) return augs[name].priority >= 0 end)
     :some(partial(buyAugmentation, faction))
   if intent then
     -- We couldn't buy one of the augmentations and it returned an intent to

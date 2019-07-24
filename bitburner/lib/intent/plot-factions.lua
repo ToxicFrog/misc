@@ -23,11 +23,11 @@ local function joinFaction(target)
   end
 
   if not fc.haveCombatLevel(target.combat) then
-    return { activity = "GRIND_COMBAT"; priority = 0 }
+    return { activity = "GRIND_COMBAT" }
   elseif not fc.haveHackingLevel(target.hack) then
-    return { activity = "GRIND_HACK"; priority = 0 }
+    return { activity = "GRIND_HACK" }
   elseif not fc.haveMoney(target.money) then
-    return { activity = "GRIND_MONEY"; priority = 0 }
+    return { activity = "GRIND_MONEY" }
   end
   return { activity = "IDLE"; priority = -1; }
 end
