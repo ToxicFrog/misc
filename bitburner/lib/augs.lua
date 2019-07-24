@@ -102,7 +102,7 @@ Augs { type='combat'; priority=-1; } {
 
 Augs { type='special'; priority=1 } {
   { name="NeuroFlux Governor"; priority=-999 }; -- special cased in autofaction.lua
-  { name="The Red Pill"; priority=10; };
+  { name="The Red Pill"; priority=1000; };
   "Neurotrainer I",
   "Neurotrainer II",
   "Neurotrainer III",
