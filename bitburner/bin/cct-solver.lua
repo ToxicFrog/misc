@@ -1,7 +1,7 @@
 -- Automatically discover and solve CCTs on the network.
 --
 
-local TIME_BETWEEN_SCANS = 60*60
+local TIME_BETWEEN_SCANS = 60*10
 
 local cct = require 'cct'
 local net = require 'net'
