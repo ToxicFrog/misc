@@ -12,13 +12,13 @@ local function logger(level, depth)
     if levels[level] >= levels[log_level] then
       info = debug.getinfo(2, "Sl")
       prefix = string.format("%1.1s %s:%d]  ",
-        level, info.short_src:gsub(".txt$",""):gsub("^/.*/",""), info.currentline)
+        level, info.short_src:gsub(".lua.txt$",""):gsub("^/.*/",""), info.currentline)
       ns:print(prefix..fmt:format(...))
     end
     if levels[level] >= levels[tty_level] then
       info = info or debug.getinfo(2, "Sl")
-      prefix = string.format("%1.1s %s:%d]  ",
-        level, info.short_src:gsub(".txt$",""):gsub("^/.*/",""), info.currentline)
+      prefix = prefix or string.format("%1.1s %s:%d]  ",
+        level, info.short_src:gsub(".lua.txt$",""):gsub("^/.*/",""), info.currentline)
       ns:tprint(prefix..fmt:format(...))
     end
     if level == "FATAL" then ns:exit() end
