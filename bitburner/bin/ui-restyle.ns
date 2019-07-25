@@ -44,13 +44,13 @@ export async function main(ns) {
 
   ns.tprint("New UI style installed.");
 
-  if (!parent.ui_restyle_installed) return;
+  if (parent.ui_restyle_installed) return;
   parent.ui_restyle_installed = true;
 
   // Save the current UI state when clicking on one of the main menu buttons.
   for (let button of doc.getElementById('mainmenu').getElementsByTagName('button')) {
     if (!button.classList.contains('mainmenu-accordion-header')) {
-      button.addEventListener('click', function() { parent.saveUI() });
+      button.addEventListener('click', function() { parent.saveUI.apply(this) });
     }
   }
 
