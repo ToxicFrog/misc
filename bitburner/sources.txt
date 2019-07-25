@@ -41,6 +41,8 @@ lib/cct/array-jumping.lua
 lib/cct/spiralize-matrix.lua
 lib/cct/prime-factors.lua
 lib/cct/unique-paths-2.lua
+lib/cct/ways-to-sum.lua
+lib/cct/stocks-2.lua
 lib/cct/interval-merge.lua
 lib/log.lua
 lib/util/table.lua
