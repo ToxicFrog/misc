@@ -25,7 +25,7 @@ local MIN_MONEY_FOR_HACK = 2e6
 local GROWTH_FACTOR = 2
 -- What the shortest time we're willing to sleep is. Small values can adversely
 -- affect performance once we have a very large swarm.
-local MIN_SLEEP_TIME = 4.0
+local MIN_SLEEP_TIME = 1.0
 -- How much memory do we reserve on home for user scripts.
 local HOME_RAM_RESERVED = 256
 
