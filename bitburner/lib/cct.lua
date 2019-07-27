@@ -17,7 +17,7 @@ local solvers = {
   ["Minimum Path Sum in a Triangle"] = require 'cct.triangle-paths';
   ["Unique Paths in a Grid I"] = require 'cct.unique-paths-1';
   ["Unique Paths in a Grid II"] = require 'cct.unique-paths-2';
-  ["Sanitize Parentheses in Expression"] = nil;
+  ["Sanitize Parentheses in Expression"] = require 'cct.sanitize-parens';
   ["Find All Valid Math Expressions"] = require 'cct.valid-expressions';
 }
 

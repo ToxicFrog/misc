@@ -34,7 +34,3 @@ local function solve(data)
 end
 
 return solve
--- for expr in permute("944400645020") do
---   local res = load("return "..expr)()
---   if res == -77 then print(expr, res) end
--- end
