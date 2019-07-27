@@ -5,6 +5,7 @@ local net = {}
 -- helper for net.walk
 local function walkOne(fn, host, depth, seen, ...)
   seen[host] = true
+  if host:match("hacknet%-node%-%d+") then return end
   if not fn(host, depth, ...) then return end
   for peer in js.of(ns:scan(host)) do
     if not seen[peer] then

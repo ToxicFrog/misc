@@ -13,6 +13,8 @@ getmetatable("").__mod = function(lhs, rhs)
     end
 end
 
+getmetatable("").__call = string.sub
+
 -- string... split(string, pattern. max) - break up string on pattern
 -- default value for pattern is to split on whitespace
 -- default value for max is infinity
