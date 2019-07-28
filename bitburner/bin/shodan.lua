@@ -155,7 +155,7 @@ end
 function preTask(info)
   local host = info.host
   if isHackable(info) then
-    TARGET_MONEY[host] = TARGET_MONEY[host] or math.max(info.money, MIN_MONEY_FOR_HACK)
+    TARGET_MONEY[host] = TARGET_MONEY[host] or info.money:max(MIN_MONEY_FOR_HACK):min(info.max_money)
     info.hack_pending = 0
     info.weaken_pending = 0
     info.grow_pending = 0
