@@ -12,7 +12,7 @@ local function Augs(defaults)
   end
 end
 
-Augs { type='hacknet'; priority=0; } {
+Augs { type='hacknet'; priority=4; } {
   "Hacknet Node CPU Architecture Neural-Upload",
   "Hacknet Node Cache Architecture Neural-Upload",
   "Hacknet Node NIC Architecture Neural-Upload",
@@ -25,7 +25,7 @@ Augs { type='hack'; priority=1; } {
   { name="CashRoot Starter Kit"; priority=10; };
   { name="Neuralstimulator"; priority=0; };
   "CRTX42-AA Gene Modification",
-  "Neuregen Gene Modification",
+  { name="Neuregen Gene Modification", priority=2 };
   "BitWire",
   "Artificial Bio-neural Network Implant",
   "Artificial Synaptic Potentiation",
