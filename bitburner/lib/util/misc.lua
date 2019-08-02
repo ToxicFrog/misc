@@ -6,7 +6,7 @@ local unpack = table.unpack
 -- fast one-liner lambda creation
 function f(src)
   return assert(load(
-    "return function(" .. src:gsub(" => ", ") return ", 1) .. " end"
+    "return function(" .. src:gsub(" ?=> ?", ") return ", 1) .. " end"
   ))()
 end
 
@@ -58,3 +58,6 @@ do
     return self
   end
 end
+
+function identity(x) return x end
+function constantly(x) return function() return x end end
