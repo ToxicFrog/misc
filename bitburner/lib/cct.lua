@@ -29,7 +29,9 @@ function cct.solve(host, path)
   local solver = solvers[t]
   if not solver then
     log.info("Can't solve %s:%s, no solver for '%s'", host, path, t)
-  elseif ns.codingcontract:getNumTriesRemaining(path, host) <= 3 then
+  elseif ns.codingcontract:getNumTriesRemaining(path, host) <= 7
+    and t ~= "Array Jumping Game" -- special case since that generates with only one try
+  then
     log.info("Skipping %s:%s, not enough tries left.", host, path)
   else
     log.info("Attempting to solve %s:%s using solver for '%s'", host, path, t)
