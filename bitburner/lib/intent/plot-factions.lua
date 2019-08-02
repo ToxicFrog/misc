@@ -7,9 +7,11 @@ local log = require 'log'
 local fc = require 'intent.faction-common'
 
 local factions = table.List {
-  { name = "The Covenant"; augs = 20; money = 75e9; hack = 850; combat = 850; };
-  { name = "Daedalus"; augs = 30; money = 100e9; hack = 2500; combat = 0; };
-  { name = "Illuminati"; augs = 30; money = 150e9; hack = 1500; combat = 1200; };
+  -- TODO take into account how long it'll take to grind up these stats based on
+  -- character multipliers and stuff
+  -- { name = "The Covenant"; augs = 20; money = 75e9; hack = 850; combat = 850; };
+  -- { name = "Daedalus"; augs = 30; money = 100e9; hack = 2500; combat = 0; };
+  -- { name = "Illuminati"; augs = 30; money = 150e9; hack = 1500; combat = 1200; };
   -- This gets stuffed into plot factions because it shares most of its code with
   -- them, even though it isn't really plot related.
   { name = "Netburners"; augs = 0; money = 0; hack = 80; combat = 0; };
@@ -23,11 +25,11 @@ local function joinFaction(target)
   end
 
   if not fc.haveCombatLevel(target.combat) then
-    return { activity = "GRIND_COMBAT" }
+    return { activity = "GRIND_COMBAT", goal = "⚔"..target.combat }
   elseif not fc.haveHackingLevel(target.hack) then
-    return { activity = "GRIND_HACK" }
+    return { activity = "GRIND_HACK", goal = 'ℍ'..target.hack }
   elseif not fc.haveMoney(target.money) then
-    return { activity = "GRIND_MONEY" }
+    return { activity = "GRIND_MONEY", goal = '$'..target.money }
   end
   return { activity = "IDLE"; priority = -1; }
 end

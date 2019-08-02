@@ -16,6 +16,8 @@ it cancels the current activity and replaces it with the new one.
 local fc = require 'intent.faction-common'
 local log = require 'log'
 local sh = require 'shell'
+local universityIntent = require 'intent.university'
+local gymIntent = require 'intent.gym'
 
 local intent_generators = table.List {
   require 'intent.write-program';
@@ -27,22 +29,22 @@ local intent_generators = table.List {
 }
 
 local function jobGrinder(jobs)
-  return function()
+  return function(self)
     for job=#jobs,1,-1 do
       local job_name = jobs[job].job
       for corp=#jobs[job],1,-1 do
         local corp = jobs[job][corp]
         ns:applyToCompany(corp, job_name)
         if fc.haveJobAt(corp) then
-          return { activity = 'workForCompany', corp }
+          return { activity = 'workForCompany', corp, priority=self.priority, source=self.source }
         end
       end
     end
-    return { activity = 'IDLE' }
+    return jobs.fallback(self)
   end
 end
 
-local function manualHack(host)
+local function manualHack(intent, host)
   sh.execute('netpath '..host)
   sh.execute('hack')
   ns:sleep(ns:getHackTime(host))
@@ -52,31 +54,46 @@ end
 -- When jobgrinding, we always prefer Blade, ECorp, or MegaCorp, because those have
 -- the best payouts and give us augments, so grinding favour with them is worthwhile.
 -- If we don't meet the prerequisites, we pick whatever gives the best XP.
+-- TODO: if we have a high-priority jobgrind and a lower-priority activity that's
+-- compatible with it, do the lowpri activity, e.g. given this:
+-- 0.6 GRIND_HACK [prerequisite: NiteSec]
+-- 0.2 workForFaction(chongquing)
+-- it should prefer working for chongquing to grinding hack.
 local intent_handlers = {
   GRIND_HACK = jobGrinder {
-    { job='waiter', 'Noodle Bar' };
-    { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'MegaCorp' };
+    -- { job='waiter', 'Noodle Bar' };
+    { job='software', 'Blade Industries', 'MegaCorp' };
+    fallback = function(self) return universityIntent(self, 'hack') end
   };
   GRIND_COMBAT = jobGrinder {
-    { job='waiter', 'Noodle Bar' };
-    { job='agent', 'Carmichael Security', 'Watchdog Security', 'NSA' };
+    -- { job='waiter', 'Noodle Bar' };
+    -- { job='agent', 'Carmichael Security', 'Watchdog Security', 'NSA' };
     { job='security', 'Blade Industries', 'MegaCorp' };
+    fallback = gymIntent;
   };
   GRIND_MONEY = jobGrinder {
-    { job='waiter', 'Noodle Bar' };
-    { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'ECorp' };
+    -- { job='waiter', 'Noodle Bar' };
+    -- { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'ECorp' };
+    { job='security', 'Blade Industries', 'MegaCorp' };
+    { job='software', 'Blade Industries', 'ECorp' };
+    fallback = function() return { activity = 'IDLE'; } end;
   };
-  BUY_AUGS_AND_RESET = fc.getAugs;
+  BUY_AUGS_AND_RESET = function(intent, faction) return fc.getAugs(faction) end;
   HACK_SERVER = manualHack;
-  IDLE = function() end;
+  IDLE = function(self) return universityIntent(self, 'hack') end;
 }
 
 local SLEEP_TIME = 60
 
 local current = ''
 local function executeIntent(intent)
+  local name = ("%s(%s)%s [%s]"):format(
+    intent.activity, table.concat(intent, ", "),
+      intent.goal and " -> "..intent.goal or "",
+      intent.source or '???')
+  -- printf("Activity: %s", name)
   if intent_handlers[intent.activity] then
-    local next_intent = intent_handlers[intent.activity](table.unpack(intent))
+    local next_intent = intent_handlers[intent.activity](intent, table.unpack(intent))
     if next_intent then
       next_intent.source = intent.source .. ' -> ' .. intent.activity
       next_intent.priority = intent.priority
@@ -84,15 +101,11 @@ local function executeIntent(intent)
       return executeIntent(next_intent)
     end
   else
+    if name ~= current then
+      log.info("Activity: %s", name)
+      current = name
+    end
     ns[intent.activity](ns, table.unpack(intent))
-  end
-  local name = ("%s(%s)%s [%s]"):format(
-    intent.activity, table.concat(intent, ", "),
-      intent.goal and " -> "..intent.goal or "",
-      intent.source or '???')
-  if name ~= current then
-    log.info("Activity: %s", name)
-    current = name
   end
   return intent.delay
 end

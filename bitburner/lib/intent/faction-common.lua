@@ -134,6 +134,8 @@ function fc.getAugs(faction)
   if intent then
     -- We couldn't buy one of the augmentations and it returned an intent to
     -- satisfy the prerequisites
+    -- intent.priority = self.priority
+    -- intent.source = self.source
     return intent
   end
 
