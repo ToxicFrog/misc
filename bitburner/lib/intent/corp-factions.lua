@@ -63,8 +63,8 @@ local function joinFaction(target)
     end
   elseif target.server then
     -- We have enough reputation, but we haven't hacked the faction's server.
-    if not not canHack(target.server) then
-      return { activity = "GRIND_HACK", goal = 'ℍ'..ns:getServerRequiredHackingLevel(target.server) }
+    if not canHack(target.server) then
+      return { priority = 1/1e16; activity = "GRIND_HACK", goal = 'ℍ'..ns:getServerRequiredHackingLevel(target.server) }
     else
       return { activity = 'HACK_SERVER', delay = 1, target.server }
     end

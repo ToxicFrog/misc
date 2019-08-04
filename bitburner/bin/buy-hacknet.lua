@@ -13,7 +13,7 @@ local function upgradeHacknet(budget, did_upgrade)
   for i=0,ns.hacknet:numNodes()-1 do
     local node = { id=i; cost = math.huge }
 
-    for _,stat in ipairs { "Level", "Ram", "Core", "Cache" } do
+    for _,stat in ipairs { "Level", "Ram", "Core", --[["Cache"]] } do
       local cost = ns.hacknet["get"..stat.."UpgradeCost"](ns.hacknet, i, 1)
       if cost < node.cost then
         node.cost = cost
@@ -74,9 +74,9 @@ local function spendHashes(budget)
 end
 
 local BUYS = {
-  {spendHashes, 1.0};
-  {buyNewHacknet, 0.5};
-  {upgradeHacknet, 0.5};
+  -- {spendHashes, 1.0};
+  {buyNewHacknet, 0.01};
+  {upgradeHacknet, 0.01};
 }
 
 ns:disableLog "ALL"
