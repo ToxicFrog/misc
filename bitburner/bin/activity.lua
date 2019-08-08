@@ -12,6 +12,10 @@ it cancels the current activity and replaces it with the new one.
 
 -- appease ram checker
 -- ns:workForCompany()
+-- ns:joinFaction()
+-- ns:createProgram()
+-- ns:universityCourse()
+-- ns:gymWorkout()
 
 local fc = require 'intent.faction-common'
 local log = require 'log'
