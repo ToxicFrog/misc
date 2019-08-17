@@ -43,9 +43,6 @@ return function()
 
   intent.priority = intent.priority or target.priority
   intent.source = intent.source or "hacker faction: %s" % target.name
-  if intent.activity:match('^GRIND_') then
-    intent.priority = intent.priority / 10
-  end
   return intent
 end
 
