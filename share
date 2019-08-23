@@ -269,7 +269,7 @@ function cmd/add-album {
   # Replace "fake" originals with the real originals
   for original replacement in "${(@kv)replacements}"; do
     echo "Replacement: $original <-> $replacement"
-    rm "$SHARE_PATH/$hash/files/$replacement"
+    rm -f "$SHARE_PATH/$hash/files/$replacement"
     install -m 644 "$original" "$SHARE_PATH/$hash/files/"
     sed -Ei 's,"files/'"$replacement"'","files/'"$(basename $original)"'",' "$SHARE_PATH/$hash/data.json"
   done
