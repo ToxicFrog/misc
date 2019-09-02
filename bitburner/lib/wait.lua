@@ -35,9 +35,9 @@ function wait.haveMoney(amount)
   end
 end
 
-function wait.waitUntil(P)
+function wait.waitUntil(P, delay)
   while not P() do
-    ns:sleep(60)
+    ns:sleep(delay or 60)
   end
 end
 
