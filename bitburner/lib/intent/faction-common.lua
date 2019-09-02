@@ -44,6 +44,7 @@ local function prioritize(faction)
   local rep = 0
   local pri = 0
   for aug in js.of(ns:getAugmentationsFromFaction(faction.name)) do
+    assert(augs[aug], "faction "..faction.name.." has aug "..aug..", which I can't find in the aug table")
     if augs[aug].priority > 0 and not fc.haveAug(aug) then
       local cost = ns:getAugmentationCost(aug)
       rep = rep:max(cost[0])

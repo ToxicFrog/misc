@@ -16,6 +16,7 @@ it cancels the current activity and replaces it with the new one.
 -- ns:createProgram()
 -- ns:universityCourse()
 -- ns:gymWorkout()
+-- ns:installAgumentations()
 
 local fc = require 'intent.faction-common'
 local log = require 'log'
@@ -29,6 +30,7 @@ local intent_generators = table.List {
   require 'intent.city-factions';
   require 'intent.plot-factions';
   require 'intent.corp-factions';
+  require 'intent.gang-factions';
   require 'intent.escape';
 }
 
@@ -55,6 +57,38 @@ local function manualHack(intent, host)
   sh.execute('home')
 end
 
+local function Crime(name, time_ms, money, kills)
+  return {
+    name = name; time = time_ms/1000; money = money; kills = kills or false;
+    efficiency = money/(time_ms/1000);
+  }
+end
+
+local crimes = table.sort({
+  Crime("rob store", 60e3, 400e3);
+  Crime("shoplift", 2e3, 15e3);
+  Crime("larceny", 90e3, 800e3);
+  Crime("mug", 4e3, 36e3);
+  Crime("deal drugs", 10e3, 120e3);
+  Crime("Bond Forgery", 300e3, 4.5e6); -- tie with homicide, but slower
+  Crime("Traffick Arms", 40e3, 600e3); -- tie with homicide, but slower
+  -- Crime("homicide", 3e3, 45e3, true);
+  Crime("grand theft auto", 80e3, 1.6e6);
+  Crime("kidnap", 120e3, 3.6e6);
+  Crime("assassinate", 300e3, 12e6, true); -- best one that generates kills
+  Crime("heist", 600e3, 120e6); -- best one outright
+}, f'x,y => x.efficiency > y.efficiency')
+
+local function crimeGrinder(self)
+  for i,crime in ipairs(crimes) do
+    if ns:getCrimeChance(crime.name:lower()) >= 1.0 then
+      return { activity = 'commitCrime', crime.name,
+        priority = self.priority, source = self.source, delay = 'UNTIL_IDLE' }
+    end
+  end
+  return { activity = 'GRIND_COMBAT', priority = self.priority, source = self.source }
+end
+
 -- When jobgrinding, we always prefer Blade, ECorp, or MegaCorp, because those have
 -- the best payouts and give us augments, so grinding favour with them is worthwhile.
 -- If we don't meet the prerequisites, we pick whatever gives the best XP.
@@ -65,23 +99,26 @@ end
 -- it should prefer working for chongquing to grinding hack.
 local intent_handlers = {
   GRIND_HACK = jobGrinder {
-    -- { job='waiter', 'Noodle Bar' };
+    { job='waiter', 'Noodle Bar' }; --re-enabled for BN2
     { job='software', 'Blade Industries', 'MegaCorp' };
     fallback = function(self) return universityIntent(self, 'hack') end
   };
   GRIND_COMBAT = jobGrinder {
-    -- { job='waiter', 'Noodle Bar' };
+    { job='waiter', 'Noodle Bar' }; --re-enabled for BN2
     -- { job='agent', 'Carmichael Security', 'Watchdog Security', 'NSA' };
+    { job='agent', 'Carmichael Security', 'Watchdog Security', };  --re-enabled for BN2
     { job='security', 'Blade Industries', 'MegaCorp' };
     fallback = gymIntent;
   };
   GRIND_MONEY = jobGrinder {
-    -- { job='waiter', 'Noodle Bar' };
-    -- { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'ECorp' };
+    { job='waiter', 'Noodle Bar' }; --re-enabled for BN2
+    { job='software', 'Rho Construction', 'LexoCorp', 'Universal Energy', 'Blade Industries', 'ECorp' }; --re-enabled for BN2
     { job='security', 'Blade Industries', 'MegaCorp' };
     { job='software', 'Blade Industries', 'ECorp' };
     fallback = function() return { activity = 'IDLE'; } end;
   };
+  GRIND_MONEY = crimeGrinder;
+  GRIND_CRIMES = crimeGrinder;
   BUY_AUGS_AND_RESET = function(intent, faction) return fc.getAugs(faction) end;
   HACK_SERVER = manualHack;
   IDLE = function(self) return universityIntent(self, 'hack') end;
@@ -133,7 +170,12 @@ function main(...)
       end)
       :remove()
     if intent then
-      ns:sleep(executeIntent(intent) or SLEEP_TIME)
+      delay = executeIntent(intent) or SLEEP_TIME
+      if delay == 'UNTIL_IDLE' then
+        while ns:isBusy() do ns:sleep(0.1) end
+      else
+        ns:sleep(delay)
+      end
     else
       log.warn('No generator produced an intent.')
       ns:sleep(SLEEP_TIME)

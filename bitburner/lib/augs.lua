@@ -1,6 +1,18 @@
 local augs = {}
 
+-- priorities currently set for BN2
+local priorities = {
+  hacknet = 0;
+  hack = 1;
+  ['social/corp'] = 0;
+  social = 1;
+  combat = 2;
+  bladeburner = 0;
+  special = 1;
+}
+
 local function Augs(defaults)
+  defaults.priority = priorities[defaults.type] or defaults.priority
   return function(list)
     for k,v in pairs(list) do
       if type(v) == 'string' then
@@ -69,6 +81,7 @@ Augs { type='social'; priority=1; } {
   "ADR-V2 Pheromone Gene",
   "SmartJaw",
   "Social Negotiation Assistant (S.N.A)",
+  "The Shadow's Simulacrum",
 }
 
 Augs { type='combat'; priority=-1; } {
@@ -85,6 +98,7 @@ Augs { type='combat'; priority=-1; } {
   "Wired Reflexes",
   "Graphene Bone Lacings",
   "Bionic Spine",
+  "Bionic Arms",
   "Graphene Bionic Spine Upgrade",
   "Bionic Legs",
   "Graphene Bionic Legs Upgrade",
@@ -98,6 +112,29 @@ Augs { type='combat'; priority=-1; } {
   "NutriGen Implant",
   "INFRARET Enhancement",
   "DermaForce Particle Barrier",
+  "Graphene BranchiBlades Upgrade",
+  "Graphene Bionic Arms Upgrade",
+  "BrachiBlades",
+}
+
+Augs { type='bladeburner'; priority=0 } {
+  "EsperTech Bladeburner Eyewear",
+  "EMS-4 Recombination",
+  "ORION-MKIV Shoulder",
+  "Hyperion Plasma Cannon V1",
+  "Hyperion Plasma Cannon V2",
+  "GOLEM Serum",
+  "Vangelis Virus",
+  "Vangelis Virus 3.0",
+  "I.N.T.E.R.L.I.N.K.E.D",
+  "Blade's Runners",
+  "BLADE-51b Tesla Armor",
+  "BLADE-51b Tesla Armor: Power Cells Upgrade",
+  "BLADE-51b Tesla Armor: Energy Shielding Upgrade",
+  "BLADE-51b Tesla Armor: Unibeam Upgrade",
+  "BLADE-51b Tesla Armor: Omnibeam Upgrade",
+  "BLADE-51b Tesla Armor: IPU Upgrade",
+  "The Blade's Simulacrum",
 }
 
 Augs { type='special'; priority=1 } {
@@ -114,3 +151,4 @@ Augs { type='special'; priority=1 } {
 }
 
 return augs
+

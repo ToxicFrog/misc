@@ -26,6 +26,7 @@ const daemons = [
   // Uses a huge amount of RAM.
   // "/bin/autofaction.L.ns",
   "/bin/activity.L.ns",
+  "/bin/gangs.L.ns",
 ];
 
 const DELAY_BETWEEN_CHECKS = 60; // seconds

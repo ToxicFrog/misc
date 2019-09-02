@@ -3,6 +3,7 @@ bin/buy-hacknet.lua
 bin/cct-solver.lua
 bin/shodan-ui.lua
 bin/init.ns
+bin/gangs.lua
 bin/netrun.lua
 bin/luac.ns
 bin/netpath.lua
@@ -22,6 +23,7 @@ lib/net.lua
 lib/json.lua
 lib/factions.lua
 lib/intent/gym.lua
+lib/intent/gang-factions.lua
 lib/intent/faction-common.lua
 lib/intent/plot-factions.lua
 lib/intent/city-factions.lua
