@@ -1,0 +1,139 @@
+#!/usr/bin/env zsh
+# Fetch/update a recipe index for Cook's Country.
+
+# Issue: title, cover image, and list of recipes.
+# Recipe: title, blurb, image, "why it works"
+# UI: a list of issues; click on an issue to expand and display the list of recipes with blurbs.
+# search box at the top; typing in a search automatically filters to only recipes matching the search and issues containing those recipes, and automatically expands those issues.
+
+set -e
+
+OUTPUT=/srv/www/archives/cooks-country/
+
+# attr html field -> returns contents of field
+function attr {
+  print -r "$1" | egrep -o " $2=\"[^\"]+\"" | cut -d'"' -f2 | head -n1
+}
+
+function sanitize {
+  print -r "$1" | tr ' /\t' '_'
+}
+
+function html {
+  >>"$OUTPUT/index.html" printf "$@"
+}
+
+function unescape {
+  print -r "<div>$*</div>" | wring text - //div
+}
+
+mkdir -p "$OUTPUT"
+
+echo "Fetching master index..."
+issues="$(curl -s 'https://www.cookscountry.com/magazines/browse' | wring html - .result__image-link)"
+# issues="$(cat /tmp/ck/browse)"
+print -r "$issues" | tac | while read -r issue; do
+  title="$(attr "$issue" title)"
+  url="$(attr "$issue" href)"
+  img="$(attr "$issue" data-src)"
+
+  out="$OUTPUT/$(sanitize "$title")"
+  [[ -f "$out/done" ]] && continue;
+
+  echo -n "Fetching $title:"
+  rm -f "$out/index"
+  mkdir -p "$out"
+  print -r "$title" > "$out/title"
+
+  # Fetch cover if missing
+  [[ -f "$out/cover.jpeg" ]] || {
+    echo -n " cover"
+    curl -s "$img" > "$out/cover.jpeg"
+    echo -n "."
+  }
+
+  # Fetch recipe images and write issue index file
+  recipes="$(curl -s "https://www.cookscountry.com$url" \
+    | wring html - .recipe \
+    | fgrep -v result__online-extra \
+    | lua -e 'print((io.read("*a"):gsub("\r",""):gsub("([^>])\n+", "%1 ")))')"
+  echo -n " recipes"
+  print -r "$recipes" | while read -r recipe; do
+    title="$(attr "$recipe" title)"
+    title="$(unescape "$title")"
+    img="$(attr "$recipe" data-src)"
+    desc="$(print -r "$recipe" | wring text - .result__description)"
+    splash="$(sanitize "$title").jpeg"
+    [[ -f "$out/$splash" ]] || {
+      if [[ $img ]] then
+        curl -s "$img" > "$out/$splash"
+      else
+        curl -s "https://cataas.com/cat?width=120&height=120" > "$out/$splash"
+      fi
+    }
+    printf '%s\t%s\t%s\n' "$splash" "$title" "$desc" >> "$out/index"
+    echo -n "."
+  done
+
+  if [[ $(wc -l $out/index) < 4 ]]; then
+    # An issue with few/no recipes? Probably this is one of those cases where
+    # they return multiple copies of an issue in the search, but only one of them
+    # is valid.
+    rm -f "$out/index" "$out/done" "$out/cover.jpeg"
+    echo "error!"
+    continue
+  fi
+
+  touch "$out/done"
+  echo ""
+  # break
+done
+
+echo -n "Generating top-level HTML"
+rm -rf "$OUTPUT/index.html"
+html "
+  <html>
+    <head>
+      <title>Cook's Country Index</title>
+      <meta charset=\"UTF-8\">
+    </head>
+  <body>
+"
+html '
+  <style>
+    table {
+      border-collapse: collapse;
+    }
+    td, th {
+      border-bottom: 1px solid black;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #A0A0A0;
+    }
+  </style>
+'
+
+ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
+  [[ -f "$issue/done" ]] || continue
+  html '
+    <table>
+      <tr>
+        <th style="width:1%%; white-space:nowrap;"><img src="%s" width=120px></th>
+        <th colspan=2 width=100%%>%s</th>
+      </tr>
+  ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")"
+  cat "$OUTPUT/$issue/index" | while IFS=$'\t' read -r splash title desc; do
+    html '
+      <tr>
+        <td colspan=2 width=100%%><b>%s</b><br>%s</td>
+        <td style="width:1%%; white-space:nowrap;"><img src="%s" height=80px></td>
+      </tr>
+    ' "$title" "$desc" "$issue/$splash"
+  done
+  html '</table>'
+  echo -n "."
+done
+html "</body></html>"
+echo ""
