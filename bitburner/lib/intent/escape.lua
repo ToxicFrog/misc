@@ -5,10 +5,11 @@ end
 
 return function()
   if not canHack('w0r1d_d43m0n') then return nil end
+  ns:kill("/bin/init.L.ns")
   return {
     priority = 9999;
     source = 'escape';
-    delay = 1;
+    delay = math.huge;
     activity = 'HACK_SERVER', 'w0r1d_d43m0n'
   }
 end
