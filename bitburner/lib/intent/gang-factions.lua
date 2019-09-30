@@ -20,6 +20,10 @@ local factions = table.List {
   -- GangFaction { name = "The Syndicate"; combat = 300; hack = 300; city = "Sector-12"; money = 10e6; karma = -90 };
 }
 
+local function inGang()
+  return pcall(function() return ns.gang:getGangInformation() end) == true
+end
+
 local function joinFaction(target)
   if fc.haveInvite(target.name) then
     return { activity = "joinFaction"; priority = target.priority; delay = 1; target.name }
@@ -28,7 +32,7 @@ local function joinFaction(target)
   end
 
   if target.combat and not fc.haveCombatLevel(target.combat) then
-    return { activity = "GRIND_CRIMES", goal = "⚔"..target.combat }
+    return { activity = "GRIND_COMBAT", goal = "⚔"..target.combat }
   elseif target.hack and not fc.haveHackingLevel(target.hack) then
     return { activity = "GRIND_HACK", goal = 'ℍ'..target.hack }
   elseif target.money and not fc.haveMoney(target.money) then
@@ -40,7 +44,14 @@ local function joinFaction(target)
   end
 
   -- TODO support kill tracking
-  return { activity = "GRIND_CRIMES"; goal = '🕱'..(target.kills or 0)..' ♆'..target.karma:abs() }
+  return { activity = "GRIND_KARMA"; goal = '🕱'..(target.kills or 0)..' ♆'..target.karma:abs() }
+end
+
+-- -54,000 is the threshold for creating a new gang outside BN2.
+local function grindKarma()
+  if ns:karma() > -54e3 and not inGang then
+    return { activity = "GRIND_KARMA" }
+  end
 end
 
 -- TODO once we meet some threshold amount of reputation/money, buy a bunch of
@@ -53,10 +64,16 @@ return function()
     return { activity = 'IDLE'; priority = -1; source = "BE GAY DO CRIMES" }
   end
 
+  -- This needs a bunch of work. Outside BN2, we need -54k karma to form a gang.
+  -- This is about 15 hours of grinding homicide, which I think is the fastest
+  -- approach; and it's worth switching from mugging to homicide as soon as the
+  -- success rate goes above 10% (!).
+  -- Conversely, once we HAVE formed the gang, we don't need to grind crimes anymore,
+  -- because the gang will grind things for us.
   local intent = joinFaction(target)
-              or { activity = "GRIND_CRIMES"; priority = 1000 }
-              or fc.getFactionRep(target.name, target.reputation)
-              or fc.getAugs(target.name)
+              or grindKarma()
+              -- or fc.getFactionRep(target.name, target.reputation)
+              -- or fc.getAugs(target.name)
               or { activity = 'IDLE'; priority = -1 }
 
   intent.priority = intent.priority or target.priority

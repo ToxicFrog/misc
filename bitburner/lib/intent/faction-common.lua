@@ -122,6 +122,10 @@ local function buyAugmentation(faction, aug)
   end
 end
 
+-- TODO: assess augs in increasing order, multiplying total by 1.9 (the aug price increase
+-- factor) for each one; stop once either
+-- (a) we have all the augs
+-- (b) we've run out of money but have at least MIN_AUGS_PER_RESET (8?) augs
 function fc.getAugs(faction)
   local intent = js.toList(ns:getAugmentationsFromFaction(faction))
     :map(function(aug)

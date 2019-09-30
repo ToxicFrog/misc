@@ -25,3 +25,7 @@ end
 function printf(fmt, ...)
   return print(fmt:format(...))
 end
+
+function ns.karma()
+  return ns.heart['break'](ns.heart)
+end

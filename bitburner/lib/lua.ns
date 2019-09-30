@@ -201,6 +201,7 @@ export async function callToCompletion(ns, L, args) {
       console.log("error handler returned:", msg)
       msg = msg.replace(/\n/g, "<br>").replace(/<br>( +)/, "<br><pre>$1</pre>");
       console.log("Error handler returned: " + msg);
+      // throw Error(msg);
       if (msg[0] == "|") {
         throw msg;
       } else {

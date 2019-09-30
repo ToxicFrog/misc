@@ -16,6 +16,17 @@
 // overhead from calling ns.read(), but also means you need to recompile any
 // time any of the dependencies change.
 
+// Revised version:
+// Same deal where we walk the dependencies and generate lua and ns dependency
+// lists.
+// However, instead of compiling everything into a standalone file, we instead
+// write the lua code to a map in WIN, possibly even precompiling it using the
+// Fengari api.
+// We then write the standalone loader iff the set of NS calls has changed,
+// since we need to appease the static RAM checker. If that hasn't changed,
+// we don't need a new loader; the old loader simply reads bin.whatever from
+// the cache in WIN and executes it.
+
 export async function main(ns) {
   const file = ns.args[0];
   const mode = ns.args[1] || "integrated";

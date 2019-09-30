@@ -57,36 +57,43 @@ local function manualHack(intent, host)
   sh.execute('home')
 end
 
-local function Crime(name, time_ms, money, kills)
+local function Crime(name, time_ms, money, karma, kills)
   return {
-    name = name; time = time_ms/1000; money = money; kills = kills or false;
-    efficiency = money/(time_ms/1000);
+    name = name; time = time_ms/1000; money = money; karma = karma, kills = kills and 1 or 0;
+    -- money_efficiency = money/(time_ms/1000);
+    -- karma_efficiency = karma/(time_ms/1000);
   }
 end
 
-local crimes = table.sort({
-  Crime("rob store", 60e3, 400e3);
-  Crime("shoplift", 2e3, 15e3);
-  Crime("larceny", 90e3, 800e3);
-  Crime("mug", 4e3, 36e3);
-  Crime("deal drugs", 10e3, 120e3);
-  Crime("Bond Forgery", 300e3, 4.5e6); -- tie with homicide, but slower
-  Crime("Traffick Arms", 40e3, 600e3); -- tie with homicide, but slower
-  -- Crime("homicide", 3e3, 45e3, true);
-  Crime("grand theft auto", 80e3, 1.6e6);
-  Crime("kidnap", 120e3, 3.6e6);
-  Crime("assassinate", 300e3, 12e6, true); -- best one that generates kills
-  Crime("heist", 600e3, 120e6); -- best one outright
-}, f'x,y => x.efficiency > y.efficiency')
+local crimes = {
+  Crime("rob store", 60e3, 400e3, 0.5);
+  Crime("shoplift", 2e3, 15e3, 0.1);
+  Crime("larceny", 90e3, 800e3, 1.5);
+  Crime("mug", 4e3, 36e3, 0.25);
+  Crime("deal drugs", 10e3, 120e3, 0.5);
+  Crime("Bond Forgery", 300e3-1, 4.5e6, 0.1); -- tie with homicide, but slower
+  Crime("Traffick Arms", 40e3-1, 600e3, 1); -- tie with homicide, but slower
+  Crime("homicide", 3e3, 45e3, 3, true);
+  Crime("grand theft auto", 80e3, 1.6e6, 5);
+  Crime("kidnap", 120e3, 3.6e6, 6);
+  Crime("assassinate", 300e3, 12e6, 10, true); -- best one that generates kills
+  Crime("heist", 600e3, 120e6, 15); -- best one outright
+}
 
-local function crimeGrinder(self)
-  for i,crime in ipairs(crimes) do
-    if ns:getCrimeChance(crime.name:lower()) >= 1.0 then
-      return { activity = 'commitCrime', crime.name,
-        priority = self.priority, source = self.source, delay = 'UNTIL_IDLE' }
+local function crimeGrinder(goal)
+  return function(self)
+    table.sort(crimes, function(x,y)
+      if x[goal] ~= y[goal] then return x[goal]/x.time > y[goal]/y.time end
+      return x.money/x.time > y.money/y.time
+    end)
+    for i,crime in ipairs(crimes) do
+      if ns:getCrimeChance(crime.name:lower()) >= 1.0 then
+        return { activity = 'commitCrime', crime.name,
+          priority = self.priority, source = self.source, delay = 'UNTIL_IDLE' }
+      end
     end
+    return { activity = 'GRIND_COMBAT', priority = self.priority, source = self.source }
   end
-  return { activity = 'GRIND_COMBAT', priority = self.priority, source = self.source }
 end
 
 -- When jobgrinding, we always prefer Blade, ECorp, or MegaCorp, because those have
@@ -117,8 +124,9 @@ local intent_handlers = {
     { job='software', 'Blade Industries', 'ECorp' };
     fallback = function() return { activity = 'IDLE'; } end;
   };
-  GRIND_MONEY = crimeGrinder;
-  GRIND_CRIMES = crimeGrinder;
+  GRIND_MONEY = crimeGrinder("money");
+  GRIND_KARMA = crimeGrinder("karma");
+  GRIND_MURDER = crimeGrinder("kills");
   BUY_AUGS_AND_RESET = function(intent, faction) return fc.getAugs(faction) end;
   HACK_SERVER = manualHack;
   IDLE = function(self) return universityIntent(self, 'hack') end;
