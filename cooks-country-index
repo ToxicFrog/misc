@@ -29,6 +29,7 @@ function unescape {
 
 mkdir -p "$OUTPUT"
 
+
 echo "Fetching master index..."
 issues="$(curl -s 'https://www.cookscountry.com/magazines/browse' | wring html - .result__image-link)"
 # issues="$(cat /tmp/ck/browse)"
@@ -97,7 +98,28 @@ html "
       <title>Cook's Country Index</title>
       <meta charset=\"UTF-8\">
     </head>
-  <body>
+      <script>
+        function restore_state(img) {
+          if (localStorage.getItem(img.src)) {
+            img.style = 'filter:grayscale(100%%);'
+          }
+        }
+        function toggle_state(img) {
+          console.log('element', img);
+          console.log('element.src', img.src);
+          console.log('localstorage', localStorage.getItem(img.src));
+          if (localStorage.getItem(img.src) == 'true') {
+            console.log('was set, unsetting');
+            localStorage.removeItem(img.src);
+            img.style = '';
+          } else {
+            console.log('not set, setting');
+            localStorage.setItem(img.src, 'true');
+            img.style = 'filter:grayscale(100%%);'
+          }
+        }
+      </script>
+    <body>
 "
 html '
   <style>
@@ -116,11 +138,11 @@ html '
 '
 
 ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
-  [[ -f "$issue/done" ]] || continue
+  # [[ -f "$issue/done" ]] || continue
   html '
     <table>
       <tr>
-        <th style="width:1%%; white-space:nowrap;"><img src="%s" width=120px></th>
+        <th style="width:1%%; white-space:nowrap;"><img src="%s" width=120px onclick="toggle_state(this);" onload="restore_state(this);"></th>
         <th colspan=2 width=100%%>%s</th>
       </tr>
   ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")"
@@ -128,7 +150,7 @@ ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
     html '
       <tr>
         <td colspan=2 width=100%%><b>%s</b><br>%s</td>
-        <td style="width:1%%; white-space:nowrap;"><img src="%s" height=80px></td>
+        <td style="width:1%%; white-space:nowrap;"><img src="%s" height=80px onclick="toggle_state(this);" onload="restore_state(this);"></td>
       </tr>
     ' "$title" "$desc" "$issue/$splash"
   done
