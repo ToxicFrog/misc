@@ -99,24 +99,36 @@ html "
       <meta charset=\"UTF-8\">
     </head>
       <script>
-        function restore_state(img) {
-          if (localStorage.getItem(img.src)) {
-            img.style = 'filter:grayscale(100%%);'
-          }
-        }
-        function toggle_state(img) {
-          console.log('element', img);
-          console.log('element.src', img.src);
-          console.log('localstorage', localStorage.getItem(img.src));
-          if (localStorage.getItem(img.src) == 'true') {
-            console.log('was set, unsetting');
-            localStorage.removeItem(img.src);
-            img.style = '';
+        // OFF: cooked -> COOKED, written -> WRITTEN
+        // COOKED: cooked -> OFF, written -> WRITTEN
+        // WRITTEN: cooked -> OFF, written -> COOKED
+        const NULL = 'null';
+        const COOKED = 'COOKED';
+        const WRITTEN = 'WRITTEN';
+        function toggle_state(button, if_null, if_cooked, if_written) {
+          const id = button.id.split(':')[1];
+          var state = String(localStorage.getItem(id));
+          if (state == 'null') {
+            state = if_null;
           } else {
-            console.log('not set, setting');
-            localStorage.setItem(img.src, 'true');
-            img.style = 'filter:grayscale(100%%);'
+            state = state == 'WRITTEN' ? if_written : if_cooked;
           }
+          localStorage.setItem(id, state);
+          apply_state(id, state);
+        }
+        function apply_state(id, state) {
+          document.getElementById('text:'+id).classList.toggle(
+            'finished', state == 'WRITTEN');
+          document.getElementById('img:'+id).classList.toggle(
+            'finished', state != 'null');
+          document.getElementById('cooked:'+id).classList.toggle(
+            'finished', state != 'null');
+          const written = document.getElementById('written:'+id).classList.toggle(
+            'finished', state == 'WRITTEN');
+        }
+        function restore_state(img) {
+          const id = img.id.split(':')[1];
+          apply_state(id, String(localStorage.getItem(id)));
         }
       </script>
     <body>
@@ -134,28 +146,64 @@ html '
     th {
       background-color: #A0A0A0;
     }
+    td.finished {
+      text-decoration: line-through;
+    }
+    img.finished {
+      filter:grayscale(100%%);
+    }
+    .cooked.finished {
+      font-weight: bold;
+      text-shadow: 0px 0px 5px #F00;
+    }
+    .written.finished {
+      font-weight: bold;
+      text-shadow: 0px 0px 5px #08F;
+    }
   </style>
 '
 
 ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
   # [[ -f "$issue/done" ]] || continue
   html '
-    <table>
+    <table style="table-layout:auto;">
       <tr>
-        <th style="width:1%%; white-space:nowrap;"><img src="%s" width=120px onclick="toggle_state(this);" onload="restore_state(this);"></th>
-        <th colspan=2 width=100%%>%s</th>
+        <th style="width:1%%; text-align:left;">
+          <img src="%s" width=120px>
+        </th>
+        <th colspan=3 style="width:100%%">%s</th>
+        <!--
+          <th>
+            <label>🍴</label><br>
+            <label>🗒</label>
+          </th>
+        -->
       </tr>
   ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")"
   cat "$OUTPUT/$issue/index" | while IFS=$'\t' read -r splash title desc; do
+    splash="${splash//\"/%22}"
+    id="$issue/${splash%.*}"
     html '
       <tr>
-        <td colspan=2 width=100%%><b>%s</b><br>%s</td>
-        <td style="width:1%%; white-space:nowrap;"><img src="%s" height=80px onclick="toggle_state(this);" onload="restore_state(this);"></td>
+        <td id="text:%s" colspan=2 width=100%%><b>%s</b><br>%s</td>
+        <td style="text-align:right;">
+          <img id="img:%s" src="%s" height=80px onclick="toggle_state(this);" onload="restore_state(this);">
+        </td>
+        <td>
+          <label id="cooked:%s" class="cooked"
+            onclick="toggle_state(this, COOKED, NULL, NULL);"
+            >🍴</label><br>
+          <label id="written:%s" class="written"
+            onclick="toggle_state(this, WRITTEN, WRITTEN, COOKED);"
+            onload="apply_state_onload(this);"
+            >🗒</label>
+        </td>
       </tr>
-    ' "$title" "$desc" "$issue/$splash"
+    ' "$id" "$title" "$desc" "$id" "$issue/$splash" "$id" "$id"
   done
   html '</table>'
   echo -n "."
+  # ;break
 done
 html "</body></html>"
 echo ""
