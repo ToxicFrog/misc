@@ -364,12 +364,16 @@ function share/ls-detail {
     local count=$(find $SHARE_PATH/$hash -type f | wc -l)
     local size=$(du -sh --apparent-size $SHARE_PATH/$hash | cut -f1)
     printf '\n'
-    printf 'Name: %s\n' $name
-    printf 'Size: %s (%d files)\n' $size $count
+    printf '    Name: %s\n' $name
+    printf '    Size: %s (%d files)\n' $size $count
     if (( count == 1 )); then
-      printf ' URL: %s/%s/%s\n' $SHARE_URL $hash $(ls -A $SHARE_PATH/$hash | sed -E 's, ,%20,g')
+      printf '     URL: \x1B[4m%s/%s/%s\x1B[0m\n' $SHARE_URL $hash $(ls -A $SHARE_PATH/$hash | sed -E 's, ,%20,g')
+    elif [[ $(share/cfg-get $hash type) == "album" ]]; then
+      printf '     URL: \x1B[4m%s/%s/\x1B[0m\n' $SHARE_URL $hash
+      printf '[album; %d images]' "$(ls $SHARE_PATH/$hash/files | wc -l)"
     else
-      printf ' URL: %s/%s/\n' $SHARE_URL $hash
+      printf '     URL: \x1B[4m%s/%s/\x1B[0m\n' $SHARE_URL $hash
+      ls --color=always "$SHARE_PATH/$hash"
     fi
   done
 }
