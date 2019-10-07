@@ -77,7 +77,11 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
   fi
 
   # Handle files.
-  dst="${dst%.*}.mp3"
+  # Cover files don't have their extensions changed, everything else becomes
+  # an MP3.
+  if ! [[ "$dst" =~ .*/cover\..* ]]; then
+    dst="${dst%.*}.mp3"
+  fi
 
   # Skip things that don't need to be updated
   if [[ -e $dst && ! $src -nt $dst ]]; then
@@ -113,6 +117,10 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
       # File is recognized but we don't have a converter for it.
       echo "[!!!] $src"
       continue
+      ;;
+    */cover.*)
+      echo "[CVR] $src"
+      ln -sf "$src" "$dst"
       ;;
     *.txt|*.m3u|*.png|*.jpg)
       # skip
