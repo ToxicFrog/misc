@@ -185,6 +185,12 @@ for book in c.execute('SELECT metadata FROM bookinfo'):
           'src="' + image + '"')
         print(' IMG', image)
         open(outdir + '/' + image, 'wb').write(base64.b64decode(data.replace('data:image/jpeg;base64,','')))
+      fd.write('\n    <!-- fragment ' + str(rows) + ' -->\n')
+      # TODO: chapter splitting.
+      # If a fragment has a <a id="chapterXXXXX" tag in it it probably starts a
+      # chapter, and we should write it to chapterXXXXX.html, along with all
+      # subsequent fragments until the next such tag.
+      # Links to #chapterXXXXX should be rewritten to ./chapterXXXXX.html.
       fd.write(fragment)
     fd.write('</body></html>')
     print("Wrote " + str(rows) + " fragments.")
