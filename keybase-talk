@@ -90,8 +90,8 @@ function main {
   fi
 
   setup-pipes
-  setup-gui "$@"
   setup-input "$@"
+  setup-gui "$@"
   setup-events
 
   # We have to do this after setup-gui, because opening the pipes will block
@@ -153,15 +153,16 @@ function setup-events {
 
 function event-listener {
   stty -onlcr
-  keybase chat api-listen --exploding 2>/dev/null \
+  keybase chat api-listen 2>/dev/null \
   | jq --unbuffered -r '[.msg.content.type,.msg.channel.name,.msg.channel.topic_name] | join("\t")'
 }
 
 # called by zle -F with the active FD as the only argument.
 function event-handler {
   read -u $1 -r type net chan
+  printf "event: %s %s %s\n" $type $net $chan
   # Redraw status pane on any activity.
-  redraw-status
+  # redraw-status
   if [[ $net == $NET && $chan == $CHAN ]]; then
     # Activity in focused channel? Redraw chat pane.
     redraw-chat
