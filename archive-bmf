@@ -1,0 +1,28 @@
+#!/usr/bin/env zsh
+# invoke me with:
+# archive-bmf <url-encoded username> <url-encoded password> <link to last page of thread>
+
+function get {
+  wget -nv --{load,save}-cookies=$HOME/.cache/bmf.cookies --keep-session-cookies "$@"
+}
+
+user="$1"; pass="$2"; shift 2
+rm ~/.cache/bmf.cookies
+touch ~/.cache/bmf.cookies
+
+get --post-data="ga_client_id=&forum=6635197&email=$user&remember=1&password=$pass&continue=Continue" \
+  https://login.proboards.com/forum_submit/login -O/tmp/$$
+
+login_page=$(cat /tmp/$$ | fgrep redirect_form | egrep -o 'http://[^"]+')
+get --method=POST $login_page -O /dev/null
+
+while [[ $1 ]]; do
+  url="$1"; shift
+  maxpage="$(echo $url | cut -d= -f2)"
+  url="$(echo $url | cut -d'?' -f1)"
+
+  get --adjust-extension --span-hosts --page-requisites \
+    --convert-links --backup-converted \
+    --force-directories --timestamping \
+    "$url" "$url?page="{2..$maxpage}
+done
