@@ -172,12 +172,6 @@ ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
           <img src="%s" width=120px>
         </th>
         <th colspan=3 style="width:100%%">%s</th>
-        <!--
-          <th>
-            <label>🍴</label><br>
-            <label>🗒</label>
-          </th>
-        -->
       </tr>
   ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")"
   cat "$OUTPUT/$issue/index" | while IFS=$'\t' read -r splash title desc; do
