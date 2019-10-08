@@ -134,6 +134,7 @@ HEADER = '''
           border-top: 3px solid #ccc;
           margin-top: 16px;
           margin-bottom: 8px;
+          page-break-before: always;
          }
       </style>
       <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
