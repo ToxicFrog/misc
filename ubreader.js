@@ -34,7 +34,7 @@ function updateReadStatus(baseURL, cell, id) {
   fetch(baseURL + "/user-api/bookmark?docId=" + id)
   .then(response => {
     if (response.status != 200) {
-      return Promise.reject("no bookmark");
+      return Promise.resolve({"mark": "-1"});
     }
     return response.json();
   }).then(json => {
@@ -44,16 +44,13 @@ function updateReadStatus(baseURL, cell, id) {
     return response.text();
   }).then(text => {
     let pages = parseInt(text.match("nbPages=([0-9]+)")[1]);
-    if (pages != cell.bookmark) {
+    if (cell.bookmark <= 0) {
+      addBubble(cell, "📕");
+    } else if (pages != cell.bookmark) {
       addBubble(cell, cell.bookmark + "/" + pages + " 📖");
     }
-    let a = cell.getElementsByTagName("a")[0];
-    let reader_url = text.match('/comicreader/reader.html[^"]+')[0];
-    a.onclick = null;
-    a.href = baseURL + reader_url.replace(/&amp;/g, "&");
-  }).catch(err => {
-    addBubble(cell, "📕");
-  });
+    fixupLinks(cell, text);
+  })
 }
 
 // Given the thumbnail img for a comic, and the text to put in the bubble,
@@ -65,6 +62,19 @@ function addBubble(cell, text) {
   div.innerHTML =
     '<div class="number read-marker"><span>' + text + '</span></div>';
   cell.append(div);
+}
+
+// Adjust the linking behaviour of the cell. Make clicking the thumbnail open
+// the comic without displaying the details popup. Make clicking the comic title
+// download the comic.
+function fixupLinks(cell, details) {
+  let a = cell.getElementsByTagName("a")[0];
+  let reader_url = details.match('/comicreader/reader.html[^"]+')[0];
+  a.onclick = null;
+  a.href = baseURL + reader_url.replace(/&amp;/g, "&");
+  let download_url = details.match('href="([^"]*/comics/[0-9]+/[^"]+cb[zrta])"')[1];
+  let label = cell.getElementsByClassName("label")[0];
+  label.innerHTML = '<a style="color:#ADF;" href="' + download_url + '">' + label.innerText + '</a>';
 }
 
 window.addEventListener('load', updateAllReadStatus);
