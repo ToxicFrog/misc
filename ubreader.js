@@ -47,6 +47,10 @@ function updateReadStatus(baseURL, cell, id) {
     if (pages != cell.bookmark) {
       addBubble(cell, cell.bookmark + "/" + pages + " 📖");
     }
+    let a = cell.getElementsByTagName("a")[0];
+    let reader_url = text.match('/comicreader/reader.html[^"]+')[0];
+    a.onclick = null;
+    a.href = baseURL + reader_url.replace(/&amp;/g, "&");
   }).catch(err => {
     addBubble(cell, "📕");
   });
