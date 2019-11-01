@@ -11,19 +11,16 @@ let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]+")[1];
 
 // Convenience function. map() works on any iterable, but is only defined as
 // a method on Array for some reason.
-function map(xs, f) {
-  return Array.prototype.map.call(xs, f);
+function filter(xs, f) {
+  return Array.prototype.filter.call(xs, f);
 }
 
 // Fetch and display the read marker for all comics, if we're in a comic screen,
 // and do nothing otherwise.
 function updateAllReadStatus(_) {
-  let cells = document.getElementsByClassName("cell");
-  if (cells.length == 0 || !cells[0].getElementsByTagName("a")[0].onclick) {
-    // Not in a comic screen.
-    return;
-  }
-
+  let cells = filter(
+    document.getElementsByClassName("cell"),
+    cell => { return !!cell.getElementsByTagName("a")[0].onclick; });
   for (let cell of cells) {
     let img = cell.getElementsByTagName("img")[0];
     let id = img.src.match("/comics/([0-9]+)/")[1];
