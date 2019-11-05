@@ -6,9 +6,6 @@
 // @version       0.1
 // ==/UserScript==
 
-// Ubooq isn't always served from /, so this lets us detect what the base URL is.
-let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]+")[1];
-
 // Convenience function. map() works on any iterable, but is only defined as
 // a method on Array for some reason.
 function filter(xs, f) {
@@ -18,6 +15,9 @@ function filter(xs, f) {
 // Fetch and display the read marker for all comics, if we're in a comic screen,
 // and do nothing otherwise.
 function updateAllReadStatus(_) {
+  if (!document.getElementById("group")) return;
+  // Ubooq isn't always served from /, so this lets us detect what the base URL is.
+  let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]+")[1];
   let cells = filter(
     document.getElementsByClassName("cell"),
     cell => { return !!cell.getElementsByTagName("a")[0].onclick; });
@@ -49,7 +49,7 @@ function updateReadStatus(baseURL, cell, id) {
     } else if (pages != cell.bookmark) {
       addBubble(cell, cell.bookmark + "/" + pages + " 📖");
     }
-    fixupLinks(cell, text);
+    fixupLinks(baseURL, cell, text);
   })
 }
 
@@ -67,7 +67,7 @@ function addBubble(cell, text) {
 // Adjust the linking behaviour of the cell. Make clicking the thumbnail open
 // the comic without displaying the details popup. Make clicking the comic title
 // download the comic.
-function fixupLinks(cell, details) {
+function fixupLinks(baseURL, cell, details) {
   let a = cell.getElementsByTagName("a")[0];
   let reader_url = details.match('/comicreader/reader.html[^"]+')[0];
   a.onclick = null;
@@ -77,4 +77,30 @@ function fixupLinks(cell, details) {
   label.innerHTML = '<a style="color:#ADF;" href="' + download_url + '">' + label.innerText + '</a>';
 }
 
+// Stuff for the better seek bar.
+
+function seekPage(page) {
+  let _prompt = window.prompt;
+  window.prompt = _ => page;
+  document.getElementById("gotobutton").click();
+  window.prompt = _prompt;
+}
+
+function showPage(page) {
+  let label = document.getElementById("pagelabel");
+  let bar = document.getElementById("progressbar");
+  label.innerText = "Page " + page + " of " + bar.max;
+}
+
+function installPageSeekBar(_) {
+  let bar = document.getElementById("progressbar");
+  console.log(bar.firstElementChild);
+  console.log(document.getElementById("pagelabel"));
+  if (!bar) return;
+  let val = bar.firstElementChild.getAttribute("aria-valuenow");
+  bar.max = bar.firstElementChild.getAttribute("aria-valuemax");
+  bar.innerHTML = '<input type="range" name="page" min="1" max="'+bar.max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="showPage(this.value)">';
+}
+
 window.addEventListener('load', updateAllReadStatus);
+window.addEventListener('load', installPageSeekBar);
