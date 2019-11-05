@@ -190,6 +190,9 @@ function cmd/add {
 # image that was installed.
 function share/add-source-image {
   case "$(echo $2 | tr A-Z a-z)" in
+    *.bmp)
+      convert "$2" "$1/$(basename $2).png"
+      ;;
     *.jpg|*.jpeg|*.png|*.tif|*.tiff)
       ln -s -r -f -t "$1" "$2"
       ;;
