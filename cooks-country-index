@@ -125,6 +125,8 @@ html "
             'finished', state != 'null');
           const written = document.getElementById('written:'+id).classList.toggle(
             'finished', state == 'WRITTEN');
+          document.getElementById('cb:cooked:'+id).checked = (state != 'null');
+          document.getElementById('cb:written:'+id).checked = (state == 'WRITTEN');
         }
         function restore_state(img) {
           const id = img.id.split(':')[1];
@@ -181,19 +183,20 @@ ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
       <tr>
         <td id="text:%s" colspan=2 width=100%%><b>%s</b><br>%s</td>
         <td style="text-align:right;">
-          <img id="img:%s" src="%s" height=80px onclick="toggle_state(this);" onload="restore_state(this);">
+          <img id="img:%s" src="%s" height=80px onload="restore_state(this);">
         </td>
         <td>
-          <label id="cooked:%s" class="cooked"
-            onclick="toggle_state(this, COOKED, NULL, NULL);"
-            >🍴</label><br>
-          <label id="written:%s" class="written"
-            onclick="toggle_state(this, WRITTEN, WRITTEN, COOKED);"
-            onload="apply_state_onload(this);"
-            >🗒</label>
+          <span id="cooked:%s" class="cooked">
+            <input id="cb:cooked:%s" type="checkbox" onchange="toggle_state(this.parentElement, COOKED, NULL, NULL);">
+            <label>🍴</label>
+          </span><br>
+          <span id="written:%s" class="written">
+            <input id="cb:written:%s" type="checkbox" onclick="toggle_state(this.parentElement, WRITTEN, WRITTEN, COOKED);">
+            <label>🗒</label>
+          </span>
         </td>
       </tr>
-    ' "$id" "$title" "$desc" "$id" "$issue/$splash" "$id" "$id"
+    ' "$id" "$title" "$desc" "$id" "$issue/$splash" "$id" "$id" "$id" "$id"
   done
   html '</table>'
   echo -n "."
