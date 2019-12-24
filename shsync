@@ -107,7 +107,8 @@ function shsync/sync {
     fi
   done
 
-  # delete files on sender not on receiver, unless ignored
+  # delete files on receiver not on sender, unless ignored
+  # may fail for empty directories, but should succeed on next run
   for file in ${(k)dst_files[@]}; do
     if shsync/ignored "$file"; then
       # shsync/status 'I %s\n' "$file"
@@ -134,39 +135,40 @@ function shsync/status {
 # outputs the list with the following format:
 # SIZE <sp> MODIFICATION_TIME <sp> FILENAME <lf>
 function shsync/list-local {
-  find . -type f -print0 | xargs -0 stat -c '%s:%Y %n'
+  find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'
 }
 
 function shsync/list-remote {
   # ssh $REMOTE "cd ${(q)1}; find . -type f" | sed -E 's,^\./,,'
-  ssh $REMOTE "cd ${(q)1}; find . -type f -print0 | xargs -0 stat -c '%s:%Y %n'"
+  ssh $REMOTE "cd ${(q)1}; find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'"
+  # | sed -E 's,^regular file:,file:,'
 }
 
 # sync-file src-path dst-path relative-path
 function shsync/send-file {
   # we can assume we're already in src-path
   if [[ ! $DRY_RUN ]]; then
-    tar c -- "$3" | ssh "$REMOTE" "cd '$2'; tar x"
+    tar c --no-recursion -- "$3" | ssh "$REMOTE" "cd '$2'; tar x"
   fi
 }
 
 function shsync/recv-file {
   # we can assume we're already in dst-path
   if [[ ! $DRY_RUN ]]; then
-    ssh "$REMOTE" "cd '$1'; tar c -- ${(q)3}" | tar x
+    ssh "$REMOTE" "cd '$1'; tar c --no-recursion -- ${(q)3}" | tar x
   fi
 }
 
 # delete-file absolute-path
 function shsync/delete-local {
   if [[ ! $DRY_RUN ]]; then
-    rm "$1"
+    rm -d "$1"
   fi
 }
 
 function shsync/delete-remote {
   if [[ ! $DRY_RUN ]]; then
-    ssh "$REMOTE" "rm ${(q)1}"
+    ssh "$REMOTE" "rm -r ${(q)1}"
   fi
 }
 
