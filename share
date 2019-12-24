@@ -162,7 +162,7 @@ function cmd/add {
 
   if [[ $# == 1 && -d "$1" ]]; then
     # Add single directory
-    command rsync -a --delete --info=progress2 "$1/" "$SHARE_PATH/$hash/"
+    command rsync -a --delete --exclude=/.share --info=progress2 "$1/" "$SHARE_PATH/$hash/"
     printf 'Name: %s\n' $name
     printf ' URL: %s/%s/\n' "$SHARE_URL" "$hash"
   else
