@@ -99,34 +99,45 @@ html "
       <meta charset=\"UTF-8\">
     </head>
       <script>
-        // OFF: cooked -> COOKED, written -> WRITTEN
-        // COOKED: cooked -> OFF, written -> WRITTEN
-        // WRITTEN: cooked -> OFF, written -> COOKED
-        const NULL = 'null';
         const COOKED = 'COOKED';
         const WRITTEN = 'WRITTEN';
-        function toggle_state(button, if_null, if_cooked, if_written) {
+        function toggle_state(button, field) {
           const id = button.id.split(':')[1];
           var state = String(localStorage.getItem(id));
-          if (state == 'null') {
-            state = if_null;
-          } else {
-            state = state == 'WRITTEN' ? if_written : if_cooked;
+          if (!state || state == 'null') state = '__';
+          if (state == 'COOKED') state = 'C_';
+          if (state == 'WRITTEN') state = 'CW';
+
+          if (field == 'COOKED') {
+            if (state[0] == 'C') {
+              state = '_' + state[1];
+            } else {
+              state = 'C' + state[1];
+            }
+          } else if (field == 'WRITTEN') {
+            if (state[1] == 'W') {
+              state = state[0] + '_';
+            } else {
+              state = state[0] + 'W';
+            }
           }
           localStorage.setItem(id, state);
           apply_state(id, state);
         }
         function apply_state(id, state) {
-          document.getElementById('text:'+id).classList.toggle(
-            'finished', state == 'WRITTEN');
-          document.getElementById('img:'+id).classList.toggle(
-            'finished', state != 'null');
-          document.getElementById('cooked:'+id).classList.toggle(
-            'finished', state != 'null');
-          const written = document.getElementById('written:'+id).classList.toggle(
-            'finished', state == 'WRITTEN');
-          document.getElementById('cb:cooked:'+id).checked = (state != 'null');
-          document.getElementById('cb:written:'+id).checked = (state == 'WRITTEN');
+          if (!state || state == 'null') state = '__';
+          if (state == 'COOKED') state = 'C_';
+          if (state == 'WRITTEN') state = 'CW';
+
+          // Text is crossed out and image greyed out if both cooked and written.
+          document.getElementById('text:'+id).classList.toggle('finished', state == 'CW');
+          document.getElementById('img:'+id).classList.toggle('finished', state == 'CW');
+          // Set cooked checkbox and flair
+          document.getElementById('cb:cooked:'+id).checked = (state[0] == 'C');
+          document.getElementById('cooked:'+id).classList.toggle('finished', state[0] == 'C');
+          // Set written checkbox and flair
+          document.getElementById('written:'+id).classList.toggle('finished', state[1] == 'W');
+          document.getElementById('cb:written:'+id).checked = (state[1] == 'W');
         }
         function restore_state(img) {
           const id = img.id.split(':')[1];
@@ -187,11 +198,11 @@ ls -t "$OUTPUT" | fgrep -v index.html | while read -r issue; do
         </td>
         <td>
           <span id="cooked:%s" class="cooked">
-            <input id="cb:cooked:%s" type="checkbox" onchange="toggle_state(this.parentElement, COOKED, NULL, NULL);">
+            <input id="cb:cooked:%s" type="checkbox" onchange="toggle_state(this.parentElement, COOKED);">
             <label>🍴</label>
           </span><br>
           <span id="written:%s" class="written">
-            <input id="cb:written:%s" type="checkbox" onclick="toggle_state(this.parentElement, WRITTEN, WRITTEN, COOKED);">
+            <input id="cb:written:%s" type="checkbox" onclick="toggle_state(this.parentElement, WRITTEN);">
             <label>🗒</label>
           </span>
         </td>
