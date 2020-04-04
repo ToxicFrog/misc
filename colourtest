@@ -1,0 +1,14 @@
+#!/usr/bin/env zsh
+
+# First, do 8-colour palette
+
+echo "            Palette (FG)  Palette (BG)    Combined"
+
+printf '%1$11s \x1B[3%2$dm####\x1B[1m####\x1B[22;2m####\x1B[0m  \x1B[4%2$dm    \x1B[1m    \x1B[22;2m    \x1B[0m  \x1B[3%2$d;4%2$dm####\x1B[1m####\x1B[22;2m####\x1B[0m\n' \
+  fg/bg 0  0 0  1 1  2 2  3 3  4 4  5 5  6 6  7 7
+
+
+echo "                  AIXTerm bright FG/BG codes"
+
+printf '%1$11s \x1B[9%2$dm####\x1B[1m####\x1B[22;2m####\x1B[0m  \x1B[10%2$dm    \x1B[1m    \x1B[22;2m    \x1B[0m  \x1B[9%2$d;10%2$dm####\x1B[1m####\x1B[22;2m####\x1B[0m\n' \
+  fg/bg 0  0 0  1 1  2 2  3 3  4 4  5 5  6 6  7 7
