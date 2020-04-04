@@ -1,0 +1,36 @@
+#!/usr/bin/env zsh
+
+# to generate the SVGs
+# rm *.svg; for puz in *.txt; do ~/devel/misc/pixels2grid.lua "$puz" || break; done
+
+printf '<meta charset="utf-8">\n' > index.html
+ls *.svg | fgrep -v -- -Solved | while read img; do
+  name=${img%.svg}
+  width=$(head -n1 $img | egrep -o 'width:[0-9]+' | cut -d: -f2)
+  height=$(head -n1 $img | egrep -o 'height:[0-9]+' | cut -d: -f2)
+  colours=$(head -n1 $img | egrep -o 'colours:[0-9]+' | cut -d: -f2)
+  if (( width > 70 )) || (( height > 70 )); then
+    # Assume that 70 cells on a side is the biggest we can reasonably print
+    # continue
+  fi
+  # output: primary sort key, secondary sort key, name width height colours
+  #printf '%02d\t%08d\t%s\t%d\t%d\t%d\n' $colours $((width*height)) $name $width $height $colours
+  # sort by largest dimension first, then colour count
+  if (( width > height )); then
+    printf '%03d\t%02d\t%s\t%d\t%d\t%d\n' $width $colours $name $width $height $colours
+  else
+    printf '%03d\t%02d\t%s\t%d\t%d\t%d\n' $height $colours $name $width $height $colours
+  fi
+done | sort | while IFS=$'\t' read _ _ name width height colours; do
+  echo -n "$name " >&2
+  img="$name.svg"
+  convert "$name-Solved.svg" "$name.png"
+  convert -density 1024 $img $name.pdf
+  printf '<div style="display:inline-block; text-align:center; font-size:8pt; border:1px solid black;">
+    <a href="%s.pdf"><img src="%s.png" width="64px" height="64px"></a><br>
+    %s<br>
+    %s×%s<br>
+    %s colours
+  </div>\n' $name $name $name $width $height $colours
+done >> index.html
+echo >&2
