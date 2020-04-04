@@ -6,7 +6,7 @@
 // @version       0.1
 // ==/UserScript==
 
-// Convenience function. map() works on any iterable, but is only defined as
+// Convenience function. filter() works on any iterable, but is only defined as
 // a method on Array for some reason.
 function filter(xs, f) {
   return Array.prototype.filter.call(xs, f);
@@ -20,12 +20,20 @@ function updateAllReadStatus(_) {
   let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]+")[1];
   let cells = filter(
     document.getElementsByClassName("cell"),
+    // Only actual comics have an onclick handler on the <a>, directories
+    // just have a direct link to the dir page
     cell => { return !!cell.getElementsByTagName("a")[0].onclick; });
   for (let cell of cells) {
     let img = cell.getElementsByTagName("img")[0];
     let id = img.src.match("/comics/([0-9]+)/")[1];
     updateReadStatus(baseURL, cell, id);
   }
+
+  // Add a button to refresh the page, for easy use on tablet, since the read-
+  // markers don't naturally refresh when you get here via "close book".
+  let pagelabel = document.getElementById("pagelabel");
+  pagelabel.innerHTML = '<a href="#" onclick="location.reload();" style="font-size:40px;"><b>&#128260;</b></a>'
+  pagelabel.setAttribute("class", "");
 }
 
 // Fetch and display read marker for one comic, identified by cell (the div
@@ -79,28 +87,57 @@ function fixupLinks(baseURL, cell, details) {
 
 // Stuff for the better seek bar.
 
+function getScope() {
+  return angular.element(document.querySelector("#pagelabel")).scope();
+}
+
+// Seek to the given page. Called by the seek slider when it's released.
 function seekPage(page) {
-  let _prompt = window.prompt;
-  window.prompt = _ => page;
-  document.getElementById("gotobutton").click();
-  window.prompt = _prompt;
+  let $scope = getScope();
+  let oldpage = $scope.currPageNb + 1
+  if (page == oldpage) return;
+  $scope.currentWay = page > oldpage ? $scope.WAY.FORWARD : $scope.WAY.BACKWARD;
+  $scope.currPageNb = page - 1;
+  $scope.loadPage(false);
 }
 
-function showPage(page) {
-  let label = document.getElementById("pagelabel");
-  let bar = document.getElementById("progressbar");
-  label.innerText = "Page " + page + " of " + bar.max;
+// Change the "page X of Y" counter to reflect the position of the slider.
+// Called when the slider is dragged, and also when our loadPage() wrapper is
+// called, since the code in ubooq that's meant to keep updating it sometimes
+// breaks.
+function updatePageCounter(page) {
+  document.getElementById("pagelabel").innerText =
+    "Page " + page + " of " + getScope().nbPages;
 }
 
+// Initial setup for the improved page seek bar.
 function installPageSeekBar(_) {
   let bar = document.getElementById("progressbar");
-  console.log(bar.firstElementChild);
-  console.log(document.getElementById("pagelabel"));
-  if (!bar) return;
-  let val = bar.firstElementChild.getAttribute("aria-valuenow");
+  if (!bar) return; // Not currently reading a book.
+
+  // Install a wrapper around $scope.loadPage() that properly updates the
+  // page counter and seek bar. This is called every time a new page is
+  // loaded, so it should keep things in sync...
+  let $scope = getScope();
+  let _loadPage = $scope.loadPage;
+  $scope.loadPage = function(firstCall) {
+    let $scope = getScope();
+    document.getElementById("pageseekbar").value = $scope.currPageNb + 1;
+    updatePageCounter($scope.currPageNb + 1);
+    return _loadPage(firstCall);
+  }
+
+  // Replace the progress bar with a range input that the user can drag in
+  // order to easily select a page.
+  let val = $scope.currPageNb + 1;
+  let max = $scope.nbPages;
   bar.max = bar.firstElementChild.getAttribute("aria-valuemax");
-  bar.innerHTML = '<input type="range" name="page" min="1" max="'+bar.max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="showPage(this.value)">';
+  console.log(val);
+  bar.innerHTML = '<input id="pageseekbar" type="range" name="page" min="1" max="'+bar.max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="updatePageCounter(this.value)">';
 }
 
-window.addEventListener('load', updateAllReadStatus);
+// It sometimes takes a few hundred millis after closing a book for the read
+// status to update on the server, so we delay briefly before loading
+// the read status.
+window.addEventListener('load', _ => { setTimeout(updateAllReadStatus, 1000); });
 window.addEventListener('load', installPageSeekBar);
