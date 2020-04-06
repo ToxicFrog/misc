@@ -110,6 +110,27 @@ function updatePageCounter(page) {
     "Page " + page + " of " + getScope().nbPages;
 }
 
+function mkExitShortcutHandler($scope, elem_id, handler, predicate) {
+  let warnCount = 0;
+  return function() {
+    console.log("exitshortcuthandler", elem_id)
+    if (!predicate($scope)) return handler();
+    console.log("proceed");
+    if (warnCount > 0) { history.back(); return false; }
+    warnCount++;
+    let button = document.getElementById(elem_id);
+    let _class = button.className;
+    button.className = "ubreader-warn";
+    button.style = "background-color: #f00; opacity: 0.3;";
+    setTimeout(_ => {
+      warnCount--;
+      button.style = "";
+      if (button.className == "ubreader-warn") button.className = _class;
+    }, 1000);
+    return handler();
+  }
+}
+
 // Initial setup for the improved page seek bar.
 function installPageSeekBar(_) {
   let bar = document.getElementById("progressbar");
@@ -121,11 +142,19 @@ function installPageSeekBar(_) {
   let $scope = getScope();
   let _loadPage = $scope.loadPage;
   $scope.loadPage = function(firstCall) {
-    let $scope = getScope();
     document.getElementById("pageseekbar").value = $scope.currPageNb + 1;
     updatePageCounter($scope.currPageNb + 1);
     return _loadPage(firstCall);
   }
+
+  // Override the next/previous page buttons to flash a warning on the first tap
+  // and close the book on the second if at the start/end of the book.
+  $scope.nextPage = mkExitShortcutHandler(
+    $scope, "rightmenu", $scope.nextPage,
+    $scope => { return $scope.currPageNb+1 == $scope.nbPages; });
+  $scope.previousPage = mkExitShortcutHandler(
+    $scope, "leftmenu", $scope.previousPage,
+    $scope => { return $scope.currPageNb == 0; });
 
   // Replace the progress bar with a range input that the user can drag in
   // order to easily select a page.
