@@ -30,25 +30,50 @@ function centerGame() {
 
 window.addEventListener("load", centerGame, false);
 window.addEventListener("resize", centerGame, false);
-// centerGame();
+// centerGame(); // TODO investigate ways to remove the delay between page load and recentering
 
-// Utility functions for keyboard selector dispatch //
 
-function numberButtonSelector(n) {
-  return _ => chain(
-    ['div.pop-usual:visible ', ''],
-    [
-      // Character selection, works both on the bottom pane and for targeting buffs
-      'div.btn-command-character[pos=' + (n-1) + ']',
-      // Ability selection
-      'div.btn-ability-available:nth-child('+n+')',
-      // Summon selection, once the summon panel has been opened
-      'div.lis-summon.on[pos='+n+']', // or .summon-available instead of .on, not sure which is better
-      // Item selection in the Heal menu
-      'div.prt-select-item div.item-small img[alt='+n+']',
-    ]);
+// Utility functions for keyboard mapping table //
+
+// Return a selector that matches any of its arguments, with :visible appended to them.
+function AnyOf() {
+  return Array.prototype.map.call(
+    arguments, x => `${x}:visible`
+  ).join(', ');
 }
 
+// Return a selector that matches any xs (with :visible) inside p.
+function Cond(p, xs) {
+  return Array.prototype.map.call(
+    xs, x => `${p} ${x}:visible`
+  ).join(', ');
+}
+
+function NumberButtonSelector(n) {
+  return [
+    // Character or item selection in popup
+    Cond('div.pop-usual',
+         [`div.btn-command-character[pos=${n-1}]`, `div.prt-select-item div.lis-item:nth-child(${n})`]),
+    AnyOf(
+      // Character selection outside popup
+      `div.btn-command-character[pos=${n-1}]`,
+      // Ability selection
+      `div.btn-ability-available:nth-child(${n})`,
+      // Summon selection, once the summon panel has been opened
+      `div.lis-summon.on[pos=${n}]`, // or .summon-available instead of .on, not sure which is better
+    ),
+  ];
+}
+
+// Mapping of shortcut keys to selectors for controls they should activate.
+// Keys are the KeyEvent.key value.
+// Values:
+// - if a string containing a single selector (no ,), has :visible appended and then used
+// - if a string containing multiple ,-separated selectors, used without modification
+// - if a function, it's called
+// - if a list, each element is evaluated in order using these rules; evaluation stops when
+//   one element succeeds
+// In any case, if the selector evaluates to exactly one element, that element is activated.
 let shortcuts = {
   // a => attack; can also use Enter
   'a': 'div.btn-attack-start.display-on',
@@ -57,67 +82,89 @@ let shortcuts = {
   'h': 'div.prt-sub-command div.btn-temporary',
   'c': 'div.prt-sub-command div.btn-lock',
   // numbers => character, ability, or summon selection
-  '1': numberButtonSelector(1),
-  '2': numberButtonSelector(2),
-  '3': numberButtonSelector(3),
-  '4': numberButtonSelector(4),
-  '5': numberButtonSelector(5), // TODO perhaps should also open summon menu
-  '6': numberButtonSelector(6),
+  '1': NumberButtonSelector(1),
+  '2': NumberButtonSelector(2),
+  '3': NumberButtonSelector(3),
+  '4': NumberButtonSelector(4),
+  '5': NumberButtonSelector(5), // TODO perhaps should also open summon menu
+  '6': NumberButtonSelector(6),
   // Arrows for next/prev
   'ArrowLeft': 'div.ico-pre',
   'ArrowRight': 'div.ico-next',
-  // Enter or Spacebar activate ok/next/quest buttons, attacks in combat, or step through dialogue or in-battle hints
+  // Enter activates ok/next/quest buttons, attacks in combat, or steps through dialogue or in-battle hints
   // If a popup is open it prefers buttons in the popup
-  'Enter': _ => chain(
-    ['div.pop-usual:visible ', 'div.prt-navi:visible ', ''],
-    ['div.btn-usual-ok', 'div.prt-advice', 'div.btn-result', 'div.btn-control', 'div.prt-scene-comment', 'div.btn-attack-start'],
-  ),
-  ' ': _ => chain(
-    ['div.pop-usual:visible ', 'div.prt-advice:visible ', ''],
-    ['div.btn-usual-ok', 'div.prt-advice', 'div.btn-result', 'div.btn-control', 'div.prt-scene-comment', 'div.btn-attack-start'],
-  ),
+  'Enter': [
+    // If a popup is open prefer that
+    'div.pop-usual div.btn-usual-ok',
+    'div.pop-usual div.btn-usual-close',
+    // Otherwise step through dialogue
+    AnyOf('div.prt-advice', 'div.prt-scene-comment'),
+    // If no popup or dialogue, look for any sort of OK/next screen/attack button and activate it.
+    // TODO: investigate other stuff in .prt-button-area: .btn-{unclaimed,retry,continue,retry-sequence}
+    AnyOf('div.btn-usual-ok', 'div.btn-usual-close', 'div.btn-result',
+          'div.prt-button-area.upper div.btn-control',
+          'div.btn-attack-start.display-on'),
+    // 'div.cnt-quest', // the "new area discovered" popup
+  ],
+  // Spacebar advances dialogue but doesn't activate buttons or attack.
+  ' ': AnyOf('div.prt-advice', 'div.prt-scene-comment', 'div.btn-result'),
   // Escape and Backspace activate cancel/back buttons, same popup behaviour as Enter.
-  'Escape': _ => chain(
-    ['div.pop-usual:visible ', ''],
-    ['div.btn-command-back.display-on', 'div.btn-usual-cancel'],
-  ),
-  'Backspace': _ => chain(
-    ['div.pop-usual:visible ', ''],
-    ['div.btn-command-back.display-on', 'div.btn-usual-cancel'],
-  ),
+  'Escape': [
+    Cond('div.pop-usual', ['div.btn-command-back.display-on', 'div.btn-usual-cancel', 'div.btn-usual-close']),
+    AnyOf('div.btn-command-back.display-on', 'div.btn-usual-cancel'),
+  ],
+  'Backspace': [
+    Cond('div.pop-usual', ['div.btn-command-back.display-on', 'div.btn-usual-cancel', 'div.btn-usual-close']),
+    AnyOf('div.btn-command-back.display-on', 'div.btn-usual-cancel'),
+  ],
 };
 
-function chain(preselectors, selectors) {
-  console.info("chain", preselectors, selectors);
-  for (let ps of preselectors) {
-    console.info("chain:", ps, '+', selectors);
-    if (tap(selectors.map(s => ps + s + ":visible").join(", "))) return;
+// Given a selector or selector tree from the keymap, try to turn it into a control and activate it
+function trySelector(selector) {
+  if (typeof(selector) == "string") {
+    if (selector.indexOf(',') == -1) {
+      // Single selector
+      return tap(selector + ":visible");
+    } else {
+      // Multiple selectors
+      return tap(selector);
+    }
   }
+  if (typeof(selector) == "function") {
+    return selector();
+  }
+  if (typeof(selector) == "object") {
+    for (let s of selector) {
+      if (trySelector(s)) return true;
+    }
+  }
+  return false;
 }
 
+// Given a CSS selector, resolve it and tap the result iff it resolves to exactly 1 element
+// returns true if a single element was found and tapped, false otherwise
 function tap(selector) {
   let elems = $(selector);
-  console.info(selector, '=>', elems);
+  // console.info(selector, '=>', elems);
   if (elems.length != 1) {
-    console.info("Warning:", elems.length, "elements returned from selector", selector);
+    if (elems.length > 1) console.info("Warning:", elems.length, "elements returned from selector", selector);
     return false;
   }
   let evt = document.createEvent('Events');
-  evt.initEvent('tap', true, false);g
+  evt.initEvent('tap', true, false);
   elems[0].dispatchEvent(evt);
   return true;
 }
 
 function keyboardEventHandler(evt) {
-  let handler = shortcuts[evt.key];
-  if (typeof(handler) == "function") {
-    return handler();
-  }
-  if (typeof(handler) == "object") {
-    return tap(handler.map(s => s + ":visible").join(", "));
-  }
-  if (typeof(handler) == "string") {
-    return tap(handler + ":visible");
+  try {
+    let selector = shortcuts[evt.key];
+    if (selector) {
+      evt.preventDefault();
+      trySelector(selector);
+    }
+  } catch(e) {
+    console.info(e);
   }
 }
 
