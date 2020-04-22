@@ -76,12 +76,15 @@ print -r "$issues" | tac | while read -r issue; do
     echo -n "."
   done
 
-  if [[ $(wc -l $out/index) < 4 ]]; then
+  if [[ $(cat $out/index | wc -l) -lt 4 ]]; then
     # An issue with few/no recipes? Probably this is one of those cases where
     # they return multiple copies of an issue in the search, but only one of them
     # is valid.
-    rm -f "$out/index" "$out/done" "$out/cover.jpeg"
+    echo $out
+    ls $out
+    #rm -f "$out/index" "$out/done" "$out/cover.jpeg"
     echo "error!"
+    exit 1
     continue
   fi
 
