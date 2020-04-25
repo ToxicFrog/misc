@@ -12,13 +12,13 @@
 // Viewport centering //
 
 function centerGame() {
-  let leftbar = document.getElementsByTagName("nav")[0];
+  let leftbar = $("nav")[0];
   leftbar.innerHTML = "";
 
   let [ww,wh] = [window.innerWidth, window.innerHeight];
   if (ww/wh < 1.0) { return; }
 
-  let zoom = document.getElementById("mobage-game-container").style.zoom;
+  let zoom = $("#mobage-game-container")[0].style.zoom;
   let gw = (320+64) * zoom;  // Game width with sidebar but without settings
   let maxgw = (320+64+320) * zoom;  // Game width with settings expanded
 
@@ -28,9 +28,19 @@ function centerGame() {
   ) + "px";
 }
 
+function tryCenterGame() {
+  try {
+    if (document.getElementsByTagName('nav')[0]) {
+      centerGame();
+    } else {
+      setTimeout(tryCenterGame, 100);
+    }
+  } catch(e) { console.info(e); }
+}
+
 window.addEventListener("load", centerGame, false);
 window.addEventListener("resize", centerGame, false);
-// centerGame(); // TODO investigate ways to remove the delay between page load and recentering
+tryCenterGame();
 
 
 // Utility functions for keyboard mapping table //
