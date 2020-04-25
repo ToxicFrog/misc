@@ -59,6 +59,10 @@ function Cond(p, xs) {
   ).join(', ');
 }
 
+function Go(hash) {
+  return _ => { window.location.hash = `#${hash}`; }
+}
+
 function NumberButtonSelector(n) {
   return [
     // Character or item selection in popup
@@ -127,6 +131,15 @@ let shortcuts = {
     Cond('div.pop-usual', ['div.btn-command-back.display-on', 'div.btn-usual-cancel', 'div.btn-usual-close']),
     AnyOf('div.btn-command-back.display-on', 'div.btn-usual-cancel'),
   ],
+  'alt-w': Go('quest/island'),
+  'alt-q': Go('quest'),
+  'alt-h': Go('mypage'),
+  'alt-d': Go('gacha'),
+  'alt-p': Go('party/index/0/npc/0'),
+  'alt-u': Go('enhancement/weapon/base'), // or npc or summon; replace enhancement with evolution for uncapping
+  'alt-i': Go('list'), // inventory
+  'alt-c': Go('present'), // crate
+  'alt-j': Go('archive/top'), // journal
 };
 
 // Given a selector or selector tree from the keymap, try to turn it into a control and activate it
@@ -168,8 +181,13 @@ function tap(selector) {
 
 function keyboardEventHandler(evt) {
   try {
-    let selector = shortcuts[evt.key];
+    let key = evt.key;
+    if (evt.metaKey) key = "meta-" + key;
+    if (evt.altKey) key = "alt-" + key;
+    if (evt.ctrlKey) key = "ctrl-" + key;
+    let selector = shortcuts[key];
     if (selector) {
+      console.info(key, ' => ', selector);
       evt.preventDefault();
       trySelector(selector);
     }
