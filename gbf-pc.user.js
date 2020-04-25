@@ -4,46 +4,104 @@
 // @match       http://game.granbluefantasy.jp/*
 // @grant       none
 // @run-at      document-end
-// @version     1.0
+// @version     1.1
 // @author      ToxicFrog
 // @description Enhancements for playing Granblue Fantasy on PC: viewport centering + keyboard hotkeys
 // ==/UserScript==
 
-// Viewport centering //
+// User configurable keybinds, as a mapping of keybind -> CSS selector(s).
+// Selectors use the following rules:
+// - a string containing a single selector (no ',') has :visible appended
+// - a string containing multiple ','-separated selectors is used as is
+// - a function is called
+// - a list has each entry evaluated using these rules, and the *first entry that
+//   matches any elements in the page* is used.
+// If a selector matches exactly one element, that element is activated; if it
+// matches more than one, nothing is activated and an error is logged.
+function keymap() {
+  // Dialogue boxes and splash screens. These can be advanced with spacebar or
+  // enter.
+  let dialogueOrSplashScreen = AnyOf(
+    'div.prt-advice', 'div.prt-scene-comment', 'div.btn-result',
+    'canvas#cjs-gacha', 'canvas#cjs-login', 'canvas#cjs-panel-mission',
+    //'div.cnt-quest',
+  );
 
-function centerGame() {
-  let leftbar = $("nav")[0];
-  leftbar.innerHTML = "";
+  // Stuff that esc/backspace should activate.
+  let cancelOrBack = [
+    // Prefer popups if open.
+    Cond('div.pop-usual', ['div.btn-command-back.display-on', 'div.btn-usual-cancel', 'div.btn-usual-close']),
+    // Otherwise just look for a generic "back" or "cancel" button.
+    AnyOf('div.btn-command-back.display-on', 'div.btn-usual-cancel'),
+  ];
 
-  let [ww,wh] = [window.innerWidth, window.innerHeight];
-  if (ww/wh < 1.0) { return; }
+  // // Actual keymap starts here. // //
+  return {
+    // Enter activates ok/next/quest buttons, attacks in combat, or steps through dialogue or in-battle hints
+    // If a popup is open it prefers buttons in the popup
+    'Enter': [
+      // If a popup is open prefer that
+      'div.pop-usual div.btn-usual-ok',
+      'div.pop-usual div.btn-usual-close',
+      // Otherwise step through dialogue
+      dialogueOrSplashScreen,
+      // If no popup or dialogue, look for any sort of OK/next screen/attack button and activate it.
+      AnyOf('div.btn-usual-ok', 'div.btn-usual-close',
+            'div.btn-lupi.multi', // 10 part rupie gacha
+            'div.btn-synthesis', 'div.btn-evolution', // upgrade and uncap
+            // TODO: investigate other stuff in .prt-button-area:
+            //.btn-{unclaimed,retry,continue,retry-sequence}
+            'div.prt-button-area.upper div.btn-control',
+            'div.btn-attack-start.display-on'),
+    ],
 
-  let zoom = $("#mobage-game-container")[0].style.zoom;
-  let gw = (320+64) * zoom;  // Game width with sidebar but without settings
-  let maxgw = (320+64+320) * zoom;  // Game width with settings expanded
+    // Spacebar advances dialogue but doesn't activate buttons or attack.
+    ' ': dialogueOrSplashScreen,
 
-  leftbar.style.width = Math.min(
-    (ww - gw)/2, // center the main game viewport if we can do so without breaking the settings screen
-    ww - maxgw   // otherwise put it as far to the right as we can without hiding settings
-  ) + "px";
+    // Escape and Backspace activate cancel/back buttons, same popup behaviour as Enter.
+    'Escape': cancelOrBack,
+    'Backspace': cancelOrBack,
+
+    // Combat hotkeys
+    // S for summons, H for heal, C to toggle CA
+    's': 'div.prt-summon-list > div.prt-list-top.btn-command-summon',
+    'h': 'div.prt-sub-command div.btn-temporary',
+    'c': 'div.prt-sub-command div.btn-lock',
+    // Q-A-Z to target enemies
+    // You can also use A to attack, or, outside of combat, to use autoselect in upgrade screens.
+    // Note that enemy 1 is always on top and enemy 2 is always on the bottom,
+    // so the order here goes 1-3-2; this is not a typo.
+    'q': 'a.btn-targeting.enemy-1',
+    'a': AnyOf('a.btn-targeting.enemy-3', 'div.btn-attack-start.display-on', 'div.btn-recommend'),
+    'z': 'a.btn-targeting.enemy-2',
+    // Number keys can be used to select a character, select an ability once a
+    // character has been selected, or select a summon if the summons pane is
+    // open.
+    '1': NumberButtonSelector(1),
+    '2': NumberButtonSelector(2),
+    '3': NumberButtonSelector(3),
+    '4': NumberButtonSelector(4),
+    '5': NumberButtonSelector(5), // TODO perhaps should also open summon menu
+    '6': NumberButtonSelector(6),
+    // Arrow keys cycle through characters, or jobs in the class details screen.
+    'ArrowLeft': AnyOf('div.ico-pre', 'div.btn-prev-job'),
+    'ArrowRight': AnyOf('div.ico-next', 'div.btn-next-job'),
+    // Hotkeys for various useful pages.
+    'alt-w': Go('quest/island'), // world
+    'alt-q': Go('quest'), // quests
+    'alt-h': Go('mypage'), // home
+    'alt-d': Go('gacha'), // draw
+    'alt-p': Go('party/index/0/npc/0'), // party
+    // TODO: hotkeys for npc/summon upgrade
+    // TODO: hotkeys for uncapping; replace 'enhancement' with 'evolution'
+    'alt-u': Go('enhancement/weapon/base'), //upgrade
+    'alt-i': Go('list'), // inventory
+    'alt-c': Go('present'), // crate
+    'alt-j': Go('archive/top'), // journal
+  };
 }
 
-function tryCenterGame() {
-  try {
-    if (document.getElementsByTagName('nav')[0]) {
-      centerGame();
-    } else {
-      setTimeout(tryCenterGame, 100);
-    }
-  } catch(e) { console.info(e); }
-}
-
-window.addEventListener("load", centerGame, false);
-window.addEventListener("resize", centerGame, false);
-tryCenterGame();
-
-
-// Utility functions for keyboard mapping table //
+// Utility functions for keymap //
 
 // Return a selector that matches any of its arguments, with :visible appended to them.
 function AnyOf() {
@@ -59,10 +117,13 @@ function Cond(p, xs) {
   ).join(', ');
 }
 
+// Return a function that takes you to the given page by editing the URL fragment
 function Go(hash) {
   return _ => { window.location.hash = `#${hash}`; }
 }
 
+// Return a selector that matches any of the things we want to activate with
+// the given number key.
 function NumberButtonSelector(n) {
   return [
     // Character or item selection in popup
@@ -79,84 +140,8 @@ function NumberButtonSelector(n) {
   ];
 }
 
-// Mapping of shortcut keys to selectors for controls they should activate.
-// Keys are the KeyEvent.key value.
-// Values:
-// - if a string containing a single selector (no ,), has :visible appended and then used
-// - if a string containing multiple ,-separated selectors, used without modification
-// - if a function, it's called
-// - if a list, each element is evaluated in order using these rules; evaluation stops when
-//   one element succeeds
-// In any case, if the selector evaluates to exactly one element, that element is activated.
 
-// Selectors for dialogue or splash screens where advancing them is "safe", i.e.
-// you won't be inadvertently agreeing to or cancelling something.
-let dialogueOrSplashScreen = AnyOf(
-  'div.prt-advice', 'div.prt-scene-comment', 'div.btn-result',
-  'canvas#cjs-gacha', 'canvas#cjs-login', 'canvas#cjs-panel-mission',
-  //'div.cnt-quest',
-);
-let shortcuts = {
-  // s, h, c for summons, heal, and CA toggle
-  's': 'div.prt-summon-list > div.prt-list-top.btn-command-summon',
-  'h': 'div.prt-sub-command div.btn-temporary',
-  'c': 'div.prt-sub-command div.btn-lock',
-  // QAZ to target enemies
-  'q': 'a.btn-targeting.enemy-1',
-  // This isn't a typo; enemies 1 and 2 are always the top and bottom ones respectively,
-  // so if you're fighting 3 enemies, #3 goes in the middle.
-  // 'a' can also be used to attack, or autoselect in the upgrade screen.
-  'a': AnyOf('a.btn-targeting.enemy-3', 'div.btn-attack-start.display-on', 'div.btn-recommend'),
-  'z': 'a.btn-targeting.enemy-2',
-  // numbers => character, ability, or summon selection
-  '1': NumberButtonSelector(1),
-  '2': NumberButtonSelector(2),
-  '3': NumberButtonSelector(3),
-  '4': NumberButtonSelector(4),
-  '5': NumberButtonSelector(5), // TODO perhaps should also open summon menu
-  '6': NumberButtonSelector(6),
-  // Arrows for next/prev
-  'ArrowLeft': 'div.ico-pre', // btn-prev-job btn-next-job
-  'ArrowRight': 'div.ico-next',
-  // Enter activates ok/next/quest buttons, attacks in combat, or steps through dialogue or in-battle hints
-  // If a popup is open it prefers buttons in the popup
-  'Enter': [
-    // If a popup is open prefer that
-    'div.pop-usual div.btn-usual-ok',
-    'div.pop-usual div.btn-usual-close',
-    // Otherwise step through dialogue
-    dialogueOrSplashScreen,
-    // If no popup or dialogue, look for any sort of OK/next screen/attack button and activate it.
-    AnyOf('div.btn-usual-ok', 'div.btn-usual-close',
-          'div.btn-lupi.multi', // 10 part rupie gacha
-          'div.btn-synthesis', 'div.btn-evolution', // upgrade and uncap
-          // TODO: investigate other stuff in .prt-button-area:
-          //.btn-{unclaimed,retry,continue,retry-sequence}
-          'div.prt-button-area.upper div.btn-control',
-          'div.btn-attack-start.display-on'),
-  ],
-  // Spacebar advances dialogue but doesn't activate buttons or attack.
-  ' ': dialogueOrSplashScreen,
-  // Escape and Backspace activate cancel/back buttons, same popup behaviour as Enter.
-  'Escape': [
-    Cond('div.pop-usual', ['div.btn-command-back.display-on', 'div.btn-usual-cancel', 'div.btn-usual-close']),
-    AnyOf('div.btn-command-back.display-on', 'div.btn-usual-cancel'),
-  ],
-  'Backspace': [
-    Cond('div.pop-usual', ['div.btn-command-back.display-on', 'div.btn-usual-cancel', 'div.btn-usual-close']),
-    AnyOf('div.btn-command-back.display-on', 'div.btn-usual-cancel'),
-    'div.lis-lead-prev',
-  ],
-  'alt-w': Go('quest/island'),
-  'alt-q': Go('quest'),
-  'alt-h': Go('mypage'),
-  'alt-d': Go('gacha'),
-  'alt-p': Go('party/index/0/npc/0'),
-  'alt-u': Go('enhancement/weapon/base'), // or npc or summon; replace enhancement with evolution for uncapping
-  'alt-i': Go('list'), // inventory
-  'alt-c': Go('present'), // crate
-  'alt-j': Go('archive/top'), // journal
-};
+// Actually wire it up //
 
 // Given a selector or selector tree from the keymap, try to turn it into a control and activate it
 function trySelector(selector) {
@@ -210,6 +195,7 @@ function tap(selector) {
   return true;
 }
 
+let shortcuts = keymap();
 function keyboardEventHandler(evt) {
   try {
     let key = evt.key;
@@ -228,3 +214,36 @@ function keyboardEventHandler(evt) {
 }
 
 document.addEventListener("keydown", keyboardEventHandler, false);
+
+// Viewport centering //
+
+function centerGame() {
+  let leftbar = $("nav")[0];
+  leftbar.innerHTML = "";
+
+  let [ww,wh] = [window.innerWidth, window.innerHeight];
+  if (ww/wh < 1.0) { return; }
+
+  let zoom = $("#mobage-game-container")[0].style.zoom;
+  let gw = (320+64) * zoom;  // Game width with sidebar but without settings
+  let maxgw = (320+64+320) * zoom;  // Game width with settings expanded
+
+  leftbar.style.width = Math.min(
+    (ww - gw)/2, // center the main game viewport if we can do so without breaking the settings screen
+    ww - maxgw   // otherwise put it as far to the right as we can without hiding settings
+  ) + "px";
+}
+
+function tryCenterGame() {
+  try {
+    if (document.getElementsByTagName('nav')[0]) {
+      centerGame();
+    } else {
+      setTimeout(tryCenterGame, 100);
+    }
+  } catch(e) { console.info(e); }
+}
+
+window.addEventListener("load", centerGame, false);
+window.addEventListener("resize", centerGame, false);
+tryCenterGame();
