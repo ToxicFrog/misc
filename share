@@ -23,6 +23,8 @@
 
 # TODO: "persistent" mode, that keeps the generated gallery around for
 # incremental updates and remembers what arguments it was invoked with.
+# -- doesn't work because fgallery doesn't support incremental updates! there's
+# an open bug for it. Replace with Sigal?
 # TODO: "ephemeral" mode, that is automatically deleted after a certain number
 # of days (when share is run).
 # TODO: share aliasing (using symlinks) -- removing the share needs to remove the
@@ -247,7 +249,7 @@ function cmd/add-album {
   local name=$1; shift
   local hash=$(share/hash $name)
   if [[ ! $1 ]]; then
-    die "share add needs a name *and* some files; see 'share help add'."
+    die "share add-album needs a name *and* some files; see 'share help add-album'."
   elif [[ -e $name ]]; then
     die "trying to create a share with a name identical to a file; did you forget the share name?"
   fi
