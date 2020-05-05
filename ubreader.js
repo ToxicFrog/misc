@@ -6,65 +6,170 @@
 // @version       0.1
 // ==/UserScript==
 
-// Convenience function. filter() works on any iterable, but is only defined as
-// a method on Array for some reason.
+// Annotations are as follows
+//   5 📕 Book unopened, 5 pages
+// 2/5 📖 Book in progress, 2 pages of 5 read
+//     ✓  Book finished
+//   ? 📁 Directory status unknown
+//   5 📁 Directory contains 5 unfinished books
+// 2/5 📂 Directory contains 2 finished books of 5 total
+//   5 ✓  All 5 books in directory finished.
+
+// Convenience functions. filter/map work on any iterable, but are only defined as
+// methods on Array for some reason.
 function filter(xs, f) {
   return Array.prototype.filter.call(xs, f);
 }
+function map(xs, f) {
+  return Array.prototype.map.call(xs, f);
+}
+
+// Ubooq isn't always served from /, so this lets us detect what the base URL is.
+let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]")[1];
 
 // Fetch and display the read marker for all comics, if we're in a comic screen,
 // and do nothing otherwise.
 function updateAllReadStatus(_) {
   if (!document.getElementById("group")) return;
-  // Ubooq isn't always served from /, so this lets us detect what the base URL is.
-  let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]+")[1];
-  let cells = filter(
+  let [_str,dirID] = window.location.pathname.match("/comics/([0-9]+)");
+  let promises = map(
     document.getElementsByClassName("cell"),
-    // Only actual comics have an onclick handler on the <a>, directories
-    // just have a direct link to the dir page
-    cell => { return !!cell.getElementsByTagName("a")[0].onclick; });
-  for (let cell of cells) {
-    let img = cell.getElementsByTagName("img")[0];
-    let id = img.src.match("/comics/([0-9]+)/")[1];
-    updateReadStatus(baseURL, cell, id);
-  }
+    cell => {
+      let img = cell.getElementsByTagName("img")[0];
+      let id = img.src.match("/comics/([0-9]+)/")[1];
+      return updateReadStatus(cell, id);
+    });
 
-  // Add a button to refresh the page, for easy use on tablet, since the read-
-  // markers don't naturally refresh when you get here via "close book".
-  let pagelabel = document.getElementById("pagelabel");
-  pagelabel.innerHTML = '<a href="#" onclick="location.reload();" style="font-size:40px;"><b>&#128260;</b></a>'
-  pagelabel.setAttribute("class", "");
+  Promise.all(promises).then(statii => {
+    // statuses is an array of booleans, true for finished, false for unfinished
+    let total = statii.length;
+    let read = statii.filter(x => x).length;
+    console.log("Done fetching read status for directory contents, writing bookmark " + dirID + ": " + read + "/" + total);
+    return saveBookmark(dirID, "" + read + "/" + total).then(_ => read == total);
+  }).then(all_read => {
+    // Add a button to refresh the page, for easy use on tablet, since the read-
+    // markers don't always refresh reliably when you get here via "close book".
+    // Do this last so that the refresh button appearing is also a visual indicator for
+    // "all page mongling is complete".
+    let pagelabel = document.getElementById("pagelabel");
+    pagelabel.innerHTML =
+      (all_read ?
+        '<a href="#" onclick="markAllUnread()" style="font-size:40px;"><b>❎</b></a>'
+        : '<a href="#" onclick="markAllRead()" style="font-size:40px;"><b>✅</b></a>')
+      + '<a href="#" onclick="location.reload();" style="font-size:40px;"><b>🔄</b></a>'
+    pagelabel.setAttribute("class", "");
+  })
+}
+
+window.markAllRead = function() {
+  let promises = map(
+    document.getElementsByClassName("cell"),
+    cell => {
+      if (cell.is_book) {
+        return saveBookmark(cell.document_id, String(cell.total_pages - 1));
+      }
+    });
+  Promise.all(promises).then(_ => updateAllReadStatus());
+}
+
+window.markAllUnread = function() {
+  let promises = map(
+    document.getElementsByClassName("cell"),
+    cell => {
+      if (cell.is_book) {
+        return saveBookmark(cell.document_id, "-1");
+      }
+    });
+  Promise.all(promises).then(_ => updateAllReadStatus());
 }
 
 // Fetch and display read marker for one comic, identified by cell (the div
 // containing the thumbnail for that comic) and server-side ID.
-function updateReadStatus(baseURL, cell, id) {
-  fetch(baseURL + "/user-api/bookmark?docId=" + id)
+function updateReadStatus(cell, id) {
+  return fetch(baseURL + "/user-api/bookmark?docId=" + id)
   .then(response => {
     if (response.status != 200) {
-      return Promise.resolve({"mark": "-1"});
+      if (!cell.getElementsByTagName("a")[0].onclick) {
+        // Missing bookmark for directory.
+        return Promise.resolve({"mark": "0/0"});
+      } else {
+        return Promise.resolve({"mark": "-1"});
+      }
     }
     return response.json();
   }).then(json => {
-    cell.bookmark = parseInt(json.mark) + 1;
-    return fetch(baseURL + "/comicdetails/" + id);
-  }).then(response => {
-    return response.text();
-  }).then(text => {
-    let pages = parseInt(text.match("nbPages=([0-9]+)")[1]);
-    if (cell.bookmark <= 0) {
-      addBubble(cell, "📕");
-    } else if (pages != cell.bookmark) {
-      addBubble(cell, cell.bookmark + "/" + pages + " 📖");
+    if (json.mark.match("/")) {
+      // We've retrieved a folder bookmark previously stored by us; no
+      // need to fetch comic details to get the total page count.
+      let [_,page,total] = json.mark.match("([0-9]+)/([0-9]+)");
+      return [parseInt(page), parseInt(total), null];
+    } else {
+      // It's a normal ubooq bookmark stored 0-indexed, we need to fetch the
+      // page count separately.
+      let page = parseInt(json.mark) + 1
+      return fetch(baseURL + "/comicdetails/" + id).then(r => r.text()).then(text => {
+        let total = parseInt(text.match("nbPages=([0-9]+)")[1]);
+        return [page, total, text];
+      })
     }
-    fixupLinks(baseURL, cell, text);
+  }).then(args => {
+    let [page,total,details] = args;
+    cell.current_page = page;
+    cell.total_pages = total;
+    cell.document_id = id;
+    if (details) {
+      // It's a book.
+      cell.is_book = true;
+      if (page <= 0) {
+        addBubble(cell, total + " 📕");
+      } else if (page < total) {
+        addBubble(cell, "<b>" + page + "/" + total + " 📖</b>");
+      } else {
+        addBubble(cell, "✓");
+      }
+      fixupLinks(cell, details);
+    } else {
+      // It's a directory.
+      cell.is_book = false;
+      if (page <= 0) {
+        addBubble(cell, (total>0? total:"?") + " 📁");
+      } else if (page < total) {
+        addBubble(cell, "<b>" + page + "/" + total + " 📂</b>");
+      } else {
+        addBubble(cell, total + " ✓"); //✔
+      }
+    }
+    return page == total;
   })
+}
+
+function put(url, body) {
+  return fetch(url, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function saveBookmark(id, mark) {
+  return put(baseURL + "/user-api/bookmark?docId=" + id,
+     {docId: id,
+     isBook: false,
+     mark: mark,
+     isFinished: false,
+     lastUpdate: 1});
 }
 
 // Given the thumbnail img for a comic, and the text to put in the bubble,
 // install a bubble on the thumbnail using the same mechanism as used for the
 // "number of comics inside this directory" bubble.
 function addBubble(cell, text) {
+  for (let bubble of cell.getElementsByClassName("numberblock")) {
+    bubble.parentNode.removeChild(bubble);
+  }
   let div = document.createElement('div');
   div.className = "numberblock";
   div.innerHTML =
@@ -75,8 +180,9 @@ function addBubble(cell, text) {
 // Adjust the linking behaviour of the cell. Make clicking the thumbnail open
 // the comic without displaying the details popup. Make clicking the comic title
 // download the comic.
-function fixupLinks(baseURL, cell, details) {
+function fixupLinks(cell, details) {
   let a = cell.getElementsByTagName("a")[0];
+  if (!a.onclick) return; // Doesn't need fixing
   let reader_url = details.match('/comicreader/reader.html[^"]+')[0];
   a.onclick = null;
   a.href = baseURL + reader_url.replace(/&amp;/g, "&");
@@ -113,9 +219,7 @@ function updatePageCounter(page) {
 function mkExitShortcutHandler($scope, elem_id, handler, predicate) {
   let warnCount = 0;
   return function() {
-    console.log("exitshortcuthandler", elem_id)
     if (!predicate($scope)) return handler();
-    console.log("proceed");
     if (warnCount > 0) { history.back(); return false; }
     warnCount++;
     let button = document.getElementById(elem_id);
@@ -160,9 +264,7 @@ function installPageSeekBar(_) {
   // order to easily select a page.
   let val = $scope.currPageNb + 1;
   let max = $scope.nbPages;
-  bar.max = bar.firstElementChild.getAttribute("aria-valuemax");
-  console.log(val);
-  bar.innerHTML = '<input id="pageseekbar" type="range" name="page" min="1" max="'+bar.max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="updatePageCounter(this.value)">';
+  bar.innerHTML = '<input id="pageseekbar" type="range" name="page" min="1" max="'+max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="updatePageCounter(this.value)">';
 }
 
 // It sometimes takes a few hundred millis after closing a book for the read
