@@ -3,7 +3,7 @@
 // @namespace     https://github.com/ToxicFrog/misc
 // @description   Adds unopened/in-progress/read markers to the Ubooquity comic server
 // @include       https://my.ubooquity.server/comics/*
-// @version       0.1
+// @version       0.2
 // ==/UserScript==
 
 // Annotations are as follows
@@ -91,9 +91,9 @@ function updateReadStatus(cell, id) {
     if (response.status != 200) {
       if (!cell.getElementsByTagName("a")[0].onclick) {
         // Missing bookmark for directory.
-        return Promise.resolve({"mark": "0/0"});
+        return {"mark": "0/0"};
       } else {
-        return Promise.resolve({"mark": "-1"});
+        return {"mark": "-1"};
       }
     }
     return response.json();
