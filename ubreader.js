@@ -25,12 +25,18 @@ function map(xs, f) {
 }
 
 // Ubooq isn't always served from /, so this lets us detect what the base URL is.
-let baseURL = window.location.pathname.match("(/.*)/comics/[0-9]")[1];
+let baseURL = window.location.pathname.match("(/.*)/(comics/[0-9]+|comicreader/reader)");
+if (baseURL) {
+  baseURL = baseURL[1];
+} else {
+  baseURL = window.location.pathname.replace(/\/+$/, '');
+}
 
 // Fetch and display the read marker for all comics, if we're in a comic screen,
 // and do nothing otherwise.
 function updateAllReadStatus(_) {
   if (!document.getElementById("group")) return;
+  if (document.getElementsByClassName("cell").length == 0) return;
   let [_str,dirID] = window.location.pathname.match("/comics/([0-9]+)");
   let promises = map(
     document.getElementsByClassName("cell"),
@@ -267,8 +273,33 @@ function installPageSeekBar(_) {
   bar.innerHTML = '<input id="pageseekbar" type="range" name="page" min="1" max="'+max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="updatePageCounter(this.value)">';
 }
 
+// Add "resume last comic" functionality.
+// If on the top-level screen (that has "comics" and "new comics"), rewires
+// "new comics" to be a "read now" button that takes you to the last folder
+// you were reading something in instead. (We can't go straight to the comic
+// because it relies on browser history for "close book" to take you from the
+// comic back to the folder list, and if we just jump straight to the book the
+// history isn't there; TODO: fix this, probably using history.pushState.)
+function enableResumeSupport(_) {
+  if (!document.getElementById("group")) return;
+  console.log("enable resume support");
+  let latest = document.getElementById("latest-comics");
+  let resume = localStorage.getItem('ubreader:resume') || "/comics/";
+  if (latest) {
+    latest.style.backgroundImage = 'url("' + baseURL + '/theme/read.png")';
+    latest.style.height = "100%";
+    latest.href = baseURL + resume;
+    latest.innerText = 'Resume Last';
+    return;
+  }
+
+  let [_str,dirID] = window.location.pathname.match("/comics/([0-9]+)");
+  localStorage.setItem('ubreader:resume', '/comics/' + dirID);
+}
+
 // It sometimes takes a few hundred millis after closing a book for the read
 // status to update on the server, so we delay briefly before loading
 // the read status.
 window.addEventListener('load', _ => { setTimeout(updateAllReadStatus, 1000); });
 window.addEventListener('load', installPageSeekBar);
+window.addEventListener('load', enableResumeSupport);
