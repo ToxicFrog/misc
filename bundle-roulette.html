@@ -1,0 +1,134 @@
+<!doctype html>
+<!--
+  itch.io bundle roulette
+  released into the public domain by ToxicFrog
+-->
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bundle Roulette</title>
+  <link rel="stylesheet" href="https://static.itch.io/main.css?1591886462">
+  <style>
+    body { text-align: center; }
+    span.lf { position: absolute; left: 1em; }
+    span.rt { position: absolute; right: 1em; }
+    .popup_details {
+      position: static !important;
+      width: initial !important;
+    }
+    .popup_details .game_text {
+      max-height: initial !important;
+      overflow: initial !important;
+    }
+    .popup_details .popup_screenshot {
+      opacity: 1.0;
+    }
+  </style>
+  <script>
+    let $ = function(sl) { return document.querySelector(sl); }
+    let $$ = function(sl) { return document.querySelectorAll(sl); }
+    let games = [];
+    let pool = [];
+    let current_game = null;
+
+    function updateGameCount() {
+      $("#gamecount").innerText = `${pool.length} games left (${games.length} total)`;
+      for (let box of $$('input[type=checkbox]')) {
+        localStorage.setItem('platform:'+box.id, box.checked ? "on" : "off");
+      }
+    }
+
+    function isGameInPool(game) {
+      if (localStorage.getItem(game.id) == "exclude") return false;
+      if (!game.platforms) return $('#notgame').checked;
+      for (let platform of game.platforms) {
+        if ($('#'+platform).checked) return true;
+      }
+      return false;
+    }
+
+    function fillPool() {
+      pool = games.filter(isGameInPool);
+      updateGameCount();
+    }
+
+    function looksGood() {
+      // open the currently selected game in a new tab and remove it from the pool
+      window.open(current_game.url, '_blank');
+      localStorage.setItem(current_game.id, "exclude");
+      fillPool();
+    }
+
+    function maybeLater() {
+      // select a new random game
+      current_game = pool[Math.floor(Math.random()*pool.length)];
+      console.log(current_game);
+      fetch(`https://cors-anywhere.herokuapp.com/itch.io/game/popup/${current_game.id}`)
+      .then(response => response.text())
+      .then(fragment => {
+        // This isn't formatted since it's only meant to show up in a tiny popup
+        // that only displays the first few lines
+        // A better approach would be to fetch the entire URL, then look for:
+        // div.formatted_description (the game description)
+        // div.screenshot_list (the screenshots)
+        $('#content').innerHTML = fragment;
+        $('div.game_title').onclick = "looksGood();";
+      });
+    }
+
+    function noThanks() {
+      // remove the current game from the pool and roll a new one
+      localStorage.setItem(current_game.id, "exclude");
+      fillPool();
+      maybeLater();
+    }
+
+    function resetLocalStorage() {
+      localStorage.clear();
+      fillPool();
+    }
+
+    fetch("https://cors-anywhere.herokuapp.com/itch.io/bundle/520/games.json")
+    .then(response => {
+      if (response.status != 200) {
+        $('#content').innerText = "Error loading game list!";
+        throw response;
+      }
+      return response.json();
+    }).then(json => {
+      games = json.games;
+      console.log(`Loaded ${games.length} games from itch.io...`);
+      for (let box of $$('input[type=checkbox]')) {
+        let state = localStorage.getItem('platform:'+box.id);
+        console.log(box, state);
+        if (state == "on") box.checked = true;
+        if (state == "off") box.checked = false;
+      }
+
+      fillPool();
+      maybeLater();
+    });
+  </script>
+</head>
+<body>
+ <span class="lf">
+  <input type="checkbox" onchange="fillPool();" checked=true id="linux"><label for="linux">Lin</label>
+  <input type="checkbox" onchange="fillPool();" checked=true id="windows"><label for="windows">Win</label>
+  <input type="checkbox" onchange="fillPool();" checked=true id="osx"><label for="osx">OSX</label>
+  <input type="checkbox" onchange="fillPool();" checked=true id="web"><label for="web">Web</label>
+  <input type="checkbox" onchange="fillPool();" checked=true id="android"><label for="android">Android</label>
+  <input type="checkbox" onchange="fillPool();" id="notgame"><label for="notgame">non-games</label>
+ </span>
+ <input type="button" onclick="looksGood();" value="Looks Good"/>
+ <input type="button" onclick="maybeLater();" value="Maybe Later"/>
+ <input type="button" onclick="noThanks();" value="No Thanks"/>
+ <span class="rt">
+  <span id="gamecount">??? games left (??? total)</span>
+  <input type="button" onclick="resetLocalStorage();" value="Reset"/>
+ </span>
+ <hr />
+ <div id="content">
+  Loading...
+ </div>
+</body>
+</html>
