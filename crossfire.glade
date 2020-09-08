@@ -1085,6 +1085,17 @@
                                             <property name="position">0</property>
                                           </packing>
                                         </child>
+                                      </widget>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">False</property>
+                                        <property name="padding">3</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <widget class="GtkHBox" id="hbox_experience">
+                                        <property name="visible">True</property>
                                         <child>
                                           <widget class="GtkLabel" id="label_level">
                                             <property name="visible">True</property>
@@ -1096,6 +1107,19 @@
                                             <property name="expand">False</property>
                                             <property name="fill">False</property>
                                             <property name="padding">5</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <widget class="GtkLabel" id="label_exp">
+                                            <property name="visible">True</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Experience:</property>
+                                          </widget>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">False</property>
+                                            <property name="padding">3</property>
                                             <property name="position">1</property>
                                           </packing>
                                         </child>
@@ -1104,7 +1128,7 @@
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
                                         <property name="padding">3</property>
-                                        <property name="position">0</property>
+                                        <property name="position">1</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1128,7 +1152,7 @@
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
                                         <property name="padding">4</property>
-                                        <property name="position">1</property>
+                                        <property name="position">3</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1138,7 +1162,7 @@
                                           <widget class="GtkLabel" id="label64">
                                             <property name="visible">True</property>
                                             <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Speed</property>
+                                            <property name="label" translatable="yes">Move:</property>
                                             <property name="width_chars">6</property>
                                           </widget>
                                           <packing>
@@ -1158,28 +1182,18 @@
                                             <property name="position">1</property>
                                           </packing>
                                         </child>
-                                      </widget>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">False</property>
-                                        <property name="padding">3</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkHBox" id="hbox_weaponspeed">
-                                        <property name="visible">True</property>
                                         <child>
                                           <widget class="GtkLabel" id="label66">
                                             <property name="visible">True</property>
                                             <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Weapon Speed</property>
+                                            <property name="label" translatable="yes"> | Attack:</property>
+                                            <property name="width_chars">11</property>
                                           </widget>
                                           <packing>
                                             <property name="expand">False</property>
                                             <property name="fill">False</property>
                                             <property name="padding">3</property>
-                                            <property name="position">0</property>
+                                            <property name="position">2</property>
                                           </packing>
                                         </child>
                                         <child>
@@ -1189,31 +1203,7 @@
                                           <packing>
                                             <property name="expand">False</property>
                                             <property name="fill">False</property>
-                                            <property name="position">1</property>
-                                          </packing>
-                                        </child>
-                                      </widget>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">False</property>
-                                        <property name="padding">4</property>
-                                        <property name="position">3</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <widget class="GtkHBox" id="hbox_experience">
-                                        <property name="visible">True</property>
-                                        <child>
-                                          <widget class="GtkLabel" id="label_exp">
-                                            <property name="visible">True</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Experience:</property>
-                                          </widget>
-                                          <packing>
-                                            <property name="expand">False</property>
-                                            <property name="fill">False</property>
-                                            <property name="padding">3</property>
-                                            <property name="position">0</property>
+                                            <property name="position">3</property>
                                           </packing>
                                         </child>
                                       </widget>
@@ -1221,7 +1211,7 @@
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
                                         <property name="padding">3</property>
-                                        <property name="position">4</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1258,7 +1248,7 @@
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
                                         <property name="padding">4</property>
-                                        <property name="position">5</property>
+                                        <property name="position">4</property>
                                       </packing>
                                     </child>
                                   </widget>
