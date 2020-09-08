@@ -1,0 +1,192 @@
+#!/usr/bin/env zsh
+#
+# Fix some common issues with comic files.
+# - repack cbt, cba, cbr into cbz
+# - rename by removing website, scanning, and scanlation group names
+# - convert greyscale+alpha PNGs to RGBA to work around a bug in Ubooquity
+
+set -e
+export DRYRUN=0
+
+function try {
+  if (( DRYRUN )); then
+    echo "$*"
+  else
+    "$@"
+  fi
+}
+
+function status {
+  local fmt="$1"; shift
+  if [[ $fmt == -c ]]; then
+    fmt='\x1B[2K\r'"$1"; shift
+  # else
+  #   printf '\r'
+  fi
+  # printf "$fmt" "$@" >&2
+  printf "$fmt" "$@" >&2
+}
+
+declare -ra PATTERNS=(
+  '\([12][0-9][0-9][0-9]\)'
+  '\([Dd]igital[^)]*\)'
+  '\(Minutemen-[A-Za-z]+\)'
+  '\(Oroboros-[A-Za-z]+\)'
+  '\([A-Za-z ]+-Empire\)'
+  'GetComics\.INFO'
+  '\((TheGroup|F|KG Manga|Mr\. Kimiko|Digital)\)'
+  '\(gb\) \[[^]]+\]'
+  '\[([a-zA-Z]+ ?Scan(s|lation)|Hourou Musume|4kumalations|Musashi Quality|s\.ADTRW|MiamMiam-Team|.* \(Ex-Licenses\))\]'
+)
+
+declare -A CH_PATTERNS=(
+  'Ch\.([0-9]+) ' 'Ch\.%s\.%s '
+  'Ch\.([0-9]+)\.cbz' 'Ch\.%s\.%s\.cbz'
+  'Chapter ([0-9]+):' 'Chapter %d\.%s:'
+)
+
+function new-name {
+  local dst="$1"
+  # status '[rename] %s' $dst
+  for pattern in ${PATTERNS[@]}; do
+    dst=$(echo "$dst" | sed -E "s, *$pattern,,")
+    # status '[rename] %s' $dst
+  done
+  for ch_pattern sc_template in ${(kv)CH_PATTERNS[@]}; do
+    if echo $dst | egrep -q $ch_pattern; then
+      # If the file contains a chapter without a subchapter number, check if
+      # there is also a subchapter with the same number, and correct the sorting
+      # if so.
+      # In other words, turn names like "Ch.005 foo" into "Ch.005.0 foo" iff
+      # "Ch.005.5 bar" exists.
+      # FIXME this doesn't seem to work right on some mangadex titles
+      # Ch.0023.cbz turns into Ch.0023.0bz.cbz which sorts correctly but is ???
+      local chapter=$(echo $dst | sed -E "s,.*$ch_pattern.*,\\1,")
+      if [[ $chapter == $dst ]]; then continue; fi
+
+      local sc_pattern=$(printf $sc_template $chapter "([0-9]+)")
+      local subchapter=$(
+        ls $(dirname $src) \
+        | egrep $sc_pattern \
+        | head -n1 \
+        | sed -E "s,.*$sc_pattern.*,\\1," \
+        | tr 0-9 0)
+      if [[ $subchapter ]]; then
+        dst=$(echo $dst | sed -E "s,$ch_pattern,$(printf $sc_template $chapter $subchapter),")
+        break
+      fi
+    fi
+  done
+
+  # if echo $dst | egrep -q 'Ch\.[0-9]{4}([^.]|\.[^0-9])'; then
+  #   # If the file contains "Ch.XXXX", check if there's a "Ch.XXXX.YY" in the same
+  #   # directory, and if so, rename this one to "Ch.XXXX.00" so that it sorts
+  #   # correctly.
+  #   # TODO: support other chapter patterns.
+  #   local chapter=$(echo $dst | sed -E 's,.*(?:Chapter |Ch\.)([0-9]+).*,\1,')
+  #   local subchapter=$(
+  #     ls $(dirname $src) \
+  #     | fgrep "Ch.$chapter" \
+  #     | sed -nE 's,.*Ch\.[0-9]+\.([0-9]+).*,\1,; T; p' \
+  #     | head -n1 \
+  #     | tr 0-9 0)
+  #   if [[ $subchapter ]]; then
+  #     dst=$(echo $dst | sed -E "s,Ch\\.$chapter,Ch.$chapter.$subchapter,")
+  #     # status '[rename] %s' $dst
+  #   fi
+  # fi
+  dst=${dst%.cb?}.cbz
+  # if [[ $src != $dst ]]; then
+  #   status '\n[rename] %s\n     --> %s' $src $dst
+  # fi
+  echo $dst
+}
+
+function fix-format {
+  local src=$(realpath $1)
+  [[ ${src##*.} == cbz ]] && return 0
+  status '\n[unpack] %s' ${src##.*}
+
+  try mkdir -p /tmp/$$
+  ( cd /tmp/$$ && dtrx --one=here -f -o -q "$src" )
+}
+
+function fix-png {
+  local src=$(realpath $1)
+  local nrof_pngs=$(dtrx -l $src | egrep -c '\.png$')
+  (( nrof_pngs > 0 )) || return 0
+
+  status '\n[fix png alpha] unpacking %d PNGs' $nrof_pngs
+  if [[ ! -d /tmp/$$ ]]; then
+    try mkdir -p /tmp/$$
+    try unzip -qq -d /tmp/$$ $src '*.png'
+    local unpacked=0
+  else
+    local unpacked=1
+  fi
+
+  checked=0
+  fixed=0
+  find /tmp/$$ -name '*.png' | while read png; do
+    ((++checked)); status -c '[fix png alpha] %d checked/%d fixed' $checked $fixed
+    file $png | fgrep -q 'gray+alpha' || continue
+    convert $png PNG32:$png
+    ((++fixed))
+  done
+
+  if (( fixed )); then
+    status -c '[fix png alpha] %d checked/%d fixed\n' $checked $fixed
+  fi
+
+  if (( !fixed && !unpacked )); then
+    rm -rf /tmp/$$
+  fi
+}
+
+function repack {
+  local src=$(realpath $1)
+  local dst=$(realpath $2)
+
+  if [[ ! -d /tmp/$$ ]]; then
+    # Rename file if needed and don't do anything else -- no need to
+    # pack up modified contents or create backups.
+    if [[ $src != $dst ]]; then
+      status '\n[rename] %s\n     --> %s\n' $1 $2
+      try mv -i "$src" "$dst"
+    fi
+    return 0
+  fi
+
+  if [[ ${src##*.} != ${dst##*.} ]]; then
+    # If we're doing a format conversion, just add .backup to the original.
+    try mv $src ${src}.backup
+  elif [[ $src != $dst ]]; then
+    try cp $src ${src}.backup
+    try mv $src $dst
+  else
+    try cp $src ${src}.backup
+  fi
+
+  status '\n[repack] %s\n' $2
+  (try cd /tmp/$$ && ls && try zip -u -r -0 $dst .)
+}
+
+[[ $DEBUG ]] && set -x
+
+trap "rm -rf '/tmp/$$'" EXIT
+while [[ $1 ]]; do
+  rm -rf /tmp/$$
+  src="$1"; shift
+  status -c '[scan] %s' $src
+  dst="$(new-name $src)"
+  fix-format $src $dst
+  fix-png $src $dst
+  repack $src $dst
+  # status '[done] %s' $dst
+
+#    if [[ $dst =~ 'Ch\.[0-9]+\.[0-9]' ]]; then
+# for ch in 57 65; do src=$(echo Vol.*\ Ch.??$ch\ *); mv $src ${src/Ch.00$ch/Ch.00$ch.0}; done
+# this one works only for ones with no chapter titles
+# for n in $(ls *.?.cbz | egrep -o '[0-9]+\.[0-9]+.cbz' | cut -d. -f1 | sort | uniq); do src=$(echo Vol.*Ch.$n.cbz); mv "$src" "${src%.cbz}.0.cbz"; done
+# for ch in $(ls | egrep -o 'Ch\.[0-9]+\.[0-9]' | cut -d. -f2 | sort -u); do src=$(ls | egrep "Ch\\.$ch(\\.[^0-9]|[^.])"); mv $src ${src/Ch.$ch/Ch.$ch.0}; done
+done
