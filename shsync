@@ -122,7 +122,7 @@ function shsync/sync {
 
   # clean up empty directories
   # shsync/status "Cleaning empty directories..."
-  # find $dst -type d -empty -delete
+  # find $dst -type d -empty -print
   shsync/status "Done.\\n"
 }
 
@@ -162,13 +162,13 @@ function shsync/recv-file {
 # delete-file absolute-path
 function shsync/delete-local {
   if [[ ! $DRY_RUN ]]; then
-    rm -d "$1"
+    rm -rf "$1"
   fi
 }
 
 function shsync/delete-remote {
   if [[ ! $DRY_RUN ]]; then
-    ssh "$REMOTE" "rm -r ${(q)1}"
+    ssh "$REMOTE" "rm -rf ${(q)1}"
   fi
 }
 
