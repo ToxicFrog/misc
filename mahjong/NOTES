@@ -1,0 +1,135 @@
+## Game Setup
+- pick an East player. This is the dealer.
+- set the prevailing wind to East.
+- turn order CCW from East: E-S-W-N. (This does not match the compass.)
+- shuffle tiles; each player then builds a 18-long, 2-high wall face down
+- east rolls 3d6, counts that many times CCW around the table (starting with themself),
+  then that many tiles CW from that player's right corner, and draws four
+- drawing proceeds around the table, 4 at a time, until everyone has 12
+- everyone draws 1, then East draws another one and discards one; play begins with South
+
+### Three Player Variant (hong kong old style)
+
+- Remove 2-8 of kanji
+- Use HKOS scoring variant 3
+
+## Game Shutdown
+- If the game was a draw: restart
+- Otherwise: rotate the compass counterclockwise (the South player becomes East and is now the dealer, etc)
+- If the compass has gone all the way around, increment the prevailing wind as well
+
+## Patterns
+
+The goal is to attain "mahjong" by having four of these patterns and a pair in your hand. They can be "concealed" (in your hand, or in some cases played face down) or "exposed/melded" (played face up after taking another player's discard).
+
+### Chow (three in a row)
+
+Run of three consecutive numbers. Form concealed or by taking the discard from the player to your left.
+
+### Pung (three of a kind)
+
+Three of a kind. Form concealed or by taking the discard from **any** player: call "pung" and grab the discard as soon as they finish their turn. In the latter case play resumes CCW from you.
+
+### Kong (four of a kind)
+
+Cannot be formed in hand as it leaves you unable to call mahjong. Three variants, depending on how you form it. After forming a kong, **you must draw a "replacement tile" from the back of the wall before discarding**. If drawing a replacement tile makes it possible for you declare another kong, you are allowed to do so (and draw another replacement, etc).
+- **concealed kong** is made by adding a tile to a concealed pung; you play the kong face down. You don't have to declare it as soon as you get it; you can save it for a later turn (or decide you don't want it and break it apart).
+- **exposed big kong** is made by stealing a discard (from any player) to add to a concealed pung; the kong is played half face down, half face up.
+- **exposed small kong** is made by adding a tile from your hand to an exposed pung.
+
+### Bonus Tiles
+
+If you draw a flower or season tile, immediately set it aside and draw a replacement; they are used for scoring.
+
+### Limit Hands
+
+Special patterns that end the game with a large score bonus for you. Too many to detail here.
+
+## Game Flow
+
+- Normal Turn
+  - Draw a tile from the wall
+  - [Optional] declare concealed or small kong (not necessarily using that tile)
+    - Draw replacement and optionally recurse
+  - Discard
+- Exposure Turn
+  - Draw preceding player's discard
+  - Declare exposed chow, pung, big kong, or mahjong
+    - If big kong, draw replacement and optionally recurse
+  - Discard
+- Interrupt
+  - Declare **after any other player discards**
+  - Take the discard and proceed as "Exposure Turn" except that you cannot chow
+  - Discard; play continues to your right even if this means skipping someone's turn
+  - If multiple players interrupt, pung and big kong take priority over chow, and mahjong over everything
+  - In case of priority tie, soonest player in turn order wins
+- Interrupt (Robbing the Kong)
+  - Declare after any other player upgrades an exposed pung to an exposed small kong
+  - Take the tile they used for that and go mahjong
+
+## Scoring (Hong Kong Old Style variant 3)
+
+Scoring is in *fan*, where more fan == more points, but nonlinearly (roughly 2^(fan/2) but it's more complicated than that). Most games require a minimum number of fan before you can call mahjong, typically 3.
+
+- Fan for Winning
+  - 0: win by discard
+    - 2 if it's the last discard of the game
+  - 1 win by drawing from the wall
+    - 2 if it's the last tile
+    - +3 if it's the last wall tile and it's 1 Orb [Moon from the Sea]
+  - 1 win by interrupting someone else's small kong
+  - 2 win from the replacement tile you draw after kong
+    - +3 if from the replacement you draw after 2 kongs in one turn
+    - +3 if it's 5 Orb and you use it in a 4-5-6 chow [Plum Blossoms on the Roof]
+- Alternate Win
+  - 6 All Flowers and Seasons (if you have 7 you can rob the 8th)
+  - 8 The Thirteen Orphans (one of each honour, one each of 1 and 9 of each suit, anything for the 13th)
+  - 8 The Blessing of Heaven (East wins with initial hand)
+  - 8 The Blessing of Earth (anyone else wins with initial hand)
+- Whole-hand Bonuses
+  - +1 whole hand is concealed
+  - +1 all chows + pair of suit cards
+  - +3 for all pungs
+  - +3 exactly one suit present (honours allowed) [Half Flush]
+  - +6 exactly one suit present, no honours [Full Flush]
+  - +8 only honour tiles present
+  - +8 four concealed pungs or kongs
+- Winds
+  - +1 pung of round wind
+  - +1 pung of seat wind
+  - +6 three pungs + 1 pair winds [Small Winds]
+  - +8 four pungs winds [Great Winds]
+- Dragons
+  - +1 at least one pung of dragons
+  - +3 two pung + 1 pair dragons [Small Dragons]
+  - +6 three pung dragons [Great Dragons]
+- Nature Bonuses
+  - +1 per flower or season tile
+  - +1 no flower tiles
+  - +1 flower or season of the round
+  - +1 flower or season of your seat
+
+### Fan to Points
+
+First, the table is used to convert fan into points:
+
+```
+   Fan  0  1  2   3   4   5   6   7   8    9    10   11   12   13   14   15   16
+Points  2  4  8  16  32  48  64  96  128  192  256  384  512  768  1024 1536 2048
+```
+N.b. usually 13 is the maximum.
+
+
+Then, if the win was from the wall, everyone gives the winner that many points; if the win was from discard, the discarder gives the winner that many and everyone else gives them half.
+
+Everyone starts with some arbitrary number of points if playing casually, maybe 512 or 1024.
+
+### Simplified scoring for Alex
+
+- 1 points per chow
+- 2 points per pung
+- 3 points per kong
+- +1 if you have dragons
+- +1 if you have winds
+- +1 if entire hand matches: all chow, all pung, all kong, all dragons, all winds, or all the same suit
+- +1 per nature tile

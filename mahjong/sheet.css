@@ -1,0 +1,28 @@
+table, th, td {
+  border: 1px solid black;
+}
+table {
+  margin-left: auto;
+  margin-right: auto;
+  border-collapse: collapse;
+}
+th {
+  font-weight: bold;
+  background: #CCFFCC;
+}
+td.tiles {
+  white-space: nowrap;
+  padding: 0px;
+}
+td.score {
+  padding-left: 1em;
+  padding-right: 1em;
+  font-weight: bold;
+}
+img {
+  margin: 0px;
+  border: 0.5px solid darkgreen;
+}
+hr {
+  margin: 0px 10% 0px 10%;
+}
