@@ -16,6 +16,27 @@
 # It may take experimentation to see what works.  It appears, for example,
 # that all weight identifiers may not be supported for all fonts.
 
+style "breeze_bg"
+{
+    # base and text are used for the treeview and entry widgets
+    # Note that the inv_.. values below can adjust these for special
+    # objects
+    base[NORMAL] = "#232729"
+    text[NORMAL] = "white"
+
+    # The ACTIVE tabs are used for the unselected tabs in the notebooks.
+    bg[ACTIVE] = "#33393b"
+    fg[ACTIVE] = "white"
+
+    # foreground/background of pretty much all the other widgets
+    bg[NORMAL] = "#33393b"
+    fg[NORMAL] = "white"
+
+}
+
+widget_class "*" style "breeze_bg"
+
+
 ############################################################################
 # Start of Stat Bar styles
 ############################################################################
@@ -154,32 +175,32 @@ widget_class "exp_gradual_bar_super" style "gradual_super_bar"
 
 style "inv_cursed"
 {
-    base[NORMAL] = "red"
+    text[NORMAL] = "red"
 }
 widget_class "inv_cursed" style "inv_cursed"
 
 style "inv_magical"
 {
-    base[NORMAL] = "blue"
+    text[NORMAL] = "cyan"
 }
 widget_class "inv_magical" style "inv_magical"
 
 # You owe gold for these
 style "inv_unpaid"
 {
-    text[NORMAL] = "gold"
+    base[NORMAL] = "gold"
 }
 widget_class "inv_unpaid" style "inv_unpaid"
 
 style "inv_locked"
 {
-    font_name = "Sans Italic"
+    font_name = "italic"
 }
 widget_class "inv_locked" style "inv_locked"
 
 style "inv_applied"
 {
-    font_name = "Sans Bold"
+    font_name = "bold"
 }
 widget_class "inv_applied" style "inv_applied"
 
@@ -317,17 +338,17 @@ widget_class "info_font_hand" style "info_font_hand"
 # different colored text, just disable all of these.
 # The values here match the traditional values used.
 
-style "black_text" {    fg[NORMAL] = "black" }
+style "black_text" {    fg[NORMAL] = "white" }
 widget_class "info_black" style "black_text"
 
 style "white_text"
 {
-    fg[NORMAL] = "black"
+    fg[NORMAL] = "white"
     font_name = "bold"
 }
 widget_class "info_white" style "white_text"
 
-style "darkblue_text" {    fg[NORMAL] = "navy" }
+style "darkblue_text" {    fg[NORMAL] = "cyan" }
 widget_class "info_darkblue" style "darkblue_text"
 
 style "red_text" {    fg[NORMAL] = "red" }
@@ -336,22 +357,22 @@ widget_class "info_red" style "red_text"
 style "orange_text" {    fg[NORMAL] = "orange" }
 widget_class "info_orange" style "orange_text"
 
-style "lightblue_text" {    fg[NORMAL] = "dodgerblue" }
+style "lightblue_text" {    fg[NORMAL] = "lightskyblue" }
 widget_class "info_lightblue" style "lightblue_text"
 
-style "darkorange_text" {    fg[NORMAL] = "darkorange2" }
+style "darkorange_text" {    fg[NORMAL] = "darkorange" }
 widget_class "info_darkorange" style "darkorange_text"
 
-style "green_text" {    fg[NORMAL] = "seagreen" }
+style "green_text" {    fg[NORMAL] = "lightgreen" }
 widget_class "info_green" style "green_text"
 
-style "darkgreen_text" {    fg[NORMAL] = "darkseagreen" }
+style "darkgreen_text" {    fg[NORMAL] = "aquamarine" }
 widget_class "info_darkgreen" style "darkgreen_text"
 
-style "grey_text" {    fg[NORMAL] = "grey50" }
+style "grey_text" {    fg[NORMAL] = "lavender" }
 widget_class "info_grey" style "grey_text"
 
-style "brown_text" {    fg[NORMAL] = "sienna" }
+style "brown_text" {    fg[NORMAL] = "rosybrown" }
 widget_class "info_brown" style "brown_text"
 
 style "yellow_text" {    fg[NORMAL] = "gold" }
