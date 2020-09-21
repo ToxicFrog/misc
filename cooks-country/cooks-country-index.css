@@ -1,0 +1,57 @@
+/* Global settings */
+table {
+  border-collapse: collapse;
+  table-layout: auto;
+}
+div.header {
+  position: sticky;
+  background-color: #A0A0A0;
+  top: 0px;
+}
+div.header > img {
+  position: absolute;
+  right:160px;
+}
+div.header-title {
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+}
+td {
+  border-bottom: 1px solid black;
+  padding: 10px;
+  text-align: left;
+}
+.hotlist-button, .recipe-name {
+  font-weight: bold;
+}
+
+/* Hidden and completed table rows */
+tr.hidden {
+  opacity: 20%;
+}
+tr.hidden .recipe-name,
+tr.cooked.written .recipe-name {
+  text-decoration: line-through;
+}
+
+tr.cooked.written:not(.hidden) > img {
+  filter:grayscale(100%);
+}
+
+/* Fancy hilighting of the checkboxes */
+.cooked-checkbox input:checked,
+.cooked-checkbox input:checked + label {
+  font-weight: bold;
+  text-shadow: 0px 0px 5px #F00;
+}
+.written-checkbox input:checked,
+.written-checkbox input:checked + label {
+  font-weight: bold;
+  text-shadow: 0px 0px 5px #08F;
+}
+.hidden-checkbox input:checked,
+.hidden-checkbox input:checked + label {
+  font-weight: bold;
+  text-shadow: 0px 0px 5px #444;
+}

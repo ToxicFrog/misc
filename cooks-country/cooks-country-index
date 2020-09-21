@@ -29,45 +29,10 @@ function unescape {
 
 mkdir -p "$OUTPUT"
 
-cat > "$OUTPUT/style.css" <<EOF
-table {
-  border-collapse: collapse;
-  table-layout: auto;
-}
-div.header {
-  position: sticky;
-  background-color: #A0A0A0;
-  top: 0px;
-}
-div.header > img {
-  position: absolute;
-  right:160px;
-}
-div.header-title {
-  text-align: center;
-  vertical-align: middle;
-  font-weight: bold;
-}
-td {
-  border-bottom: 1px solid black;
-  padding: 10px;
-  text-align: left;
-}
-td.finished {
-  text-decoration: line-through;
-}
-img.finished {
-  filter:grayscale(100%%);
-}
-.cooked.finished {
-  font-weight: bold;
-  text-shadow: 0px 0px 5px #F00;
-}
-.written.finished {
-  font-weight: bold;
-  text-shadow: 0px 0px 5px #08F;
-}
-EOF
+CSS=$(dirname $0)/cooks-country-index.css
+JS=$(dirname $0)/cooks-country-index.js
+
+cp $CSS $OUTPUT/style.css
 
 echo "Fetching master index..."
 issues="$(curl -s 'https://www.cookscountry.com/magazines/browse' | wring html - .result__image-link)"
@@ -142,50 +107,7 @@ html "
       <meta charset=\"UTF-8\">
     </head>
       <script>
-        const COOKED = 'COOKED';
-        const WRITTEN = 'WRITTEN';
-        function toggle_state(button, field) {
-          const id = button.id.split(':')[1];
-          var state = String(localStorage.getItem(id));
-          if (!state || state == 'null') state = '__';
-          if (state == 'COOKED') state = 'C_';
-          if (state == 'WRITTEN') state = 'CW';
-
-          if (field == 'COOKED') {
-            if (state[0] == 'C') {
-              state = '_' + state[1];
-            } else {
-              state = 'C' + state[1];
-            }
-          } else if (field == 'WRITTEN') {
-            if (state[1] == 'W') {
-              state = state[0] + '_';
-            } else {
-              state = state[0] + 'W';
-            }
-          }
-          localStorage.setItem(id, state);
-          apply_state(id, state);
-        }
-        function apply_state(id, state) {
-          if (!state || state == 'null') state = '__';
-          if (state == 'COOKED') state = 'C_';
-          if (state == 'WRITTEN') state = 'CW';
-
-          // Text is crossed out and image greyed out if both cooked and written.
-          document.getElementById('text:'+id).classList.toggle('finished', state == 'CW');
-          document.getElementById('img:'+id).classList.toggle('finished', state == 'CW');
-          // Set cooked checkbox and flair
-          document.getElementById('cb:cooked:'+id).checked = (state[0] == 'C');
-          document.getElementById('cooked:'+id).classList.toggle('finished', state[0] == 'C');
-          // Set written checkbox and flair
-          document.getElementById('written:'+id).classList.toggle('finished', state[1] == 'W');
-          document.getElementById('cb:written:'+id).checked = (state[1] == 'W');
-        }
-        function restore_state(img) {
-          const id = img.id.split(':')[1];
-          apply_state(id, String(localStorage.getItem(id)));
-        }
+        $(cat $JS)
       </script>
     <body>
 "
@@ -203,23 +125,30 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
     splash="${splash//\"/%22}"
     id="$issue/${splash%.*}"
     html '
-      <tr>
-        <td id="text:%s" colspan=2 width=100%%><b>%s</b><br>%s</td>
+      <tr id="%s" class="recipe-row">
+        <td class="hotlist-button" onclick="toggleStar(this)">☆</td>
+        <td class="recipe-name" width=100%%>%s<br>%s</td>
         <td style="text-align:right;">
-          <img id="img:%s" src="%s" height=80px onload="restore_state(this);">
+          <img src="%s" height="80px" loading="lazy">
         </td>
-        <td>
-          <span id="cooked:%s" class="cooked">
-            <input id="cb:cooked:%s" type="checkbox" onchange="toggle_state(this.parentElement, COOKED);">
-            <label>🍴</label>
-          </span><br>
-          <span id="written:%s" class="written">
-            <input id="cb:written:%s" type="checkbox" onclick="toggle_state(this.parentElement, WRITTEN);">
+        <td nowrap>
+          <span class="cooked-checkbox">
+            <input id="cb:cooked:%s" type="checkbox" onchange="toggleState(this, '\''cooked'\'');">
+            <label>🍽</label>
+          </span>
+          <br>
+          <span class="written-checkbox">
+            <input id="cb:written:%s" type="checkbox" onchange="toggleState(this, '\''written'\'');">
             <label>🗒</label>
+          </span>
+          <br>
+          <span class="hidden-checkbox">
+            <input id="cb:hidden:%s" type="checkbox" onchange="toggleState(this, '\''hidden'\'');">
+            <label>⊗</label>
           </span>
         </td>
       </tr>
-    ' "$id" "$title" "$desc" "$id" "$issue/$splash" "$id" "$id" "$id" "$id"
+    ' "$id" "$title" "$desc" "$issue/$splash" "$id" "$id" "$id"
   done
   html '</table>'
   echo -n "."
