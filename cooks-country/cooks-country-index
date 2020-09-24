@@ -110,6 +110,7 @@ html "
         $(cat $JS)
       </script>
     <body>
+    <div id=loading>Loading...</div>
 "
 
 ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue; do
@@ -117,42 +118,44 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
   html '
     <div class="header">
       <img src="%s" width=120px>
-      <div class="header-title">%s</div>
+      <span><input type="button" value="✬" onclick="toggleRowFilter('\''star-view'\'')"/></span>
+      <span><input type="button" value="🗒" onclick="toggleRowFilter('\''unwritten-view'\'')"/></span>
+      <span class="header-title">%s</span>
     </div>
-    <table>
-  ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")"
+    <table id="%s">
+  ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")" "$issue"
   cat "$OUTPUT/$issue/index" | while IFS=$'\t' read -r splash title desc; do
     splash="${splash//\"/%22}"
     id="$issue/${splash%.*}"
     html '
       <tr id="%s" class="recipe-row">
-        <td class="hotlist-button" onclick="toggleStar(this)">☆</td>
-        <td class="recipe-name" width=100%%>%s<br>%s</td>
+        <td><label class="hotlist-button" onclick="toggleStar(this)">☆</label></td>
+        <td class="recipe-name" width=100%%><b>%s</b><br>%s</td>
         <td style="text-align:right;">
           <img src="%s" height="80px" loading="lazy">
         </td>
         <td nowrap>
           <span class="cooked-checkbox">
             <input id="cb:cooked:%s" type="checkbox" onchange="toggleState(this, '\''cooked'\'');">
-            <label>🍽</label>
+            <label for="cb:cooked:%s">🍽</label>
           </span>
           <br>
           <span class="written-checkbox">
             <input id="cb:written:%s" type="checkbox" onchange="toggleState(this, '\''written'\'');">
-            <label>🗒</label>
+            <label for="cb:written:%s">🗒</label>
           </span>
           <br>
           <span class="hidden-checkbox">
             <input id="cb:hidden:%s" type="checkbox" onchange="toggleState(this, '\''hidden'\'');">
-            <label>⊗</label>
+            <label for="cb:hidden:%s">⊗</label>
           </span>
         </td>
       </tr>
-    ' "$id" "$title" "$desc" "$issue/$splash" "$id" "$id" "$id"
+    ' "$id" "$title" "$desc" "$issue/$splash" "$id" "$id" "$id" "$id" "$id" "$id"
   done
   html '</table>'
   echo -n "."
-  # ;break
+  # break
 done
 html "</body></html>"
 echo ""

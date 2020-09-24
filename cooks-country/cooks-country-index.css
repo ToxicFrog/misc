@@ -12,17 +12,24 @@ div.header > img {
   position: absolute;
   right:160px;
 }
-div.header-title {
+span.header-title {
   text-align: center;
   vertical-align: middle;
   font-weight: bold;
+  width: 100%;
+}
+input.hotlist-button {
+  padding: 1px;
+  width: 20px;
+  margin-left: 10px;
+  margin-right: 10px;
 }
 td {
   border-bottom: 1px solid black;
   padding: 10px;
   text-align: left;
 }
-.hotlist-button, .recipe-name {
+.hotlist-button {
   font-weight: bold;
 }
 
@@ -33,6 +40,33 @@ tr.hidden {
 tr.hidden .recipe-name,
 tr.cooked.written .recipe-name {
   text-decoration: line-through;
+}
+
+div#loading {
+  position: fixed;
+  left: 40%;
+  width: 0px;
+  top: 0px;
+  text-shadow: 0px 0px 5px #F00;
+  font-weight: bold;
+  top: 0px;
+  z-index: 1;
+}
+div#loading.loading-done {
+  display: none;
+}
+
+tr.starred .hotlist-button {
+  text-shadow: 0px 0px 5px #0F0;
+}
+
+tr.star-view:not(.starred) {
+  display:none;
+}
+
+tr.unwritten-view.written,
+tr.unwritten-view:not(.cooked) {
+  display:none;
 }
 
 tr.cooked.written:not(.hidden) > img {
