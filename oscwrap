@@ -11,12 +11,12 @@ import sys
 
 def openURL(url):
   subprocess.call(['notify-send', 'Opening ' + url + ' as URL...'])
-  subprocess.call(["google-chrome", url],
+  subprocess.Popen(["firefox", url],
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def openIMG(url):
   subprocess.call(['notify-send', 'Opening ' + url + ' as image...'])
-  subprocess.call(['feh', '-x', '-F', '--auto-zoom', url],
+  subprocess.Popen(['feh', '-x', '-F', '--auto-zoom', url],
     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 oscs = {
