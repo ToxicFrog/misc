@@ -28,15 +28,17 @@
   <head>
   <title>Lone Wolf</title>
   <script>
-    $ = qs => document.querySelector(qs);
-    $$ = qs => document.querySelectorAll(qs);
+    const $ = qs => document.querySelector(qs);
+    const $$ = qs => document.querySelectorAll(qs);
+
+    let CROSS_DOMAIN = false;
 
     function init() {
       document.addEventListener('keydown', dispatchKeyEvent);
       for (let elem of $$('.recalc')) {
         elem.addEventListener('input', recalculate);
       }
-      if (localStorage.getItem('autosave')) {
+      if (localStorage.getItem('LW:autosave')) {
         loadGame('autosave');
       }
       try {
@@ -51,6 +53,7 @@
       } catch(err) {
         console.log("Failed. (Cross-domain usage?) Installing focus manager instead.");
         console.log(err);
+        CROSS_DOMAIN = true;
         window.addEventListener('blur', keepFocus);
         if (document.activeElement) document.activeElement.blur();
         document.body.focus();
@@ -130,18 +133,33 @@
       let games = []
       for (let i = 0; i < localStorage.length; ++i) {
         let key = localStorage.key(i);
+        console.log(key, localStorage.getItem(key));
+        if (!key.startsWith('LW:')) continue;
         let val = JSON.parse(localStorage.getItem(key));
-        games = games.concat([val.desc])
+        games = games.concat(["["+key.replace('LW:','')+"]  "+val.desc])
       }
       return games.join('\n');
     }
 
-    function saveGame(title) {
-      if (!title)
-        title = prompt("Enter save name.\nFirst word is slot name, the rest is description.\nNote that it is not currently able to store book/paragraph number, so you should add that yourself.\n" + saveGameList());
-      if (!title) return;
-      let slot = title.split(' ')[0];
-      localStorage.setItem(slot, saveBuffer(title));
+    // Return current book location
+    function getLocation() {
+      if (CROSS_DOMAIN) return "";
+
+      let title = $('#book').contentDocument
+        .getElementById('title')
+        .firstElementChild.alt;
+      let section = $('#book').contentDocument
+        .getElementById('body')
+        .getElementsByClassName('maintext')[0]
+        .firstElementChild.innerText;
+      return " -- " + title + ": " + section;
+    }
+
+    function saveGame(slot) {
+      if (!slot)
+        slot = prompt("Which save slot?\n" + saveGameList());
+      if (!slot) return;
+      localStorage.setItem('LW:'+slot, saveBuffer(new Date().toISOString() + getLocation()));
       console.log('Saved to', slot);
     }
 
@@ -158,7 +176,7 @@
       if (!slot)
         slot = prompt("Which slot?\n" + saveGameList());
       if (!slot) return;
-      loadBuffer(localStorage.getItem(slot));
+      loadBuffer(localStorage.getItem('LW:'+slot));
     }
 
     let fields = [
@@ -270,7 +288,7 @@
       // of fights in later books by making "trash mobs" significantly less
       // threatening.
       if (false && lw_cs > enemy_cs) {
-        let bonus = bound(0, Math.floor((lw_cs - enemy_cs)/(enemy_cs*0.2)) 5);
+        let bonus = bound(0, Math.floor((lw_cs - enemy_cs)/(enemy_cs*0.2)), 5);
         rng = bound(1, rng+bonus, 10);
       }
 
