@@ -16,24 +16,24 @@
       }
       try {
         console.log("Attempting to install key event handler in the iframe.");
-        $('#book').contentDocument.addEventListener('keydown', evt => {
-          console.log("Forwarding event: ", evt);
-          parent.dispatchKeyEvent(evt);
-        });
+        installIframeKeyWatcher();
+        // This ensures that the keywatcher remains installed as the user navigates
+        // around in the iframe.
+        iframe.addEventListener('load', installIframeKeyWatcher);
       } catch(err) {
         console.log("Failed. (Cross-domain usage?) Installing focus manager instead.");
-        console.log(err);
         window.addEventListener('blur', keepFocus);
         if (document.activeElement) document.activeElement.blur();
         document.body.focus();
       }
     }
 
-    function isNavigationKey(evt) {
-      let k = evt.key;
-      return k.startsWith('Arrow')
-          || k.startsWith('Page')
-          || k == 'Home' || k == 'End';
+    function installIframeKeyWatcher() {
+      let iframe = $('#book');
+      iframe.contentDocument.addEventListener('keydown', evt => {
+        console.log("Forwarding event: ", evt);
+        parent.dispatchKeyEvent(evt);
+      })
     }
 
     function dispatchKeyEvent(evt) {
@@ -156,11 +156,22 @@
       for (let field of fields) {
         state[field] = getField(field);
       }
+      try {
+        state['href'] = $('#book').contentWindow.location.href;
+      } catch(err) {}
       return JSON.stringify(state);
     }
 
     function loadBuffer(buffer) {
       let state = JSON.parse(buffer);
+      if (state['href']) {
+        try {
+          console.log("Attempted to restore saved page:", state['href']);
+          $('#book').contentWindow.location.href = state['href'];
+        } catch(err) {
+          console.log("Failed. :(")
+        }
+      }
       for (let field of fields) {
         setField(field, state[field]);
       }
