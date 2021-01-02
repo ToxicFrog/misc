@@ -1,0 +1,155 @@
+#!/usr/bin/env zsh
+#
+# Run this in a directory created by `webtoon-dl`.
+# Sticks the individual subimages created by webtoon-dl back into whole-page images.
+# If this would result in an image that's taller than 65000px (the imagemagick
+# limit on JPEG generation), it tries to subdivide the image along a line that
+# has no colour variation, i.e. it will try to avoid cutting apart individual
+# panels or dialogue boxes.
+#
+# N.b. the 65000px limit is a limitation of ImageMagick's JPEG encoder, and can
+# be worked around by using other image formats like PNG; however, some comic
+# readers like Ubooquity have trouble reading these large PNGs anyways, so it's
+# better to split them.
+
+set -e
+
+declare -r SPLIT_WIDTH=${SPLIT_WIDTH:=5}
+declare -r SPLIT_THRESHOLD=${SPLIT_THRESHOLD:=1}
+# histogram image width gravity
+function histogram {
+  convert $1 -gravity $3 -crop 0x${2}+0+0 \
+    -define histogram:unique-colors=true \
+    -format %c histogram:info:-
+}
+
+function img {
+  for name in $1.jpg $1.jpeg $1.png $1.webp; do
+    for prefix in "" 0 00; do
+      if [[ -f $prefix$name ]]; then
+        echo "$prefix$name"
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
+function can-split-at {
+  local split=$1
+  local before=$(img $split)
+  local after=$(img $((split+1)))
+  echo -ne "  can-split-at? $split $before $after\r"
+  # Both n and n+1 need to exist for this to be a valid split point
+  [[ -f $(img $split) && -f $(img $((split+1))) ]] || { echo; return 1; }
+  # Check that n ends with, and n+1 starts with, a row of pixels at least 5px
+  # wide of uniform colour
+  local thiscolors=$(histogram $(img $split) $SPLIT_WIDTH southwest | wc -l)
+  local nextcolors=$(histogram $(img $((split+1))) $SPLIT_WIDTH northwest | wc -l)
+  echo "  can-split-at? $split $before =$thiscolors $after =$nextcolors  "
+  return $(( thiscolors > SPLIT_THRESHOLD || nextcolors > SPLIT_THRESHOLD ))
+}
+
+function split-page {
+  local chapter=$1
+  local first=$2
+  local last=$3
+  local max_scan=$(( (last-first+1)/2 - 1 ))
+  local split=$(( first + max_scan ))
+
+  pushd $chapter
+  for scan in {0..$max_scan}; do
+    if can-split-at $(( split - scan )); then
+      merge-page $chapter $first $((split-scan))
+      merge-page $chapter $((split-scan+1)) $last
+      popd
+      return 0
+    elif can-split-at $(( split + scan )); then
+      merge-page $chapter $first $((split+scan))
+      merge-page $chapter $((split+scan+1)) $last
+      popd
+      return 0
+    fi
+  done
+  echo "Unable to find any split points for $chapter; split the chapter manually"
+  popd
+  return 1
+}
+
+function pages {
+  for i in {$1..$2}; do
+    echo $(img $i)
+  done
+}
+
+# merge-page chapter start end
+function merge-page {
+  local out=$(printf "%s-pp-%03d-%03d.jpeg" $1 $2 $3)
+  echo -n "merging pp. ${2}-${3} -> $out: "
+  if ! convert $(pages $2 $3) -append ../$out; then
+    rm ../$out
+    printf "%d\t%d\t%s\n" $2 $3 $1 >> ../FAILED
+    echo "FAILED"
+  else
+    echo "OK"
+  fi
+}
+
+title=$1
+mkdir -p $1
+cd $1
+
+if [[ ! -f index.html && $2 ]]; then
+  echo "Downloading chapter index..."
+  baseurl=$(echo $2 | sed 's,&page=[0-9]+,,')
+  page=1
+  while true; do
+    url="${baseurl}&page=${page}"
+    wget -nv ${url} -O- >> index.html
+    fgrep -q "$url" index.html || break
+    ((++page))
+  done
+fi
+
+if [[ ! -f chapter.html && $2 ]]; then
+  cat index.html | fgrep a:list | sort -u \
+  | while read link; do
+    url=$(echo $link | egrep -o 'https://www.webtoons.com/[^"]+/viewer?[^"]+')
+    n=$(echo $link | egrep -o 'class="[^"]+"' | sed -E 's,.*r=([0-9]+).*,\1,')
+    wget -nv "$url" -O- > chapter.html
+    ep_title=$(fgrep episodeTitle chapter.html | cut -d'"' -f2)
+    dir=$(printf "%03d - %s" $n $ep_title)
+    echo "Chapter: $dir"
+    mkdir -p $dir
+    page=1
+    cat chapter.html | fgrep 'class="_images"' | egrep -o 'data-url="[^"]+"' | cut -d'"' -f2 \
+    | while read img; do
+      wget --referer="$url" -nv -U "" $img -O "$dir/$(printf '%03d.jpg' $page)"
+      ((++page))
+    done
+  done
+fi
+
+if [[ ! -f FAILED ]]; then
+  for i in */; do
+    chapter=${i%/}
+    if ls | fgrep "$chapter" | egrep -q '\.jpeg$'; then
+      # echo "${chapter} already raveled, skipping"
+      continue
+    else
+      echo "Raveling ${chapter}..."
+    fi
+    pushd "$i" >/dev/null
+    merge-page $chapter 001 $(printf "%03d" $(ls | wc -l))
+    popd >/dev/null
+  done
+fi
+
+while [[ -f FAILED ]]; do
+  mv FAILED FAILED_
+  cat FAILED_ | while read first last chapter; do
+    split-page $chapter $first $last
+  done
+  rm FAILED_
+done
+cd ..
