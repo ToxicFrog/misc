@@ -106,6 +106,15 @@
       console.log('Saved to', slot);
     }
 
+    function exportGame() {
+      alert(saveBuffer("autosave"));
+    }
+
+    function importGame() {
+      loadBuffer(prompt("Paste exported save game:"));
+      recalculate();
+    }
+
     function loadGame(slot) {
       if (!slot)
         slot = prompt("Which slot?\n" + saveGameList());
@@ -268,10 +277,10 @@
       'J': _ => showPopup('journal-container'),
       'i': _ => showPopup('inventory-container'),
       'I': _ => showPopup('inventory-container'),
-      's': _ => saveGame(),
-      'S': _ => saveGame(),
-      's': _ => loadGame(),
-      'L': _ => loadGame(),
+      // 's': _ => saveGame(),
+      // 'S': _ => saveGame(),
+      // 'l': _ => loadGame(),
+      // 'L': _ => loadGame(),
       'Escape': _ => showPopup('menu-container'),
     }
 
@@ -362,8 +371,10 @@
     <div class="glow purple" onclick="showPopup('disciplines-container')">🔯 <b>D</b>isciplines</div>
     <div class="glow red" onclick="showPopup('combat-container')">⚔️ <b>C</b>ombat</div>
     <div class="glow blue" onclick="showPopup('journal-container')">📔 <b>J</b>ournal</div>
-    <div class="glow white" onclick="saveGame()">💾⇐ <b>S</b>ave</div>
-    <div class="glow white" onclick="loadGame()">💾⇒ <b>L</b>oad</div>
+    <div class="glow white" onclick="saveGame()">💾⇐ Save</div>
+    <div class="glow white" onclick="loadGame()">💾⇒ Load</div>
+    <div class="glow white" onclick="exportGame()">📋⇐ Export</div>
+    <div class="glow white" onclick="importGame()">📋⇒ Import</div>
   </div>
   <div class="floating popup hidden" id="inventory-container">
     <div class="cancel" onclick="showPopup('menu-container')">❌</div>
