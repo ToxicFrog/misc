@@ -19,9 +19,13 @@
         installIframeKeyWatcher();
         // This ensures that the keywatcher remains installed as the user navigates
         // around in the iframe.
-        iframe.addEventListener('load', installIframeKeyWatcher);
+        $('#book').addEventListener('load', _ => {
+          saveGame('autosave');
+          installIframeKeyWatcher();
+        });
       } catch(err) {
         console.log("Failed. (Cross-domain usage?) Installing focus manager instead.");
+        console.log(err);
         window.addEventListener('blur', keepFocus);
         if (document.activeElement) document.activeElement.blur();
         document.body.focus();
@@ -29,9 +33,7 @@
     }
 
     function installIframeKeyWatcher() {
-      let iframe = $('#book');
-      iframe.contentDocument.addEventListener('keydown', evt => {
-        console.log("Forwarding event: ", evt);
+      $('#book').contentDocument.addEventListener('keydown', evt => {
         parent.dispatchKeyEvent(evt);
       })
     }
@@ -52,7 +54,8 @@
       // Skip events where ctrl is held down, so e.g. ctrl-C ctrl-V work as expected
       if (evt.ctrlKey) return;
 
-      // TODO: forward arrows and pageup/down to the iframe
+      // TODO: forward arrows and pageup/down to the iframe when in cross-domain
+      // mode?
 
       if (keymap[evt.key]) {
         return keymap[evt.key](evt);
@@ -158,6 +161,7 @@
       }
       try {
         state['href'] = $('#book').contentWindow.location.href;
+        console.log("Saved current page:", state['href']);
       } catch(err) {}
       return JSON.stringify(state);
     }
@@ -205,7 +209,7 @@
       let cr = bound(-11, cs + bonuses - enemy_cs, 0);
       setField('cr', cr);
 
-      saveGame("autosave");
+      // saveGame("autosave");
     }
 
     function adjust(field, delta) {
