@@ -259,8 +259,20 @@
       // Bound combat ratio between -11 and +0
       let cr = bound(-11, lw_cs - enemy_cs, 0);
 
-      // TODO: optional overkill mechanism that gives a bonus to roll based
-      // on how much you outclass the enemy?
+      // Experimental overkill mechanism that makes fights against completely
+      // outclassed opponents faster and less risky by giving a bonus to rolls.
+      // This is meant to address the issue where Lone Wolf (Magnakai, 41 CS,
+      // Sommerswerd, Weaponmastery) is just as likely to be seriously injured
+      // in a fight against a CS 17 Rogue Miner as against a CS 35 Helghast.
+      // It works by giving +1 to your rolls for each 20% LW's CS exceeds the
+      // enemies, up to a maximum of +5 when LW has twice the CS.
+      // It is currently disabled because it dramatically changes the balance
+      // of fights in later books by making "trash mobs" significantly less
+      // threatening.
+      if (false && lw_cs > enemy_cs) {
+        let bonus = bound(0, Math.floor((lw_cs - enemy_cs)/(enemy_cs*0.2)) 5);
+        rng = bound(1, rng+bonus, 10);
+      }
 
       // Enemy damage follows a fairly simple formula:
       // damage = rng + 2 + ceil(cr/2)
