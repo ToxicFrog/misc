@@ -7,14 +7,25 @@
     $$ = qs => document.querySelectorAll(qs);
 
     function init() {
-      if (document.activeElement) document.activeElement.blur();
-      document.body.focus();
       document.addEventListener('keydown', dispatchKeyEvent);
       for (let elem of $$('.recalc')) {
         elem.addEventListener('input', recalculate);
       }
       if (localStorage.getItem('autosave')) {
         loadGame('autosave');
+      }
+      try {
+        console.log("Attempting to install key event handler in the iframe.");
+        $('#book').contentDocument.addEventListener('keydown', evt => {
+          console.log("Forwarding event: ", evt);
+          parent.dispatchKeyEvent(evt);
+        });
+      } catch(err) {
+        console.log("Failed. (Cross-domain usage?) Installing focus manager instead.");
+        console.log(err);
+        window.addEventListener('blur', keepFocus);
+        if (document.activeElement) document.activeElement.blur();
+        document.body.focus();
       }
     }
 
@@ -285,7 +296,6 @@
     }
 
     window.addEventListener('load', init)
-    window.addEventListener('blur', keepFocus)
   </script>
   <style>
     body { margin: 0px; }
