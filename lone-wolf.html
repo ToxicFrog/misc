@@ -340,10 +340,8 @@
       'J': _ => showPopup('journal-container'),
       'i': _ => showPopup('inventory-container'),
       'I': _ => showPopup('inventory-container'),
-      // 's': _ => saveGame(),
-      // 'S': _ => saveGame(),
-      // 'l': _ => loadGame(),
-      // 'L': _ => loadGame(),
+      's': _ => showPopup('system-container'),
+      'S': _ => showPopup('system-container'),
       'Escape': _ => showPopup('menu-container'),
     }
 
@@ -362,7 +360,7 @@
       background: #cccc99;
     }
     div.popup.hidden {
-      right: -50vw;
+      right: -100vw;
       visibility: hidden;
     }
     div.header {
@@ -370,6 +368,12 @@
       margin-left: 2em;
     }
     input.small { width: 2em; }
+
+    div#help-container {
+      width: 60vw;
+      height: 70vh;
+      overflow-y: scroll;
+    }
 
     div.glow.green:hover { text-shadow: 0px 0px 5px #0F0; }
     div.glow.purple:hover { text-shadow: 0px 0px 5px #80F; }
@@ -388,7 +392,8 @@
       text-shadow: 0px 0px 5px #000;
     }
 
-    div#menu-container {
+    div#menu-container,
+    div#system-container {
       user-select: none;
     }
 
@@ -433,10 +438,8 @@
     <div class="glow purple" onclick="showPopup('disciplines-container')">🔯 <b>D</b>isciplines</div>
     <div class="glow red" onclick="showPopup('combat-container')">⚔️ <b>C</b>ombat</div>
     <div class="glow blue" onclick="showPopup('journal-container')">📔 <b>J</b>ournal</div>
-    <div class="glow white" onclick="saveGame()">💾⇐ Save</div>
-    <div class="glow white" onclick="loadGame()">💾⇒ Load</div>
-    <div class="glow white" onclick="exportGame()">📋⇐ Export</div>
-    <div class="glow white" onclick="importGame()">📋⇒ Import</div>
+    <div class="glow white" onclick="showPopup('system-container')">⚙️ <b>S</b>ystem</div>
+    <div class="glow white" onclick="showPopup('help-container')">❓ Help</div>
   </div>
   <div class="floating popup hidden" id="inventory-container">
     <div class="cancel" onclick="showPopup('menu-container')">❌</div>
@@ -469,6 +472,36 @@
     <div class="cancel" onclick="showPopup('menu-container')">❌</div>
     <div class="header">Journal</div>
     <textarea id="journal" class="focus-default" cols=40></textarea>
+  </div>
+  <div class="floating popup hidden" id="system-container">
+    <div class="cancel" onclick="showPopup('menu-container')">❌</div>
+    <div class="header">System&nbsp;&nbsp;&nbsp;</div>
+    <div class="glow white" onclick="saveGame()">💾⇐ Save</div>
+    <div class="glow white" onclick="loadGame()">💾⇒ Load</div>
+    <div class="glow white" onclick="exportGame()">📋⇐ Export</div>
+    <div class="glow white" onclick="importGame()">📋⇒ Import</div>
+  </div>
+  <div class="floating popup hidden" id="help-container">
+    <div class="cancel" onclick="showPopup('menu-container')">❌</div>
+    <div class="header">Help</div>
+    <p><b>Keyboard Shortcuts</b><br>
+      You can use the bolded letters in the main menu to open and close various screens, and Escape to return to the main menu. You can also use h, g, f, and a to reduce your EP, Gold, Food, and Arrows by 1, and H, G, F, and A to increase them. Finally, you can press r or R to pick a random number.<br>
+      Any keyboard shortcut also works when holding down Alt, which is convenient when a text box is focused (as without Alt it would just result in typing in the box).
+    </p>
+    <p><b>Inventory, Disciplines, and Journal</b><br>
+      These are free-form text fields (with Inventory divided into Weapons, Backpack, and Special) in which you can write anything you like.
+    </p>
+    <p><b>Combat</b><br>
+      To use the combat screen, enter your base CS, the enemy's CS and EP, and any modifiers you have; it will automatically calculate your total CS and Combat Ratio. Then click "One Round" or "To The Death" to fight.<br>
+      To enter a combat modifier, just type it on a line of its own in the Combat Modifiers box preceded by a + or a - and a number, e.g.<br>
+      <blockquote><pre>+8 Sommerswerd
++3 Swordmastery
+-4 vision obscured</pre></blockquote>
+      Would result in a net +7 bonus. If you want to temporarily disable a bonus you can just put something else in front of it, and it will be skipped -- I like to use <tt>;</tt>, e.g. <tt>;+8 Sommerswerd</tt>.
+    </p>
+    <p><b>Save/Load</b><br>
+      The game is automatically saved to the "autosave" slot every time you open or close a screen, and (when possible) whenever you turn to a new page in the book. You can also manually save or load from the System menu; save files are stored in the browser's <tt>LocalStorage</tt>. If you need to copy a save file into or out of the browser (e.g. for transfer to a different computer), Import/Export will give you a text string you can copy around.
+    </p>
   </div>
   <iframe id="book" src="./index.htm" style="width: 100%; height: 100%; border: 0px;"></frame>
  </body>
