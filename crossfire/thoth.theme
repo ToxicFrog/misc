@@ -188,7 +188,7 @@ widget_class "inv_magical" style "inv_magical"
 # You owe gold for these
 style "inv_unpaid"
 {
-    base[NORMAL] = "gold"
+    text[NORMAL] = "gold"
 }
 widget_class "inv_unpaid" style "inv_unpaid"
 
@@ -539,6 +539,7 @@ widget_class "msg_spell_failure" style "grey_text"
 widget_class "msg_spell_success" style "darkblue_text"
 widget_class "msg_spell_error" style "darkblue_text"
 widget_class "msg_spell_target" style "orange_text"
+widget_class "msg_spell_info" style "lightblue_text"
 
 # ITEM messages
 widget_class "msg_item_remove" style "brown_text"
