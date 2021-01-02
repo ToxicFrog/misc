@@ -1,0 +1,106 @@
+Setting up the activity sidebar.
+To get the terminal back, we need $.routing.navigateTo($.Page.Terminal),
+which we can do by setting #mainmenu-container visibility: visible
+
+CSS #work-in-progress-container:
+  display block
+  right 0
+  bottom 0
+  max-width 280px
+  max-height 100%
+  height auto
+  width auto
+  overflow-y scroll
+  border 2px solid #ffffff
+CSS #work-in-progress-text:
+  width 100%
+  margin 0px
+  font-size 80%
+
+Synchronous RPC implementation.
+RPC channel has {state,token,data}.
+Channel begins in IDLE. Possible states are:
+IDLE (channel not in use)
+AWAIT_SEND (recv() called, waiting for matching send())
+AWAIT_RECV (send() called, waiting for matching recv())
+AWAIT_REPLY (send() and recv() both called, sender is waiting for reply)
+REPLIED (reply() called but sender has not acked yet)
+We might be able to do something here with promises rather than constant sleeps.
+
+Receive in IDLE state:
+1. State changes to AWAIT_SEND.
+2. Block until state changes to AWAIT_REPLY.
+3. Clear and return data.
+4. On reply(d), set data=d and state=REPLIED.
+
+Receive in REPLIED state:
+1. Block until IDLE state, then continue as above.
+
+Receive in AWAIT_RECV state:
+1. State changes to AWAIT_REPLY.
+2. Proceed from IDLE[3].
+
+Send in IDLE state:
+1. Write data and token. State changes to AWAIT_RECV.
+2. Block until state is REPLIED.
+3. Clear token. Clear data. Set state to IDLE. Return data.
+
+Send in AWAIT_SEND state:
+
+On recv(AWAIT_RECV), state is set to AWAIT_REPLY
+
+
+
+
+Alternate promise-based implementation.
+Note: this is always many senders, one receiver. Multiple receivers are UB.
+A channel has an ownership token (initially nil),
+  a send promise, and a reply promise.
+
+To send, if the ownership token is set and is not yours, you block until it's unset.
+Then you set the ownership token to yours, fulfill the send promise, and block on the reply promise.
+When the promise resolves, you clear the ownership token, and return whatever the promise resolved to.
+
+To receive, you block on the send promise.
+When it resolves, you return the value it resolved to and delete the promise.
+To reply, you extract the reply promise, replace both promises, clear the ownership token (the channel is now ready for use), and then fulfill the reply promise.
+
+When creating a channel, we check for an ownership token. If it's present, the channel is either in AWAIT_RECV or AWAIT_REPLY state.
+
+
+A few possibilities
+Sender dies between calling send and receiver getting the message: reciever will handle the message and reply, sender will not wake up ("cannot resume dead coroutine"), reply is lost. This means RECEIVER is responsible for resetting the channel after reply()! How do we do this?
+
+Sender dies between receiver getting the message and replying: same as above.
+
+Receiver dies after send() is called but before recv(): RPC is left pending until receiver starts back up, then is received.
+Receiver dies after recv() and before reply(): when receiver starts back up the sender will get an error, and will block until then.
+
+
+
+Alternate alternate idea. Entirely promise-based, no spinwaits.
+An RPC channel is initialized with { sendq: [], wake: null, message: null, reply: null }
+
+To receive when sendq is empty, set wake=Future() and await wake, then proceed as normal.
+
+When sendq is nonempty, shift it; it will give you [message, reply-promise]. Set reply=reply-promise and message=message and return message.
+
+To send, create reply-promise, push [message, reply-promise] onto sendq, fulfill and delete wake if present, and yield reply-promise.
+
+To reply, delete message and reply, then fulfill reply-promise.
+
+Possible interrupt points:
+- Sender interrupted before reply: the reply is lost (cannot resume dead coroutine). Life continues as normal for the receiver.
+- Receiver interrupted after recv, before first send: sendq is empty, receiver is blocked on wake. Recreate channel from scratch.
+- Receiver interrupted after send, before first recv: sendq is full, wake is absent, message/reply are absent. Re-use sendq when recreating channel.
+- Receiver interrupted after send and recv and before reply: message and reply are set; sender is blocked on reply; recvq may contain stuff. Assume processing of message was interrupted: push message and reply back onto the queue, clear message and reply, recreate
+
+
+const function Future() {
+  let result = {};
+  result.promise = new Promise(function(resolve, reject) {
+      result.resolve = resolve;
+      result.reject = reject;
+  });
+  return result;
+}
