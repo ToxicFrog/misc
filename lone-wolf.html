@@ -1,0 +1,402 @@
+<html>
+  <meta content="text/html; charset=utf-8" http-equiv="Content-type" />
+  <head>
+  <title>Lone Wolf</title>
+  <script>
+    $ = qs => document.querySelector(qs);
+    $$ = qs => document.querySelectorAll(qs);
+
+    function init() {
+      if (document.activeElement) document.activeElement.blur();
+      document.body.focus();
+      document.addEventListener('keydown', dispatchKeyEvent);
+      for (let elem of $$('.recalc')) {
+        elem.addEventListener('input', recalculate);
+      }
+      if (localStorage.getItem('autosave')) {
+        loadGame('autosave');
+      }
+    }
+
+    function isNavigationKey(evt) {
+      let k = evt.key;
+      return k.startsWith('Arrow')
+          || k.startsWith('Page')
+          || k == 'Home' || k == 'End';
+    }
+
+    function dispatchKeyEvent(evt) {
+      // Skip compose-key events
+      if (evt.isComposing || evt.keyCode === 229) {
+        return;
+      }
+
+      // Skip events targeting an <input> or <textarea> element...
+      if (evt.target.tagName == 'INPUT' || evt.target.tagName == 'TEXTAREA') {
+        // ...unless the user is pressing escape, or holding down alt.
+        if (!evt.altKey && evt.key != 'Escape')
+          return;
+      }
+
+      // Skip events where ctrl is held down, so e.g. ctrl-C ctrl-V work as expected
+      if (evt.ctrlKey) return;
+
+      // TODO: forward arrows and pageup/down to the iframe
+
+      if (keymap[evt.key]) {
+        return keymap[evt.key](evt);
+      }
+    }
+
+    // When the window loses focus, it means the user has clicked inside the
+    // iframe to e.g. turn the page, which means we need to snap focus back to
+    // the top level so that keyboard shortcuts keep working.
+    function keepFocus() {
+      setTimeout(_ => {
+        // For unknown reasons we need to blur the iframe before we can focus
+        // the body.
+        document.activeElement.blur();
+        document.body.focus();
+      }, 0)
+    }
+
+    function showPopup(id) {
+      for (let elem of $$('.popup')) {
+        if (elem.id === id) {
+          if (!elem.classList.contains('hidden') && id != 'menu-container') {
+            return showPopup('menu-container');
+          }
+          elem.classList.remove('hidden');
+          let focusable = $('#'+id+' .focus-default')
+          if (focusable) {
+            focusable.focuser = setTimeout(_ => {
+              focusable.focuser = null
+              focusable.focus({preventScroll:true})
+            }, 500);
+          } else {
+            keepFocus();
+          }
+        } else {
+          elem.classList.add('hidden');
+          if (elem.focuser) {
+            clearTimeout(elem.focuser);
+            elem.focuser = null;
+          }
+        }
+      }
+      saveGame("autosave");
+    }
+
+    function saveGameList() {
+      let games = []
+      for (let i = 0; i < localStorage.length; ++i) {
+        let key = localStorage.key(i);
+        let val = JSON.parse(localStorage.getItem(key));
+        games = games.concat([val.desc])
+      }
+      return games.join('\n');
+    }
+
+    function saveGame(title) {
+      if (!title)
+        title = prompt("Enter save name.\nFirst word is slot name, the rest is description.\nNote that it is not currently able to store book/paragraph number, so you should add that yourself.\n" + saveGameList());
+      if (!title) return;
+      let slot = title.split(' ')[0];
+      localStorage.setItem(slot, saveBuffer(title));
+      console.log('Saved to', slot);
+    }
+
+    function loadGame(slot) {
+      if (!slot)
+        slot = prompt("Which slot?\n" + saveGameList());
+      if (!slot) return;
+      loadBuffer(localStorage.getItem(slot));
+    }
+
+    let fields = [
+      'ep', 'max-ep', 'gold', 'food', 'arrows',
+      'weapons', 'backpack', 'special-items',
+      'disciplines',
+      'base-cs', 'cs-modifiers', 'enemy-cs', 'enemy-ep',
+      'journal',
+    ];
+
+    function getField(field) {
+      return $('#'+field).value;
+    }
+    function getIntField(field) {
+      return parseInt(getField(field)) || 0;
+    }
+    function setField(field, value) {
+      $('#'+field).value = value;
+    }
+
+    function saveBuffer(desc) {
+      let state = {desc:desc};
+      for (let field of fields) {
+        state[field] = getField(field);
+      }
+      return JSON.stringify(state);
+    }
+
+    function loadBuffer(buffer) {
+      let state = JSON.parse(buffer);
+      for (let field of fields) {
+        setField(field, state[field]);
+      }
+      recalculate();
+    }
+
+    // Clip n such that lower <= n <= higher
+    function bound(lower, n, higher) {
+      return Math.max(lower, Math.min(n, higher));
+    }
+
+    // Recalculate all derived stats based on fundamental stats.
+    // At the moment this just means EP display and combat rating.
+    function recalculate() {
+      // EP bar.
+      let epbar = $('#epbar');
+      epbar.max = getField('max-ep');
+      epbar.value = getField('ep');
+
+      // Combat skill.
+      let cs = getIntField('base-cs');
+      let bonuses = getField('cs-modifiers')
+        .split("\n")
+        .map(n => parseInt(n))
+        .filter(n => !isNaN(n))
+        .reduce((x,y) => x+y, 0);
+      setField('total-cs', cs+bonuses);
+
+      // Combat ratio.
+      let enemy_cs = getIntField('enemy-cs');
+      let cr = bound(-11, cs + bonuses - enemy_cs, 0);
+      setField('cr', cr);
+
+      saveGame("autosave");
+    }
+
+    function adjust(field, delta) {
+      setField(field, getIntField(field)+delta)
+      recalculate();
+    }
+
+    function rng() {
+      let roll = Math.floor(Math.random() * 10);
+      setField('rng', roll);
+      $('#dice').classList.add('glow');
+      setTimeout(_ => $('#dice').classList.remove('glow'), 500);
+      return roll;
+    }
+
+    // Based on the combat skill of Lone Wolf and his opponent,
+    // and a random die roll, return [damage taken by enemy,
+    // damage taken by LW].
+    function combatResults(lw_cs, enemy_cs, rng) {
+      // random numbers of 0 are the best here
+      if (rng === 0) rng = 10;
+      // Bound combat ratio between -11 and +0
+      let cr = bound(-11, lw_cs - enemy_cs, 0);
+
+      // TODO: optional overkill mechanism that gives a bonus to roll based
+      // on how much you outclass the enemy?
+
+      // Enemy damage follows a fairly simple formula:
+      // damage = rng + 2 + ceil(cr/2)
+      let enemy_damage = Math.max(0, rng + 2 + Math.ceil(cr/2));
+
+      // LW damage does not, so we just hard-code the table in below.
+      let lw_damage = lw_damage_table[rng][Math.ceil(cr/2)+6];
+
+      return [enemy_damage, lw_damage];
+    }
+
+    // Row is indexed by RNG value.
+    // Column is indexed by ceil(cr/2)+6
+    const lw_damage_table = [
+      [], // no entry for RNG=0, we go 1..10 here
+      [Infinity, Infinity, 8, 6, 6, 5, 5],
+      [Infinity, 8, 7, 6, 5, 5, 4],
+      [8, 7, 6, 5, 5, 4, 4],
+      [8, 7, 6, 5, 4, 4, 3],
+      [7, 6, 5, 4, 4, 3, 2],
+      [6, 6, 5, 4, 3, 2, 2],
+      [5, 5, 4, 3, 2, 2, 1],
+      [4, 4, 3, 2, 1, 1, 0],
+      [3, 3, 2, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+    ];
+
+    function fightOne() {
+      let cs = getIntField('total-cs');
+      let enemy_cs = getIntField('enemy-cs');
+      let [enemy_damage, lw_damage] = combatResults(cs, enemy_cs, rng());
+      adjust('ep', -lw_damage);
+      adjust('enemy-ep', -enemy_damage);
+      if (getIntField('ep') <= 0) {
+        alert("Lone Wolf has been slain in battle.\nYour life and your quest end here.");
+      } else if (getIntField('enemy-ep') <= 0) {
+        alert("You are victorious!");
+      }
+    }
+
+    function fightAll() {
+      while (getIntField('ep') > 0 && getIntField('enemy-ep') > 0) {
+        fightOne();
+      }
+    }
+
+    keymap = {
+      'h': _ => adjust('ep', -1),
+      'e': _ => adjust('ep', -1),
+      'g': _ => adjust('gold', -1),
+      'f': _ => adjust('food', -1),
+      'a': _ => adjust('arrows', -1),
+      'H': _ => adjust('ep', 1),
+      'E': _ => adjust('ep', 1),
+      'G': _ => adjust('gold', 1),
+      'F': _ => adjust('food', 1),
+      'A': _ => adjust('arrows', 1),
+      'r': _ => rng(),
+      'R': _ => rng(),
+      'c': _ => showPopup('combat-container'),
+      'C': _ => showPopup('combat-container'),
+      'd': _ => showPopup('disciplines-container'),
+      'D': _ => showPopup('disciplines-container'),
+      'j': _ => showPopup('journal-container'),
+      'J': _ => showPopup('journal-container'),
+      'i': _ => showPopup('inventory-container'),
+      'I': _ => showPopup('inventory-container'),
+      's': _ => saveGame(),
+      'S': _ => saveGame(),
+      's': _ => loadGame(),
+      'L': _ => loadGame(),
+      'Escape': _ => showPopup('menu-container'),
+    }
+
+    window.addEventListener('load', init)
+    window.addEventListener('blur', keepFocus)
+  </script>
+  <style>
+    body { margin: 0px; }
+    iframe { width: 100%; height: 100%; border: 0px; }
+
+    div.floating { position: absolute; margin: 1em; }
+    div.popup {
+      border: 0.5em ridge burlywood;
+      padding: 0.2em;
+      transition: right 0.5s ease, visibility 0.5s;
+      right: 0px; top: 4em;
+      background: #cccc99;
+    }
+    div.popup.hidden {
+      right: -50vw;
+      visibility: hidden;
+    }
+    div.header {
+      font-style: italic;
+      margin-left: 2em;
+    }
+    input.small { width: 2em; }
+
+    div.glow.green:hover { text-shadow: 0px 0px 5px #0F0; }
+    div.glow.purple:hover { text-shadow: 0px 0px 5px #80F; }
+    div.glow.red:hover { text-shadow: 0px 0px 5px #F00; }
+    div.glow.blue:hover { text-shadow: 0px 0px 5px #08F; }
+    div.glow.white:hover { text-shadow: 0px 0px 5px #FFF; }
+
+    span.glow input { background-color: red; font-weight: bold; border: none;}
+
+    div.cancel {
+      position: absolute;
+      right: 2px; top: 2px;
+      user-select: none;
+    }
+    div.cancel:hover {
+      text-shadow: 0px 0px 5px #000;
+    }
+
+    div#menu-container {
+      user-select: none;
+    }
+
+    div#statline-container {
+      right: 0px; top: 0px;
+      user-select: none;
+    }
+    div#statline-container input {
+      text-align: center;
+      user-select: contain;
+    }
+    div#statline-container meter { width: 100%; margin-top: 2px; }
+    div#statline-container input#rng { width: 2em; }
+
+    textarea#journal { height: 60vh; }
+
+    textarea {
+      background-attachment: local;
+      background-image:
+      repeating-linear-gradient(white, white 0.95rem, #ccc 0.95rem, #ccc 0.05px, white 1.0rem);
+      line-height: 1.0rem;
+      overflow: hidden;
+    }
+
+    input:disabled {
+      color: #000;
+      text-align: center;
+    }
+  </style>
+ </head>
+ <body>
+  <div class="floating" id="statline-container">
+    💗 <input type="text" class="small recalc" id="ep"/>/<input type="text" class="small recalc" id="max-ep"/>
+    💰 <input type="text" class="small recalc" id="gold"/>
+    🍗 <input type="text" class="small recalc" id="food"/>
+    🏹 <input type="text" class="small recalc" id="arrows"/>
+    <span id="dice">🎲 <input type="text" class="small" id="rng" disabled="true"/></span>
+    <br><meter id="epbar" min=0 max=100 value=100></meter>
+  </div>
+  <div class="floating popup" id="menu-container">
+    <div class="glow green" onclick="showPopup('inventory-container')">📦 <b>I</b>nventory</div>
+    <div class="glow purple" onclick="showPopup('disciplines-container')">🔯 <b>D</b>isciplines</div>
+    <div class="glow red" onclick="showPopup('combat-container')">⚔️ <b>C</b>ombat</div>
+    <div class="glow blue" onclick="showPopup('journal-container')">📔 <b>J</b>ournal</div>
+    <div class="glow white" onclick="saveGame()">💾⇐ <b>S</b>ave</div>
+    <div class="glow white" onclick="loadGame()">💾⇒ <b>L</b>oad</div>
+  </div>
+  <div class="floating popup hidden" id="inventory-container">
+    <div class="cancel" onclick="showPopup('menu-container')">❌</div>
+    <div class="header">Weapons</div>
+    <textarea id="weapons" cols=40 rows=2></textarea>
+    <div class="header">Backpack</div>
+    <textarea id="backpack" class="focus-default" cols=40 rows=8></textarea>
+    <div class="header">Special Items</div>
+    <textarea id="special-items" cols=40 rows=12></textarea>
+  </div>
+  <div class="floating popup hidden" id="disciplines-container">
+    <div class="cancel" onclick="showPopup('menu-container')">❌</div>
+    <div class="header">Kai Disciplines</div>
+    <textarea id="disciplines" class="focus-default" cols=40 rows=10></textarea>
+  </div>
+  <div class="floating popup hidden" id="combat-container">
+    <div class="cancel" onclick="showPopup('menu-container')">❌</div>
+    <div class="header">Combat</div>
+    Base CS <input type="text" class="small recalc" class="small" id="base-cs">
+    Total CS <input type="text" class="small" id="total-cs" disabled=true>
+    CR <input type="text" class="small" id="cr" disabled=true>
+    <div class="header">CS Modifiers</div>
+    <textarea id="cs-modifiers" class="recalc" rows=4 style="width: 100%"></textarea><br>
+    Enemy CS <input type="text" class="recalc small focus-default" id="enemy-cs"/>
+    Enemy EP <input type="text" class="small" id="enemy-ep"/><br>
+    <input type=button onclick="fightOne()" value="One Round"/>
+    <input type=button onclick="fightAll()" value="To The Death"/>
+  </div>
+  <div class="floating popup hidden" id="journal-container">
+    <div class="cancel" onclick="showPopup('menu-container')">❌</div>
+    <div class="header">Journal</div>
+    <textarea id="journal" class="focus-default" cols=40></textarea>
+  </div>
+  <iframe id="book" src="./index.htm" style="width: 100%; height: 100%; border: 0px;"></frame>
+ </body>
+</html>
