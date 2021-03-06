@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+function sgr { printf '\x1B[%sm' "$@"; }
+
+declare -a message=(
+  " WE ARE EXPERIENCING "
+  " GENDER DIFFICULTIES "
+  "                     "
+  "   PLEASE STAND BY   "
+)
+
+shopt -s lastpipe
+stty size | read rows cols
+
+tput smcup
+tput civis
+clear
+
+# Calling flagbar 20+ times is slow, so we run it once and cache the output
+bar="$(flagbar -w $cols $(flagbar -l))"
+for i in $(seq 0 $((rows-1))); do
+  tput cup $i 0
+  echo -n "$bar"
+  sleep 0.05
+done
+
+sgr '0;1;5'
+message_rows=${#message[@]}
+message_cols=$(printf '%s\n' "${message[@]}" | wc -L)
+for i in $(seq 0 $((message_rows-1))); do
+  tput cup $((rows-message_rows+i)) $((cols/2 - message_cols/2))
+  printf ' %*s ' $message_cols "${message[$i]}"
+done
+
+read -n 1 key
+sgr 0
+tput cnorm
+tput rmcup

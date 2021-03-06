@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Usage: flagbar <width> <colour> <colour> <colour...>
+# Or flagbar -a colour colour colour... to autodetect terminal width.
+# Width is meant to be the total width of the flag; if the number of
+# stripes doesn't divide evenly into this it will be left-padded.
+# Stripes will never be less than 1 col wide, so width=0 will make
+# the flag exactly as wide as the number of stripes.
+# Give colour as a hex triple, e.g.
+# flagbar -a 00ffff ff00ff ffffff ff00ff 00ffff
+# It also supports some presets; try `flagbar 0 pride`.
+
+declare -A presets=(
+  [pride]="ff0018 ffa52c ffff41 008018 0000f9 86007d"
+  [trans]="55CDFC F7A8B8 FFFFFF F7A8B8 55CDFC"
+  [lesbian]="D62900 FF9B55 FFFFFF D461A6 A50062"
+  [bi]="D60270 D60270 9B4F96 0038A8 0038A8"
+  [nonbinary]="FFF430 FFFFFF 9C59D1 000000"
+  [genderqueer]="b57edc ffffff 498022"
+  [agender]="000000 bababa ffffff BAF584 ffffff bababa 000000"
+  [asexual]="000000 A4A4A4 FFFFFF 810081"
+)
+
+function parse-colour {
+  local R=$(echo $1 | cut -c1-2)
+  local G=$(echo $1 | cut -c3-4)
+  local B=$(echo $1 | cut -c5-6)
+  echo -n "$(( 0x$R ));$(( 0x$G ));$(( 0x$B ))"
+}
+
+if [[ $1 == "-h" ]]; then
+  echo "Usage: flagbar -l"
+  echo "       flagbar [-w width|-a] <hex triples>"
+  exit 0
+fi
+
+if [[ $1 == "-l" ]]; then
+  echo ${!presets[@]}
+  exit 0
+fi
+
+while [[ $1 ]]; do
+  if [[ $1 == "-a" ]]; then
+    shift
+    total_width=$(stty size | cut -d' ' -f2)
+  elif [[ $1 == "-w" ]]; then
+    total_width="$2"
+    shift 2
+  else
+    break
+  fi
+done
+
+stripe_count=0
+for arg in "$@"; do
+  if [[ ${presets[$arg]} ]]; then
+    ((stripe_count += $(echo "${presets[$arg]}" | wc -w) ))
+  else
+    ((stripe_count++))
+  fi
+done
+stripe_width=$(( total_width / stripe_count ))
+padding=$(( (total_width - stripe_width * stripe_count)/2 ))
+
+printf "%${padding}s" ""
+while [[ $1 ]]; do
+  if [[ ${presets[$1]} ]]; then
+    colour="$1"; shift
+    set -- ${presets[$colour]} "$@"
+    continue
+  fi
+  colour="$(parse-colour $1)"; shift
+  printf "\\x1B[48;2;%sm%${stripe_width}s\\x1B[0m" "$colour" " "
+done

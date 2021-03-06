@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+function xrgb {
+  local R=$(echo $1 | cut -c1-2)
+  local G=$(echo $1 | cut -c3-4)
+  local B=$(echo $1 | cut -c5-6)
+  printf '\x1B[38;2;%d;%d;%dm' "0x$R" "0x$G" "0x$B"
+}
+
+function nixflake {
+  set -- $(xrgb $1) $(xrgb $2) $(xrgb $3) $(xrgb $4) $(xrgb $5) $(xrgb $6) ""
+  # The $7s are just so that everything is spaced consistently
+  # For reference: it's 25 cols, 12 rows as displayed
+  cat <<EOF
+$1      ▜█▙   $2▜█▙  ▟█▖
+$1       ▜█▙   $2▜█▙▟█▛
+$1   ▟████████▙ $2▜██▛  $3 ▄
+$6      ▗▄▖      $2▜█▖ $3 ▟█▘
+$6     ▗█▛        $2▜▛$3 ▟█▘
+$6▜█████▛         $7 $3 ▟█████▙
+$6   ▗█▛ $5▟▙       $3 ▟█▘
+$6  ▗█▛ $5 ▝█▙     $3 ▝▀▘
+$6   ▀ $5  ▟██▙ $4▜████████▛
+$7    $5  ▟█▛▜█▙ $4   ▜█▙
+$7   $5  ▝█▛  ▜█▙ $4   ▜█▙
+EOF
+}
+
+if [[ $6 ]]; then
+  nixflake "$@"
+else
+  >&2 echo "Usage: nixflake R1G1B1 R2G2B2 ... R6G6B6"
+  exit 1
+fi

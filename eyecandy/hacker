@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+shopt -s lastpipe
+trap "printf '\\x1B[0m\\x1B[?1049l\x1B[?25h'" EXIT
+printf '\x1B[?1049h\x1B[30m\x1B[?25l'
+
+stty size | read COLUMNS LINES
+
+function newspark {
+  echo $((RANDOM % LINES + 1)) $((RANDOM % (COLUMNS-3) + 1 )) 255 $((RANDOM % 65536))
+}
+
+function step {
+  while [[ $1 ]]; do
+    local row=$1; local col=$2; local colour=$3; local octet=$4; shift 4
+    if (( colour < 8 )); then
+      >&2 printf '\x1B[%d;%dH\x1B[48;2;0;0;0m    ' $row $col
+    else
+      >&2 printf '\x1B[%d;%dH\x1B[48;2;0;%d;0m%04x' $row $col $colour $octet
+      echo $row $col $((colour-4)) $((octet/2))
+    fi
+  done
+}
+
+SPARKS=""
+while true; do
+  SPARKS="$(step $SPARKS $(newspark))"
+  sleep 0.1
+done
