@@ -95,7 +95,7 @@ function books/cc {
   exec booklord "$@"
 }
 
-task/register bookstats 'bookstats' books/bookstats <<EOF
+task/register bookstats '(^| )(book)?stats( |$)' books/bookstats <<EOF
 
   $NAME [filter] bookstats <field ...>
 
@@ -114,7 +114,7 @@ EOF
 function books/bookstats {
   local FILTER=(+COMPLETED)
   while [[ $1 ]]; do
-    if [[ $1 == bookstats ]]; then
+    if [[ $1 == bookstats ]] || [[ $1 == stats ]]; then
       shift; break;
     fi
     FILTER+="$1"
