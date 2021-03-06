@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# Rising Light
+# Copyright (C) 2011, 2013 by Yu-Jie Lin (Let It Rain)
+# Copyright (C) 2020 by Rebecca Kelly (Rising Light)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+shopt -s lastpipe
+
+RAINS=("|" "│" "┃" "┆" "┇" "┊" "┋" "╽" "╿")
+RAINS=("|" "│" ":" "║" "▌" "▐" "░" "▒" "▓" "█") # these work in the linux console
+COLORS=(
+  "\x1B[38;2;255;0;0m"
+  "\x1B[38;2;0;255;0m"
+  "\x1B[38;2;0;0;255m"
+  "\x1B[38;2;255;255;0m"
+  "\x1B[38;2;255;0;255m"
+  "\x1B[38;2;0;255;255m"
+  "\x1B[38;2;255;255;255m"
+  "\x1B[38;2;128;128;128m"
+
+  # "\x1B[38;2;255;0;255m"
+  # "\x1B[38;2;0;255;255m"
+  # "\x1B[38;2;255;255;255m"
+  # "\x1B[38;2;0;255;255m"
+  # "\x1B[38;2;255;0;255m"
+)
+#COLORS=("\e[37m" "\e[37;1m")
+# More from 256 color mode
+# for i in {244..255}; do
+#   COLORS+=("\x1B[38;5;${i}m")
+# done
+NRAINS=${#RAINS[@]}
+NCOLORS=${#COLORS[@]}
+NUM_RAIN_METADATA=5
+
+function sigwinch {
+  TERM_WIDTH=$(stty -a | egrep -o 'columns [0-9]+' | cut -d' ' -f2)
+  TERM_HEIGHT=$(stty -a | egrep -o 'rows [0-9]+' | cut -d' ' -f2)
+  STEP_DURATION=0.05
+  ((MAX_RAINS = TERM_WIDTH * TERM_HEIGHT / 4))
+  ((MAX_RAIN_LENGTH = TERM_HEIGHT < 10 ? 1 : TERM_HEIGHT / 5))
+  # In percentage
+  ((NEW_RAIN_ODD = TERM_HEIGHT > 50 ? 100 : TERM_HEIGHT * 2))
+  ((NEW_RAIN_ODD = NEW_RAIN_ODD * 75 / 100))
+  NEW_RAIN_ODD=100
+}
+
+function csi {
+  printf '\x1B[%s' "$(printf '%s' "$@")"
+}
+
+function setup {
+  # enable alternate buffer
+  csi \? 1049 h
+
+  # No echo stdin and hide the cursor
+  stty -echo
+  setterm -cursor off
+
+  # clear screen
+  csi 2 J
+
+  # configure based on detected terminal size
+  sigwinch
+}
+
+function cleanup {
+  # restore primary buffer
+  csi \? 1049 l
+
+  # Show cursor and echo stdin
+  setterm -cursor on
+  stty echo
+}
+
+# 32 33 31
+# load-bar <load on a scale of 0-16>
+# draws a bar using unicode full/half block characters
+function load-bar {
+  local load=$1
+  local n=0
+  printf '\x1B[1;32m' # green
+  if (( load >= 4 )); then
+    printf '██\x1B[1;33m'
+    n=4
+  fi
+  if (( load >= 8 )); then
+    printf '██\x1B[0;33m'
+    n=8
+  fi
+  if (( load >= 12 )); then
+    printf '██\x1B[1;31m'
+    n=12
+  fi
+  while (( n <= load )); do
+    if (( (load-n) > 0 )); then
+      printf '█'
+      ((n+=2))
+    else
+      printf '▌'
+      ((n+=2))
+      break
+    fi
+  done
+  printf "%$(( (16-n)/2 ))s"'\x1B[7m│\x1B[0m\r' ""
+  # printf '\x1B[7m│\x1B[0m\r'
+}
+
+function draw {
+  # scroll screen up
+  # csi 1 S
+  csi 999 1 H
+  echo
+
+  for ((idx = (num_rains-1) * NUM_RAIN_METADATA; idx >= 0; idx -= NUM_RAIN_METADATA)); do
+    X=${rains[idx]}
+    LENGTH=${rains[idx + 4]}
+
+    X=${rains[idx]}
+    Y=${rains[idx + 1]}
+    RAIN=${rains[idx + 2]}
+    COLOR=${rains[idx + 3]}
+    LENGTH=${rains[idx + 4]}
+    echo -ne "\e[999;${X}H${COLOR}${RAIN}"
+    rains[$idx+4]=$((LENGTH-1))
+
+    if (( !LENGTH )); then
+      # Out of screen, bye sweet <3
+      rains=("${rains[@]:0:idx}"
+             "${rains[@]:idx+NUM_RAIN_METADATA:num_rains*NUM_RAIN_METADATA}")
+      ((num_rains--))
+    fi
+  done
+
+  # draw CPU load meter down the left side of the screen
+  csi 999 1 H
+  csi 0 m
+  load-bar $LOAD
+  # draw date and time in top left
+#  csi 1 1 H
+#  date +"%F %H:%M"
+  # '%16s\x1B[0;7m│\x1B[0m\r' ''
+}
+
+LAST_CPU=0
+LAST_IDLE=0
+LOAD=0
+function update-cpu {
+  head -n1 /proc/stat | read corename user nice sys idle io irq sirq virt
+  local cpu=$(( cpu+user+nice+sys+io+irq+sirq ))
+  local total=$(( (cpu-LAST_CPU)+(idle-LAST_IDLE) ))
+  LOAD=$(( ((cpu-LAST_CPU)*16)/total ))
+  # csi 999 60 H
+  # echo -n $cpu $idle $total $LOAD $(( cpu-LAST_CPU )) $(( idle-LAST_IDLE ))
+  LAST_CPU=$cpu
+  LAST_IDLE=$idle
+}
+
+trap cleanup EXIT
+trap sigwinch WINCH
+
+update-cpu
+setup
+
+rains=()
+while :; do
+  read -n 1 -t $STEP_DURATION ch
+  case "$ch" in
+    q|Q)
+      exit 0
+      ;;
+  esac
+
+  if ((num_rains < MAX_RAINS)) && ((100 * RANDOM / 32768 < NEW_RAIN_ODD)); then
+    # Need new |, 1-based
+    RAIN="${RAINS[NRAINS * RANDOM / 32768]}"
+    COLOR="${COLORS[NCOLORS * RANDOM / 32768]}"
+    LENGTH=$((MAX_RAIN_LENGTH * RANDOM / 32768 + 1))
+    X=$((TERM_WIDTH * RANDOM / 32768 + 1))
+    Y=$((1 - LENGTH))
+    rains=("${rains[@]}" "$X" "$Y" "$RAIN" "$COLOR" "$LENGTH")
+    ((num_rains++))
+  fi
+
+  # Let rain fall!
+  update-cpu
+  draw
+done
