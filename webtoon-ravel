@@ -50,6 +50,13 @@ function can-split-at {
   return $(( thiscolors > SPLIT_THRESHOLD || nextcolors > SPLIT_THRESHOLD ))
 }
 
+# TODO: we probably don't want to do merges if the pages have significantly differing widths;
+# e.g. some webcomics have a "cover" page at the start that's wider/narrower, or append
+# fanart to the end.
+# The best way to handle this is probably something like:
+# in merge-page below, if the merge range spans significantly different image widths, fail the merge
+# in split-page, prefer splitting where there are width changes, and fall back to splitting based on
+# image contents only if that fails
 function split-page {
   local chapter=$1
   local first=$2
@@ -152,4 +159,6 @@ while [[ -f FAILED ]]; do
   done
   rm FAILED_
 done
+
+zip -q -0 ../"$title.cbz" *.jpeg
 cd ..
