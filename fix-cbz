@@ -4,9 +4,21 @@
 # - repack cbt, cba, cbr into cbz
 # - rename by removing website, scanning, and scanlation group names
 # - convert greyscale+alpha PNGs to RGBA to work around a bug in Ubooquity
+# - optionally normalize chapter/volume numbering based on a user-provided
+# - pattern; the following works well for stuff from Mangadex:
+#   -r 'Vol\.([0-9]+) Ch\.([0-9.+])' 'v%02d ch%03.1f'
+#   use '%2$d' instead of '%d' to (e.g.) process the second argument
 
 set -e
-export DRYRUN=0
+
+# default settings
+# -n
+declare DRYRUN=0
+# -B
+declare BACKUP=1
+# -r
+declare RENAME_SRC=""
+declare RENAME_DST=""
 
 function try {
   if (( DRYRUN )); then
@@ -39,67 +51,32 @@ declare -ra PATTERNS=(
   '\[([a-zA-Z]+ ?Scan(s|lation)|Hourou Musume|4kumalations|Musashi Quality|s\.ADTRW|MiamMiam-Team|.* \(Ex-Licenses\))\]'
 )
 
-declare -A CH_PATTERNS=(
-  'Ch\.([0-9]+) ' 'Ch\.%s\.%s '
-  'Ch\.([0-9]+)\.cbz' 'Ch\.%s\.%s\.cbz'
-  'Chapter ([0-9]+):' 'Chapter %d\.%s:'
-)
-
 function new-name {
   local dst="$1"
-  # status '[rename] %s' $dst
+  # clean up filename by trimming scanlator group names, etc
   for pattern in ${PATTERNS[@]}; do
     dst=$(echo "$dst" | sed -E "s, *$pattern,,")
-    # status '[rename] %s' $dst
   done
-  for ch_pattern sc_template in ${(kv)CH_PATTERNS[@]}; do
-    if echo $dst | egrep -q $ch_pattern; then
-      # If the file contains a chapter without a subchapter number, check if
-      # there is also a subchapter with the same number, and correct the sorting
-      # if so.
-      # In other words, turn names like "Ch.005 foo" into "Ch.005.0 foo" iff
-      # "Ch.005.5 bar" exists.
-      # FIXME this doesn't seem to work right on some mangadex titles
-      # Ch.0023.cbz turns into Ch.0023.0bz.cbz which sorts correctly but is ???
-      local chapter=$(echo $dst | sed -E "s,.*$ch_pattern.*,\\1,")
-      if [[ $chapter == $dst ]]; then continue; fi
-
-      local sc_pattern=$(printf $sc_template $chapter "([0-9]+)")
-      local subchapter=$(
-        ls $(dirname $src) \
-        | egrep $sc_pattern \
-        | head -n1 \
-        | sed -E "s,.*$sc_pattern.*,\\1," \
-        | tr 0-9 0)
-      if [[ $subchapter ]]; then
-        dst=$(echo $dst | sed -E "s,$ch_pattern,$(printf $sc_template $chapter $subchapter),")
-        break
-      fi
-    fi
-  done
-
-  # if echo $dst | egrep -q 'Ch\.[0-9]{4}([^.]|\.[^0-9])'; then
-  #   # If the file contains "Ch.XXXX", check if there's a "Ch.XXXX.YY" in the same
-  #   # directory, and if so, rename this one to "Ch.XXXX.00" so that it sorts
-  #   # correctly.
-  #   # TODO: support other chapter patterns.
-  #   local chapter=$(echo $dst | sed -E 's,.*(?:Chapter |Ch\.)([0-9]+).*,\1,')
-  #   local subchapter=$(
-  #     ls $(dirname $src) \
-  #     | fgrep "Ch.$chapter" \
-  #     | sed -nE 's,.*Ch\.[0-9]+\.([0-9]+).*,\1,; T; p' \
-  #     | head -n1 \
-  #     | tr 0-9 0)
-  #   if [[ $subchapter ]]; then
-  #     dst=$(echo $dst | sed -E "s,Ch\\.$chapter,Ch.$chapter.$subchapter,")
-  #     # status '[rename] %s' $dst
-  #   fi
-  # fi
+  # fix extension in case it's not a cbz
   dst=${dst%.cb?}.cbz
-  # if [[ $src != $dst ]]; then
-  #   status '\n[rename] %s\n     --> %s' $src $dst
-  # fi
-  echo $dst
+
+  # no user-specified renames? then we're done.
+  if [[ ! $RENAME_SRC ]]; then
+    echo "$dst"
+    return
+  fi
+
+  # otherwise run it through the lua-based rename engine
+  echo ${dst%.cbz} | luajit -e "
+    local name = io.read('*l')
+    local src = '^(.-)$RENAME_SRC(.*)$'
+    local dst = '%s$RENAME_DST%s.cbz'
+    if not name:match(src) then
+      print(name)
+    else
+      print(dst:format(name:match(src)))
+    end
+  "
 }
 
 function fix-format {
@@ -127,15 +104,17 @@ function fix-png {
 
   checked=0
   fixed=0
-  find /tmp/$$ -name '*.png' | while read png; do
-    ((++checked)); status -c '[fix png alpha] %d checked/%d fixed' $checked $fixed
-    file $png | fgrep -q 'gray+alpha' || continue
-    convert $png PNG32:$png
-    ((++fixed))
-  done
+  if (( !DRYRUN )); then
+    find /tmp/$$ -name '*.png' | while read png; do
+      ((++checked)); status -c '[fix png alpha] %d checked/%d fixed' $checked $fixed
+      file $png | fgrep -q 'gray+alpha' || continue
+      convert $png PNG32:$png
+      ((++fixed))
+    done
+  fi
 
   if (( fixed )); then
-    status -c '[fix png alpha] %d checked/%d fixed\n' $checked $fixed
+    status -c '[fix png alpha] %d checked/%d fixed' $checked $fixed
   fi
 
   if (( !fixed && !unpacked )); then
@@ -151,7 +130,7 @@ function repack {
     # Rename file if needed and don't do anything else -- no need to
     # pack up modified contents or create backups.
     if [[ $src != $dst ]]; then
-      status '\n[rename] %s\n     --> %s\n' $1 $2
+      status '\n[rename] %s\n     --> %s' $1 $2
       try mv -i "$src" "$dst"
     fi
     return 0
@@ -159,34 +138,62 @@ function repack {
 
   if [[ ${src##*.} != ${dst##*.} ]]; then
     # If we're doing a format conversion, just add .backup to the original.
-    try mv $src ${src}.backup
+    if (( BACKUP )); then
+      try mv $src ${src}.backup
+    else
+      try rm -f $src
+    fi
   elif [[ $src != $dst ]]; then
-    try cp $src ${src}.backup
+    if (( BACKUP )); then
+      try cp $src ${src}.backup
+    fi
     try mv $src $dst
   else
     try cp $src ${src}.backup
   fi
 
-  status '\n[repack] %s\n' $2
-  (try cd /tmp/$$ && ls && try zip -u -r -0 $dst .)
+  status '\n[repack] %s' $2
+  (try cd /tmp/$$ && try zip -q -u -r -0 $dst .)
 }
 
-[[ $DEBUG ]] && set -x
+function help {
+  cat <<EOF
+Usage: fix-cbz [-dvnh] [-r pattern format] <*.cbz/*.cbr/...>
+Clean up filenames, normalize pack format, and fix damaged PNG files; optionally
+rename files based on user-provided pattern.
+Options:
+  -d,-v     enable debug tracing
+  -n        dry run
+  -B        do not save .backup files
+  -h        this message
+  -r        rename files from <pattern> to <format>; e.g.
+            -r 'Volume ([0-9]+), Chapter ([0-9]+)' 'Vol.%02d Ch.%03d'
+            <pattern> is a Lua string.match pattern with capture groups;
+            <format> is a Lua string.format string.
+EOF
+}
+
+# process argv
+while [[ $1 ]]; do
+  case "$1" in
+    -d|-v) set -x; shift;;
+    -r) RENAME_SRC="$2"; RENAME_DST="$3"; shift 3;;
+    -n) DRYRUN=1; shift;;
+    -B) BACKUP=0; shift;;
+    -h) help; exit 0;;
+    --) shift; break;;
+    *) break;
+  esac
+done
 
 trap "rm -rf '/tmp/$$'" EXIT
 while [[ $1 ]]; do
   rm -rf /tmp/$$
   src="$1"; shift
-  status -c '[scan] %s' $src
+  status -c '\n[scan] %s' $src
   dst="$(new-name $src)"
   fix-format $src $dst
   fix-png $src $dst
   repack $src $dst
-  # status '[done] %s' $dst
-
-#    if [[ $dst =~ 'Ch\.[0-9]+\.[0-9]' ]]; then
-# for ch in 57 65; do src=$(echo Vol.*\ Ch.??$ch\ *); mv $src ${src/Ch.00$ch/Ch.00$ch.0}; done
-# this one works only for ones with no chapter titles
-# for n in $(ls *.?.cbz | egrep -o '[0-9]+\.[0-9]+.cbz' | cut -d. -f1 | sort | uniq); do src=$(echo Vol.*Ch.$n.cbz); mv "$src" "${src%.cbz}.0.cbz"; done
-# for ch in $(ls | egrep -o 'Ch\.[0-9]+\.[0-9]' | cut -d. -f2 | sort -u); do src=$(ls | egrep "Ch\\.$ch(\\.[^0-9]|[^.])"); mv $src ${src/Ch.$ch/Ch.$ch.0}; done
+  status '\n[done] %s\n' $dst
 done
