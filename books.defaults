@@ -12,6 +12,7 @@ journal.info=off
 # Stop colourizing books just because they have tags.
 color.tagged=
 color.tag.ANNOTATED=rgb243
+color.tag.DNF=on rgb100
 color.blocking=on rgb001
 
 # Books we are currently reading get listed first.
@@ -59,6 +60,12 @@ report.all.description=All Books
 report.all.columns=id,end,genre,gender,author,description.desc,tags,start.age
 report.all.labels=ID,Finished,Genre,⚥,Author,Title,Tags,Reading
 report.all.sort=end+,urgency-,start+,author+,description+
+
+report.series.description=Series Preview Mode
+report.series.columns=id,project,description
+report.series.labels=ID,Series,Title
+report.series.sort=id+
+report.series.filter=status:pending
 
 # "Notes" -- displays title and annotations only.
 report.notes.description=Book Notes
