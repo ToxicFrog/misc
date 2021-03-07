@@ -1,21 +1,6 @@
 #!/usr/bin/env zsh
 
-# First, do 8-colour palette
-
-# this is actually a bunch of colours:
-# - default FG and BG (0)
-# - ansi colours (30-37, 40-47)
-# - aixterm colours (90-97, 100-107)
-# - with bold (1) and faint (2)
-
-# proposed layout
-# top line lists colour codes
-# then one line for FG only
-# one for BG only
-# one for both
-# each cell is three entries: faint, standard, bold
-
-# result: 50 cells wide, 3 high
+# First, do 8-colour palette, in both ANSI (30-37) and AIX (90-97) colours
 
 codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
 
