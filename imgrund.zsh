@@ -22,14 +22,14 @@ function scrape-twitter {
     page.open('https://twitter.com/imgrund', function() {
       setTimeout(function() {
         phantom.exit();
-      }, 10000);
+      }, 30000);
     });
 EOF
 }
 
 function init-twitter {
   echo "Initializing Twitter cookie jar."
-  scrape-twitter | fgrep -v TypeError > curl
+  scrape-twitter | fgrep -v TypeError | tee /tmp/$$/curl
   id=\"$(head -n1 /tmp/$$/curl | egrep -o 'timeline/profile/[0-9]+.json' | egrep -o '[0-9]+')\"
   [[ $id ]] || { echo "Couldn't initialize twitter, giving up."; exit 1; }
 }
@@ -68,7 +68,7 @@ function fetch-images {
 
 function generate-album {
   echo "Generating album."
-  fgallery -j 4 -d -i -t -o --index /pub/covid/ $when $OUT/$when
+  fgallery --no-sRGB -j 4 -d -i -t -o --index /pub/covid/ $when $OUT/$when
   rm $OUT/today $OUT/index.html
   printf '<pre>\n<a href="today/">TODAY</a>\n' > index.html
   ls $OUT | while read dir; do
