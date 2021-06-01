@@ -1,4 +1,5 @@
-# Default image format.
+# Default image format. "jpeg" or "png".
+# JPEG is recommended; PNG is slightly higher quality but also massively larger.
 format=jpeg
 
 # Commentary inclusion or not.
@@ -17,7 +18,7 @@ include_extras=on
 
 ## Primary run of Narbonic: Director's Cut
 
-volume "Narbonic+ Volume 01"
+volume "Narbonic Volume 01"
   chapter "The Job Interview"
     page "july-31-august-5-2000" "The Job Interview"
     page "enter-helen-narbon-with-gerbils" "Enter Helen Narbon, With Gerbils"
@@ -62,7 +63,7 @@ volume "Narbonic+ Volume 01"
     page "halloween-costumes" "Halloween Costumes!"
   endvolume
 
-volume "Narbonic+ Volume 02"
+volume "Narbonic Volume 02"
   chapter "Smart Gerbils"
     page "january-1-6-2001" "Smart Gerbils"
     page "january-15-20-2001" "Smart Gerbils"
@@ -110,7 +111,7 @@ volume "Narbonic+ Volume 02"
     page "the-characters-strike" "The Characters Strike"
   endvolume
 
-volume "Narbonic+ Volume 03"
+volume "Narbonic Volume 03"
   chapter "Mell's Major"
     page "july-9-14-2001" "Mell's Major"
     page "july-16-21-2001" "Mell's Major"
@@ -171,7 +172,7 @@ volume "Narbonic+ Volume 03"
     page "g-i-and-narbonic-christmas" "G.I. and Narbonic Christmas"
   endvolume
 
-volume "Narbonic+ Volume 04"
+volume "Narbonic Volume 04"
   chapter "D-Con"
     page "february-4-9-2002" "D-Con"
     page "february-11-16-2002" "D-Con"
@@ -213,7 +214,7 @@ volume "Narbonic+ Volume 04"
     page "a-gerbil-named-artie" "A Gerbil Named Artie"
   endvolume
 
-volume "Narbonic+ Volume 05"
+volume "Narbonic Volume 05"
   chapter "Grass Roots"
     page "june-24-29-2002" "Grass Roots"
     page "july-1-6-2002" "Grass Roots"
@@ -257,7 +258,7 @@ volume "Narbonic+ Volume 05"
     page "halloween-costumes-3" "Halloween Costumes!"
   endvolume
 
-volume "Narbonic+ Volume 06"
+volume "Narbonic Volume 06"
   chapter "Professor Madblood and the Doppelganger Gambit"
     page "december-2-7-2002" "Professor Madblood and the Doppelganger Gambit"
     page "december-9-14-2002" "Professor Madblood and the Doppelganger Gambit"
@@ -314,7 +315,7 @@ volume "Narbonic+ Volume 06"
     page "2003-ape-sketches" "2003 APE Sketches"
   endvolume
 
-volume "Narbonic+ Volume 07"
+volume "Narbonic Volume 07"
   chapter "Dave Davenport Has Come Unstuck in Time"
     page "july-21-26-2003" "Dave Davenport Has Come Unstuck in Time"
     page "july-28-august-2-2003" "Dave Davenport Has Come Unstuck in Time"
@@ -359,7 +360,7 @@ volume "Narbonic+ Volume 07"
     page "results-of-the-third-anniversary-gratuitously-obscure-reference-contest" "Results of the Third Anniversary Gratuitously Obscure Reference Contest"
   endvolume
 
-volume "Narbonic+ Volume 08"
+volume "Narbonic Volume 08"
   chapter "Demons"
     page "december-29-2003-january-3-2004" "Demons"
     page "january-5-10-2004" "Demons"
@@ -408,7 +409,7 @@ volume "Narbonic+ Volume 08"
     page "the-animated-bite-me-french-lesson" "The Animated \"Bite Me\" French Lesson"
   endvolume
 
-volume "Narbonic+ Volume 09"
+volume "Narbonic Volume 09"
   chapter "Mad Science Is Decadent and Depraved"
     page "july-5-10-2004" "Mad Science Is Decadent and Depraved"
     page "july-12-17-2004" "Mad Science Is Decadent and Depraved"
@@ -455,7 +456,7 @@ volume "Narbonic+ Volume 09"
     page "dirk-as-dave" "Dirk as Dave"
   endvolume
 
-volume "Narbonic+ Volume 10"
+volume "Narbonic Volume 10"
   chapter "Professor Madblood and the Lovelace Affair (cont'd)"
     page "january-3-8-2005" "Professor Madblood and the Lovelace Affair"
     page "january-10-15-2005" "Professor Madblood and the Lovelace Affair"
@@ -499,7 +500,7 @@ volume "Narbonic+ Volume 10"
     page "narbonicon-photos" "Narbonicon Photos"
   endvolume
 
-volume "Narbonic+ Volume 11"
+volume "Narbonic Volume 11"
   chapter "Hiccup"
     page "june-27-july-2-2005" "Hiccup"
     page "july-4-9-2005" "Hiccup"
@@ -549,7 +550,7 @@ volume "Narbonic+ Volume 11"
     page "moleman-s-christmas" "Moleman's Christmas"
   endvolume
 
-volume "Narbonic+ Volume 12"
+volume "Narbonic Volume 12"
   chapter "The End"
     page "january-2-7-2006" "The End"
     page "january-9-14-2006" "The End"
@@ -598,7 +599,7 @@ volume "Narbonic+ Volume 12"
     page "narbonicon-iv" "Narbonicon IV"
   endvolume
 
-volume "Narbonic+ Volume 13"
+volume "Narbonic Volume 13"
   chapter "Madness"
     page "july-24-29-2006" "Madness"
     page "july-31-august-5-2006" "Madness"

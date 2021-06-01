@@ -347,7 +347,7 @@ function main {
     curl zip fgrep egrep cut sed
   mkdir -p tmp/{commentary,html} out
   # Load commentary
-  source narbonic.perfect-commentary
+  source perfect-collection-commentary.toc
   echo 0 > tmp/commentary/.tail
   if [[ -f tmp/commentary/.complete ]]; then
     CHEAD=$(ls tmp/commentary/*.html | wc -l)
@@ -357,7 +357,7 @@ function main {
   fi
   status "Done initializing commentary with $CHEAD entries; building images next.\\n"
   # Generate the actual volumes.
-  source narbonic.perfect-index
+  source perfect-collection.toc
 }
 
 function status {

@@ -33,7 +33,7 @@ function main {
       "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
   }
   # Generate the actual volumes.
-  source narbonic.index
+  source narbonic.toc
   # Download music and podcasts.
   [[ $DOWNLOAD_MUSIC == yes ]] && download-music
 }
