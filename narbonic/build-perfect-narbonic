@@ -1,78 +1,9 @@
 #!/usr/bin/env bash
 set -e
 shopt -s lastpipe
+cd "$(basename "$0")"
 
-# WIP on a tool that works similar to build-narbonic, but extracts the images
-# from the Narbonic: The Perfect Collection PDFs and adds commentary to them
-# before repacking them into CBZ (or maybe back into PDF? idk)
-# this is made more difficult by the fact that the PDF is one page per image,
-# but each page typically contains either three daily strips or one sunday
-# strip, while the website is typically six daily strips or one sunday strip
-# per page.
-# So, we need to split each page in the PDF up into subpages, then match each
-# subpage up with the corresponding commentary.
-# We can get commentary from the HTML cache; each HTML file contains commentary
-# blocks annotated as class="comic-strip-commentary" id="comic-strip-commentary-N",
-# where N typically runs from 1 to 6.
-
-# To split a PDF image, we can do something like:
-# convert page.jpeg -resize '1x!' txt:
-# this outputs one line per row, and rows that were entirely whitespace are
-# written as:
-# 0,0: (255,255,255)  #FFFFFF  gray(255)
-# while non-whitespace rows will be (e.g.)
-# 0,87: (254.969,254.969,254.969)  #FFFFFF  gray(99.9878%)
-# leading and trailing runs of whitespace will correspond to the page top and
-# bottom margins
-# there will be a small blob of non-whitespace at the bottom (~25px high or so)
-# which is the page number, and should be left at the bottom of the page
-# apart from that we can probably assume that a run of whitespace more than 5px
-# high divides comic strips on the page
-
-# So, our input is a collection of images emitted by `pdfimages` from the two
-# Perfect Collection volumes
-# For each image, we then need to either:
-# - drop it
-# - include it as is in the output
-# - include it as a single image, but append commentary
-#   - look up commentary for that page
-#   - split the page between the page number and the bottom of the comic,
-#     and insert the rendered commentary
-# - include it as multiple images
-#   - find the inter-image divisions
-#   - split each image into a separate file, probably like:
-#       margin+image - middle image - bottom image - page number+margin
-#   - find the commentary for each image and insert it immediately after the image
-#   - weave the images back together into a single page
-# So we need an input page control map that says what to do with what pages
-
-# For volume 1 this might start out looking something like
-# copy 0-10
-# split 11 12
-# annotate 13
-# split 14-53
-# ...etc
-# Ideally, it would be smart enough to mostly-automatically map PDF page/subpage
-# IDs to commentary IDs perhaps with occasional manual resyncs, but this seems
-# unlikely. We'll need some way to map strip IDs to commentary IDs in the cache,
-# identified by HTML page and then by commentary ID within the page.
-
-# It's tempting to do this "commentary first", where we start with the pages in
-# the cache containing image references and commentary, and then have a mapping
-# that lets us rewrite the image references to images extracted from the Perfect
-# Collection. That might be easier overall, and it would preserve all the sunday
-# strips, etc -- I might keep that as an alternate operating mode, come to think
-# of it. But it will also result in a lot of visual inconsistency since we'll be
-# mixing Perfect Collection strips with web strips, and I'd like to keep the
-# ordering and layout of the Perfect Collection as an option as the "most distilled"
-# way to read Narbonic.
-
-# If we were laying this out for print, I might do comics on one page and
-# commentary on the facing pages, but since this is going to be for digital reading,
-# I think the same layout as the website makes sense -- comic with commentary
-# underneath.
-
-# Ok, our basic operations here are:
+### functions for toc files ###
 
 # volume $name
 # Set output name as given
@@ -83,48 +14,13 @@ function volume {
   mkdir -p "tmp/$VOLUME"
 }
 
-# images-from $pdf
-# extract images from the given PDF file
+# Input settings.
 SOURCE=""
-function images-from {
-  status "Extracting images from %s..." "$1"
-  SOURCE="$(basename "$1")"
-  mkdir -p "tmp/$SOURCE"
-  pdfimages -all "$1" "tmp/$SOURCE/page"
-}
-
+function original { SOURCE="$1"; mkdir -p "tmp/$SOURCE"; }
 DPI=150
-function dpi {
-  DPI="$1"
-}
+function dpi { DPI="$1"; }
 
-function images-from-2 {
-  status "Extracting images from %s..." "$1"
-  SOURCE="$(basename "$1")"
-  mkdir -p "tmp/$SOURCE"
-  shift
-  return
-  local pages=$(identify "$SOURCE" | wc -l)
-  for page in $(seq 0 20 $pages); do
-    status "Extracting images from %s [pages $page-$((page+19))]..." "$1"
-    convert \
-      -define registry:temporary-path="$PWD/tmp/" \
-      -density "$DPI" \
-      "$SOURCE[$page-$((page+19))]" \
-      -quality 100 \
-      -colorspace gray \
-      "tmp/$SOURCE/page-%03d.jpg"
-  done
-  # redo the cover in full colour
-  convert \
-    -define registry:temporary-path="$PWD/tmp/" \
-    -density 300 \
-    "$SOURCE[0]" \
-    -quality 100 \
-    "tmp/$SOURCE/page-%03d.jpg"
-}
-
-# stubbed out so that we can load the index
+# stubbed out so that we can load the commentary index
 function chapter {
   return 0
 }
@@ -137,13 +33,14 @@ function page {
   local name="$1"
   local title="$2"
   shift 2
-  status "Commentary for \"%s\" (%s)" "$name" "$title"
+  status "Commentary %04d \"%s\" (%s)" "$CHEAD" "$name" "$title"
   local out="tmp/html/$name"
   if [[ ! -f $out ]]; then
-    status "Commentary for \"%s\" (%s) [download]" "$title" "$name"
+    status "Commentary %04d \"%s\" (%s) [download]" "$CHEAD" "$title" "$name"
     curl --retry 5 --silent "http://narbonic.com/comic/$name/" > "$out"
+    chmod a-w "$out"
   else
-    status "Commentary for \"%s\" (%s) [cached]" "$title" "$name"
+    status "Commentary %04d \"%s\" (%s) [cached]" "$CHEAD" "$title" "$name"
   fi
   # at this point we have the page in cache, so extract commentary from it
   # unless we already have a *complete* commentary cache, in which case just
@@ -157,11 +54,20 @@ function page {
     else egrep -o 'comic-strip-commentary-[0-9]+' "$out" | sort -u
     fi
   } | while read id; do
-    status "Commentary for \"%s\" (%s) [$id]" "$title" "$name"
+    status "Commentary %04d \"%s\" (%s) [%s]" "$CHEAD" "$title" "$name" "$id"
     local div="$(wring html $out "#$id")"
     [[ ! $div ]] && continue
-    echo "$div" | sed -E 's,<br>,,g' > "tmp/commentary/$(printf %04d $CHEAD).html"
+    local dst="tmp/commentary/$(printf %04d $CHEAD)"
+    echo "$div" | sed -E 's,<br>,,g' > "$dst.html"
     ((++CHEAD))
+    # fix up links in the comment fragment
+    for link in $(egrep -o '/wordpress/wp-content/uploads/[^"]+' "$dst.html"); do
+      status "Commentary %04d \"%s\" (%s) [fixup %s]" "$CHEAD" "$title" "$name" "$(basename $link)"
+      local file="$dst-$(basename "$link")"
+      [[ -f "$file" ]] || curl --retry 5 --silent "http://narbonic.com$link" > "$file"
+      sed -E -i "s;$link;$(basename "$file");g" "$dst.html"
+    done
+
   done
 }
 
@@ -175,24 +81,75 @@ function next-commentary-id {
 }
 
 function sync {
-  echo "$1" > tmp/commentary/.tail
+  local n="$1"
+  case "$n" in
+    -*|+*)
+      local tail=$(cat tmp/commentary/.tail)
+      tail=$((tail+n))
+      ;;
+    *)
+      tail=$n
+      ;;
+  esac
+  echo "$tail" > tmp/commentary/.tail
 }
 
 function css {
   echo "$1" > tmp/style.css
 }
 
+# Extract a single page in raster format from the PDF.
+# Takes as argument the page number, 0-indexed.
+# Emits the basename of the extracted page, with extension.
+RASTER_MODE=pdfimages
+function raster-page {
+  local page="$(printf page-%03d $1)"
+  case $RASTER_MODE in
+    pdfimages)
+      pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" tmp/raster
+      mv tmp/raster-000.jpg "tmp/$SOURCE/$page.jpg"
+      echo "$page.jpg"
+      ;;
+    imagemagick)
+      convert \
+        -define registry:temporary-path="$PWD/tmp/" \
+        -density "$DPI" \
+        "$SOURCE[$1]" \
+        -colorspace gray \
+        "tmp/$SOURCE/page-%03d.png"
+      echo "$page.png"
+      ;;
+    imagemagick-aa)
+      # sample at 2*DPI and then downscale
+      convert \
+        -define registry:temporary-path="$PWD/tmp/" \
+        -density "$((DPI*2))" \
+        "$SOURCE[$1]" \
+        -colorspace gray \
+        -scale '50%' \
+        "tmp/$SOURCE/page-%03d.png"
+      echo "$page.png"
+      ;;
+    *)
+      die "unknown raster mode $RASTER_MODE"
+      ;;
+  esac
+}
+
 # copy $start [$end]
 # copy the given pages, as is, from the input PDF to the output
 function copy {
-  local start=$1
-  local end=$2
-  [[ $end ]] || end=$start
-  for i in $(seq $start $end); do
-    local page="$(printf page-%03d.jpg $i)"
-    status "$page: copying"
-    ln "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
-  done
+  local first="$1"
+  if [[ $2 ]]; then
+    local last="$2"
+  else
+    local last="$first"
+  fi
+  status "page %03d-%03d: copying" "$first" "$last"
+  # The index file uses 0-indexing. pdfseparate uses 1-indexing. We standardize
+  # on 0-indexing at the interfaces and adjust here.
+  pdfseparate -f $((first+1)) -l $((last+1)) \
+    "$SOURCE" "tmp/$VOLUME/page-%03d.pdf"
 }
 
 # whole $start [$end]
@@ -206,9 +163,10 @@ function whole {
     local end=$start; shift 1
   fi
   for i in $(seq $start $end); do
-    local page="$(printf page-%03d.jpg $i)"
+    local page="$(raster-page $i)"
     status "$page: annotating"
-    find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1 | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
+    find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1 \
+    | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
   done
 }
 
@@ -224,7 +182,7 @@ function split {
     local end=$start; shift 1
   fi
   for i in $(seq $start $end); do
-    local page="$(printf page-%03d.jpg $i)"
+    local page="$(raster-page $i)"
     status "$page: splitting and annotating"
     find-splits "tmp/$SOURCE/$page" "$@" | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
   done
@@ -235,7 +193,7 @@ function split {
 # autodetect split points at all. Use only for pages where split detection
 # fails badly.
 function split-at {
-  local page="$(printf page-%03d.jpg $1)"
+  local page="$(raster-page $1)"
   shift
   status "$page: splitting and annotating"
   printf '%s\n' "$@" | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
@@ -248,11 +206,12 @@ function endvolume {
   if [[ $skip ]]; then return 0; fi
   status "Packing $VOLUME.pdf"
   cd "tmp/$VOLUME"
-  convert *.jpg "../../out/$VOLUME.pdf"
+  pdfunite *.pdf "../../out/$VOLUME.pdf"
+  # convert *.jpg "../../out/$VOLUME.pdf"
   status "Packed out/$VOLUME.pdf\\n"
-  status "Packing $VOLUME.cbz"
-  zip --quiet -0 -r "../../out/$VOLUME.cbz" .
-  status "Packed out/$VOLUME.cbz\\n"
+  # status "Packing $VOLUME.cbz"
+  # zip --quiet -0 -r "../../out/$VOLUME.cbz" .
+  # status "Packed out/$VOLUME.cbz\\n"
   cd ../..
   VOLUME=""
 }
@@ -309,6 +268,19 @@ function find-margins {
   printf '%d %d\n' $LM $RM
 }
 
+function render-commentary {
+  local cid="$1"
+  local width="$2"
+  local out="tmp/commentary/$cid-$(md5sum tmp/style.css | cut -c1-4)-$width.png"
+  if [[ ( ! -f $out ) || ( $out -ot tmp/commentary/$cid.html ) ]]; then
+    #status "Render commentary %s at width %s" $cid $width
+    wkhtmltoimage --format png --enable-local-file-access --quiet \
+      --user-style-sheet tmp/style.css --width $width \
+      tmp/commentary/$cid.html "$out"
+  fi
+  echo "$out"
+}
+
 # add-commentary IN OUT
 # add commentary to IN and write the resulting image to OUT
 # takes on stdin the Y-coordinates at which to insert the commentary; pulls
@@ -320,7 +292,7 @@ function add-commentary {
   local -a args=("$input" -background white)
   local LM RM width
   find-margins "$input" | read LM RM
-  width=$((RM-LM))
+  local width=$((RM-LM))
 
   declare -a lines=()
   sort -g | while read Y; do
@@ -331,19 +303,18 @@ function add-commentary {
   # CTAIL correctly
   printf '%s\n' "${lines[@]}" | tac | while read Y cid; do
     status "$page: render commentary %s @ (%d,%d)" $cid $LM $Y
+    local commentary="$(render-commentary $cid $width)"
     if [[ $skip ]]; then continue; fi
-    wkhtmltoimage --format png --enable-local-file-access --quiet \
-      --user-style-sheet tmp/style.css --width $width \
-      tmp/commentary/$cid.html tmp/commentary/$cid.png
-    local H=$(identify tmp/commentary/$cid.png | cut -d' ' -f3 | cut -dx -f2)
-    args+=(-splice 0x$H+0+$Y -page +$LM+$Y tmp/commentary/$cid.png -flatten)
+    local H=$(identify "$commentary" | cut -d' ' -f3 | cut -dx -f2)
+    args+=(-splice 0x$H+0+$Y -page +$LM+$Y "$commentary" -flatten)
   done
   # status '%s' "convert ${args[*]} $output"
   if [[ $skip ]]; then
     convert "$input" raw:/dev/null
   else
-    status "$page: raveling strips and commentary to $output"
-    convert "${args[@]}" -quality 95 "$output"
+    status "$page: writing $output"
+    convert "${args[@]}" -colorspace gray "$output"
+    convert "$output" "${output%.*}.pdf"
   fi
 }
 
@@ -367,26 +338,39 @@ set -e
 shopt -s lastpipe
 
 function main {
-  checkdeps wkhtmltoimage curl wring zip pdfimages convert fgrep cut gs
+  checkdeps \
+    wkhtmltoimage \
+    convert identify \
+    pdfimages pdfseparate pdfunite \
+    wring \
+    gs \
+    curl zip fgrep egrep cut sed
   mkdir -p tmp/{commentary,html} out
   # Load commentary
   source narbonic.perfect-commentary
   echo 0 > tmp/commentary/.tail
   if [[ -f tmp/commentary/.complete ]]; then
-    CHEAD=$(ls tmp/commentary | wc -l)
+    CHEAD=$(ls tmp/commentary/*.html | wc -l)
     ((++CHEAD))
   else
     touch tmp/commentary/.complete
   fi
-  status "Done initializing commentary; building images next.\\n"
+  status "Done initializing commentary with $CHEAD entries; building images next.\\n"
   # Generate the actual volumes.
   source narbonic.perfect-index
 }
 
 function status {
   local fmt="$1"; shift
-  printf '\n\x1B[2K'"$fmt" "$@"
+  printf '\r\x1B[2K'"$fmt" "$@" >&2
 }
+
+if [[ $DEBUG ]]; then
+  function status {
+    local fmt="$1"; shift
+    printf "$fmt\n" "$@" >&2
+  }
+fi
 
 function checkdeps {
   local missing=""

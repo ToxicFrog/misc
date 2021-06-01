@@ -14,21 +14,12 @@
 #format=jpeg
 
 VOL1="Narbonic - Perfect Collection Volume 1.pdf"
-# VOL2="Narbonic - Perfect Collection Volume 2.pdf"
+VOL2="Narbonic - Perfect Collection Volume 2.pdf"
 
-# rewrite plans
-# make "copy" directly copy pages from the source using pdfseparate.
-# split/whole should extract pages from the source PDF on demand
-# if volume 1, use pdfimages to extract the whole-page JPEG and edit that, then
-# turn it into a single-page PDF
-#   - TODO: extract the JPEG, split it up, then render a PDF page with the
-#     slices of JPEG interspersed with text
-# if volume 2, FOR NOW, use convert to extract a whole-page PNG and edit that
-#   - TODO: use pdfimages to extract the source images and weave together a
-#     PDF page out of that
 if [[ $VOL1 ]]; then
-volume "Narbonic+ - Perfect Collection Volume 1"
-  images-from "$VOL1"
+volume "Narbonic Director's Cut - Perfect Collection Volume 1"
+  RASTER_MODE=pdfimages
+  original "$VOL1"
   css 'div.comic-strip-commentary { font-size: 24px; }'
   # frontmatter
   # TODO: insert a page explaining that this copy has been modified?
@@ -107,26 +98,31 @@ fi
 # the LaTeX to get things to come out approximately the same as the original, and
 # it would probably never exactly match.
 if [[ $VOL2 ]]; then
-volume "Narbonic+ - Perfect Collection Volume 2"
-  # 150 gives us quality comparable to the first volume.
-  # 300 gives us quality comparable to the second volume as originally shipped,
-  # at the cost of massively increasing file size and probably ooming when we
-  # try to generate the pdf.
-  dpi 150; images-from-2 "$VOL2"
-  # strip big white expanse from cover
-  mogrify "tmp/$VOL2/page-000.jpg" -bordercolor white -border 1x1 -trim +repage
+volume "Narbonic Director's Cut - Perfect Collection Volume 2"
+  original "$VOL2"
+  # The original seems to have the images at 300dpi. Rasterizing at 300dpi,
+  # however, results in noticeable jaggies, so we compromise: raster at 300 and
+  # then downscale to 150 for a 2xAA effect.
+  RASTER_MODE=imagemagick-aa
+  DPI=150
+  # 24px works well for 150dpi.
   css 'div.comic-strip-commentary { font-size: 24px; }'
+  # Even if we skipped generating the first volume, make sure we're in the right
+  # place in the commentary queue.
   sync 899
   copy 0 6
-  split-at 7 992 1765 2550
+  # These manual splits are correct for 150dpi. Adjust as needed for other densities.
+  split-at 7 496 882 1275
   split 8 37
   whole 38
   split 39 128
   copy 129 138
-  # in page 188 the same strip appears twice in a row in the web version, but
-  # not in the print version, leading to doubled commentary; we need to drop one
-  # after page 187 and before page 188
-  split 139 213
+  split 139 187
+  # The strip at the end of page 187 appears twice in the web version (with twice
+  # the commentary) but only once in the Perfect Collection, so eat the extra
+  # commentary block.
+  sync +1
+  split 188 213
   whole 214
   split 215 252
   copy 253 265
@@ -134,7 +130,11 @@ volume "Narbonic+ - Perfect Collection Volume 2"
   whole 364
   split 365 390
   copy 391
-  whole 392 # final page, might want to synth a page of commentary after it
-  copy 393 413
-#endvolume # oooo this takes up all the RAM, not great
+  # TODO: this is the final page (of the main comic; there's backmatter after).
+  # We might want to write the final commentary to a page of its own after this.
+  copy 392 413
+  # copy 392 393
+  # split-at 394 100
+  # copy 395 413
+endvolume
 fi
