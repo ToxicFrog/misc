@@ -43,6 +43,7 @@ declare -ra PATTERNS=(
   '\([12][0-9][0-9][0-9]\)'
   '\([Dd]igital[^)]*\)'
   '\(Minutemen-[A-Za-z]+\)'
+  '\(Empire-[A-Za-z]+\)'
   '\(Oroboros-[A-Za-z]+\)'
   '\([A-Za-z ]+-Empire\)'
   'GetComics\.INFO'
@@ -85,7 +86,7 @@ function fix-format {
   status '\n[unpack] %s' ${src##.*}
 
   try mkdir -p /tmp/$$
-  ( cd /tmp/$$ && dtrx --one=here -f -o -q "$src" )
+  ( cd /tmp/$$ && dtrx --one=here -f -o -q "$src" ) || exit 1
 }
 
 function fix-png {
