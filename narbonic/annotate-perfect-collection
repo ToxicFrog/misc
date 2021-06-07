@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 shopt -s lastpipe
-cd "$(basename "$0")"
+cd "$(dirname "$0")"
 
 ### functions for toc files ###
 

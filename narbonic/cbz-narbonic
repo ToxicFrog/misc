@@ -20,7 +20,7 @@ DOWNLOAD_MUSIC='yes'
 
 #### No user serviceable parts below this line. ####
 
-cd "$(basename "$0")"
+cd "$(dirname "$0")"
 set -e
 
 function main {
