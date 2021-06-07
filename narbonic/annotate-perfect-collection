@@ -106,8 +106,10 @@ function raster-page {
   local page="$(printf page-%03d $1)"
   case $RASTER_MODE in
     pdfimages)
-      pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" tmp/raster
-      mv tmp/raster-000.jpg "tmp/$SOURCE/$page.jpg"
+      if [[ ! -f "tmp/$SOURCE/$page.jpg" ]]; then
+        pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" tmp/raster
+        mv tmp/raster-000.jpg "tmp/$SOURCE/$page.jpg"
+      fi
       echo "$page.jpg"
       ;;
     imagemagick)
@@ -165,8 +167,8 @@ function whole {
   for i in $(seq $start $end); do
     local page="$(raster-page $i)"
     status "$page: annotating"
-    find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1 \
-    | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
+    add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page" \
+      $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1)
   done
 }
 
@@ -184,7 +186,8 @@ function split {
   for i in $(seq $start $end); do
     local page="$(raster-page $i)"
     status "$page: splitting and annotating"
-    find-splits "tmp/$SOURCE/$page" "$@" | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
+    add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page" \
+      $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g)
   done
 }
 
@@ -196,33 +199,27 @@ function split-at {
   local page="$(raster-page $1)"
   shift
   status "$page: splitting and annotating"
-  printf '%s\n' "$@" | add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page"
+  add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page" "$@"
 }
 
 # endvolume
 # finalize the volume by packing it into a PDF or a CBZ
 function endvolume {
   if [[ ! $VOLUME ]]; then die "endvolume without matching volume"; fi
-  if [[ $skip ]]; then return 0; fi
   status "Packing $VOLUME.pdf"
   cd "tmp/$VOLUME"
   pdfunite *.pdf "../../out/$VOLUME.pdf"
-  # convert *.jpg "../../out/$VOLUME.pdf"
   status "Packed out/$VOLUME.pdf\\n"
-  # status "Packing $VOLUME.cbz"
-  # zip --quiet -0 -r "../../out/$VOLUME.cbz" .
-  # status "Packed out/$VOLUME.cbz\\n"
-  cd ../..
   VOLUME=""
 }
 
-# supporting functions
+
+#### supporting functions ####
+
 
 # find-splits $img
 # scan it for horizontal split points, output the Y coordinate of each split
 # on stdout
-# FIXME: this doesn't work if there's no page number, since the final split
-# is never detected
 function find-splits {
   local img="$1"; shift
   if [[ $1 ]]; then printf "%s\n" "$@"; fi
@@ -246,7 +243,7 @@ function find-splits {
           and sof > 200
           and eof - sof >= 8 then
           --io.stderr:write("split: "..sof.."-"..eof.."\n")
-          print(math.floor(sof + (eof-sof)/4))
+          print(math.floor(sof + (eof-sof)/8))
           didsplit = true
         end
         if depth > 2 then
@@ -268,69 +265,61 @@ function find-margins {
   printf '%d %d\n' $LM $RM
 }
 
-function render-commentary {
-  local cid="$1"
-  local width="$2"
-  local out="tmp/commentary/$cid-$(md5sum tmp/style.css | cut -c1-4)-$width.png"
-  if [[ ( ! -f $out ) || ( $out -ot tmp/commentary/$cid.html ) ]]; then
-    #status "Render commentary %s at width %s" $cid $width
-    wkhtmltoimage --format png --enable-local-file-access --quiet \
-      --user-style-sheet tmp/style.css --width $width \
-      tmp/commentary/$cid.html "$out"
-  fi
-  echo "$out"
+# TODO we get the width on $2; wrap the whole thing in a div or something that
+# has the necessary width or margins or something
+function html-commentary {
+  cat "tmp/commentary/$1.html" \
+  | sed -E 's,img src=",img src="../../tmp/commentary/,g'
 }
 
-# add-commentary IN OUT
+# add-commentary IN OUT SPLITS
 # add commentary to IN and write the resulting image to OUT
-# takes on stdin the Y-coordinates at which to insert the commentary; pulls
-# the commentary from the commentary queue
+# n.b. IN and OUT probably have directory separators in them; handle with care
+# Redesign: rather than using image processing for all of this:
+# - do a series of crops to slice the image into subimages at the given lines
+# - output HTML combining the images and the commentary concatenated
+# - use wkhtmltopdf to write output.pdf
 function add-commentary {
   local input="$1"
   local page="$(basename "$input")"
-  local output="$2"
-  local -a args=("$input" -background white)
-  local LM RM width
+  local output="tmp/$VOLUME/${page%.*}.html"
+  local ext="${page##*.}"
+  shift 2 # $2 currently unused, TODO: remove
+
+  local LM RM text_width page_width
   find-margins "$input" | read LM RM
-  local width=$((RM-LM))
+  local text_width=$((RM-LM))
+  local page_width=$(identify "$input" | egrep -o '[0-9]+x[0-9]+' | head -n1 | cut -dx -f1)
 
-  declare -a lines=()
-  sort -g | while read Y; do
-    local cid=$(next-commentary-id)
-    lines+=("$Y $cid")
+  local old_y=0
+  echo -n > "$output"
+  for Y in "$@"; do
+    cid=$(next-commentary-id)
+    status "$page: insert commentary %s @ (%d,%d)" $cid $LM $Y
+    local slice="${input}-${old_y}-$Y.$ext"
+    [[ -f $slice ]] || convert "$input" \
+      -crop x$((Y-old_y))+0+$((old_y)) +repage \
+      "$slice"
+    printf '<img class="strip" src="../../%s"><br/>\n' "$slice" >> "$output"
+    html-commentary $cid $width >> "$output"
+    old_y=$Y
   done
-  # we don't just pipe one into the other so that next-commentary-id can update
-  # CTAIL correctly
-  printf '%s\n' "${lines[@]}" | tac | while read Y cid; do
-    status "$page: render commentary %s @ (%d,%d)" $cid $LM $Y
-    local commentary="$(render-commentary $cid $width)"
-    if [[ $skip ]]; then continue; fi
-    local H=$(identify "$commentary" | cut -d' ' -f3 | cut -dx -f2)
-    args+=(-splice 0x$H+0+$Y -page +$LM+$Y "$commentary" -flatten)
-  done
-  # status '%s' "convert ${args[*]} $output"
-  if [[ $skip ]]; then
-    convert "$input" raw:/dev/null
-  else
-    status "$page: writing $output"
-    convert "${args[@]}" -colorspace gray "$output"
-    convert "$output" "${output%.*}.pdf"
-  fi
+  status "$page: slice footer"
+  local slice="${input}-${old_y}-EOF.$ext"
+  [[ -f $slice ]] || convert "$input" \
+    -crop +0+$((old_y)) +repage \
+    "$slice"
+  printf '<img src="../../%s">\n' "$slice" >> "$output"
+
+  status "$page: render commentary"
+  wkhtmltopdf --enable-local-file-access --quiet \
+    --user-style-sheet tmp/style.css \
+    -B 0 -T 0 -L 0 -R 0 \
+    --page-width 24cm \
+    --page-height 100cm \
+    "$output" "${output%.*}.pdf"
+  pdfcrop "${output%.*}.pdf" "${output%.*}.pdf" >/dev/null
 }
-
-# to insert commentary
-# given an image and a sequence of (Y, commentary) pairs:
-# - get the margins LM and RM for the image
-# - for each pair
-#   - render the commentary to C with width (RM-LM)
-#   - get the height H of C
-#   - use "-background white -splice 0xH+0+Y" to insert the necessary whitespace
-#   - use "-page +RM+Y C" to insert the commentary overtop of it
-#   - finally write out with "-flatten out.jpeg"
-# ideally we want to do all of these steps in one "convert" call so that we don't
-# end up repeatedly decompressing and recompressing the image
-# we need to do the splices and inserts from the bottom up because otherwise
-# each one will affect the coordinates of the ones below it
 
 # Now the actual machinery of the program
 
@@ -339,9 +328,9 @@ shopt -s lastpipe
 
 function main {
   checkdeps \
-    wkhtmltoimage \
+    wkhtmltopdf \
     convert identify \
-    pdfimages pdfseparate pdfunite \
+    pdfimages pdfseparate pdfunite pdfcrop \
     wring \
     gs \
     curl zip fgrep egrep cut sed

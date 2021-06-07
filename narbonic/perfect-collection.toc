@@ -20,7 +20,23 @@ if [[ $VOL1 ]]; then
 volume "Narbonic Director's Cut - Perfect Collection Volume 1"
   RASTER_MODE=pdfimages
   original "$VOL1"
-  css 'div.comic-strip-commentary { font-size: 24px; }'
+  css '
+    body { margin: 0; padding: 0; }
+    img {
+      margin: 0;
+      padding: 0;
+      /*border: 0.5em solid red;*/
+    }
+    div.comic-strip-commentary {
+      font-size: 1.2em;
+      padding: 0 10%;
+      margin: 0;
+      /*border: 0.5em solid blue;*/
+    }
+    div.comic-strip-commentary img {
+      display: block;
+    }
+  '
   # frontmatter
   # TODO: insert a page explaining that this copy has been modified?
   copy 0 10
@@ -97,6 +113,9 @@ fi
 # add a bunch more dependencies, plus I'd need to spend a lot of time tweaking
 # the LaTeX to get things to come out approximately the same as the original, and
 # it would probably never exactly match.
+
+# TODO: rewrite to extract just the strip images and use wkhtmltopdf to
+# weave them back together
 if [[ $VOL2 ]]; then
 volume "Narbonic Director's Cut - Perfect Collection Volume 2"
   original "$VOL2"
