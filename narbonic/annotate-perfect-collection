@@ -106,10 +106,8 @@ function raster-page {
   local page="$(printf page-%03d $1)"
   case $RASTER_MODE in
     pdfimages)
-      if [[ ! -f "tmp/$SOURCE/$page.jpg" ]]; then
-        pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" tmp/raster
-        mv tmp/raster-000.jpg "tmp/$SOURCE/$page.jpg"
-      fi
+      pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" tmp/raster
+      mv tmp/raster-000.jpg "tmp/$SOURCE/$page.jpg"
       echo "$page.jpg"
       ;;
     imagemagick)
@@ -167,7 +165,7 @@ function whole {
   for i in $(seq $start $end); do
     local page="$(raster-page $i)"
     status "$page: annotating"
-    add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page" \
+    add-commentary "tmp/$SOURCE/$page" \
       $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1)
   done
 }
@@ -186,7 +184,7 @@ function split {
   for i in $(seq $start $end); do
     local page="$(raster-page $i)"
     status "$page: splitting and annotating"
-    add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page" \
+    add-commentary "tmp/$SOURCE/$page" \
       $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g)
   done
 }
@@ -199,7 +197,7 @@ function split-at {
   local page="$(raster-page $1)"
   shift
   status "$page: splitting and annotating"
-  add-commentary "tmp/$SOURCE/$page" "tmp/$VOLUME/$page" "$@"
+  add-commentary "tmp/$SOURCE/$page" "$@"
 }
 
 # endvolume
@@ -284,18 +282,13 @@ function add-commentary {
   local page="$(basename "$input")"
   local output="tmp/$VOLUME/${page%.*}.html"
   local ext="${page##*.}"
-  shift 2 # $2 currently unused, TODO: remove
-
-  local LM RM text_width page_width
-  find-margins "$input" | read LM RM
-  local text_width=$((RM-LM))
-  local page_width=$(identify "$input" | egrep -o '[0-9]+x[0-9]+' | head -n1 | cut -dx -f1)
+  shift
 
   local old_y=0
   echo -n > "$output"
   for Y in "$@"; do
     cid=$(next-commentary-id)
-    status "$page: insert commentary %s @ (%d,%d)" $cid $LM $Y
+    status "$page: insert commentary %s @ %d" $cid $Y
     local slice="${input}-${old_y}-$Y.$ext"
     [[ -f $slice ]] || convert "$input" \
       -crop x$((Y-old_y))+0+$((old_y)) +repage \
