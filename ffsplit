@@ -1,0 +1,40 @@
+#!/usr/bin/env zsh
+
+function split {
+#  echo split "$1" "$(printf %02d $3) - $2.${1##*.}" $start $end
+  </dev/null ffmpeg -hide_banner -i $1 -ss $4 -to $5 -acodec copy -vcodec copy "$(printf %02d $3) - $2.${1##*.}"
+}
+
+{ ffprobe "$1" 2>&1; echo eof } \
+| sed -En '
+/Duration/,$ {
+  /Chapter #/ {
+    s/ +Chapter #0:([0-9]+): start ([0-9.]+), end ([0-9.]+)/chapter\t\1\t\2\t\3/
+    p
+  }
+  /^ +title/ {
+    s/ +title +: (.*)/title\t\1/
+    p
+  }
+  /^eof$/ p
+}
+' | while read line; do
+  echo $line
+  case $line in
+    chapter*)
+      if [[ $idx ]]; then
+        split "$1" "${title:=Track $idx}" $idx $start $end
+        unset idx start end title
+      fi
+      echo "$line" | read _ idx start end
+      ((++idx))
+      ;;
+    title*)
+      echo "$line" | read _ title
+      ;;
+    eof)
+      split "$1" "${title:=Track $idx}" $idx $start $end
+      break
+      ;;
+  esac
+done
