@@ -14,7 +14,7 @@ gc=off
 # Games we are currently playing have highest priority.
 # Older games have priority by default so they don't languish forever :)
 urgency.active.coefficient=1024
-urgency.age.coefficient=1
+urgency.age.coefficient=-1
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
 
@@ -40,6 +40,7 @@ color.tagged=
 uda.gamestate.label=Play Status
 uda.gamestate.type=string
 uda.gamestate.values=unplayed,unfinished,finished,completed,mastered,null
+uda.gamestate.default=unplayed
 
 uda.genres.label=Genres
 uda.genres.type=string
@@ -59,12 +60,18 @@ default.command=next
 report.list.columns=id,end,project,gamestate,tags,genres,description.desc
 report.list.labels=ID,Finished,Plt,Status,Tags,Genre,Title
 report.list.sort=end+,start+,description+
-report.list.filter=(+COMPLETED or +ACTIVE)
+report.list.filter=(+COMPLETED or +ACTIVE) and gamestate.not:null
 
 ## Next: games in progress & waiting to be played
 report.next.columns=id,start.age,project,gamestate,tags,genres,description.desc
 report.next.labels=ID,Playing,Plt,Status,Tags,Genre,Title
 report.next.sort=urgency-,start+
+
+## Nulled: all games in the null pile
+report.nulled.columns=id,end,project,gamestate,tags,genres,description.desc
+report.nulled.labels=ID,Finished,Plt,Status,Tags,Genre,Title
+report.nulled.sort=end+,start+,description+
+report.nulled.filter=gamestate:null
 
 report.all.columns=id,end,project,gamestate,tags,genres,description
 report.all.description=All games
