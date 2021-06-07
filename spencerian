@@ -1,0 +1,184 @@
+% shitpost generator for Spencerian script
+% basic idea:
+% - a function for each stroke using relative paths
+% - a function for each letter using the stroke functions, plus punctuation
+%   functions
+% - an entry point that decomposes strings into function calls
+%
+% To draw a space:
+% - insert horizontal whitespace
+% - home vertically
+% - clear stack and push 0 0
+%
+% To draw a letter:
+% - pop. if == self, set shading to 0.5, else to 1.0
+% - pop. if == first stroke, skip first stroke
+% - emit all strokes
+% - push final stroke followed by self name
+
+% stack contains the previous letter, then this letter
+/setshading {
+  % doubled letters set line width to half on the second letter
+  eq { (!! half shade) = } { (!! full shade) = } ifelse
+  (!setshading) debug
+} def
+
+% stack contains the ending stroke, then the starting stroke
+% if they're the same, skip, otherwise execute
+/coalesce {
+  % stack is prev cur
+  dup 3 1 roll
+  % stack is now cur prev cur
+  % if cur == prev execute cur else discard it
+  eq { pop } { render-stroke } ifelse
+} def
+
+/render-stroke {
+  (pre-render) debug
+  strokes exch get exec
+  (post-render) debug
+} def
+
+% angle advance :: distance
+% given a line angle up from baseline, gives the x advance of a line drawn at
+% that angle that is one unit high.
+% use theta advance neg to get retreat distance for descending strokes
+/advance {
+  % sin(90-angle)/sin(angle)
+  dup 90 exch sub sin exch sin div
+} def
+
+/; {} def
+
+% all strokes expect to read from the stack a bool indicating if we are on the
+% baseline (true) or above it (false)
+% and then set it accordingly
+/strokes <<
+  % no-op padding
+  0 { }
+  % straight line at 52° from the baseline
+  1 {
+    dup
+    { 52 advance 1 rlineto } % ascending
+    { 52 advance neg -1 rlineto } % descending
+    ifelse not
+  }
+  % closing curve at 30° from the baseline
+  2 {
+    dup
+    { 30 advance 0.1 mul 0 ; 30 advance 0.9 ; 30 advance 1 rcurveto }
+    { 0 -0.1 ; 30 advance neg 0.9 mul -1 ; 30 advance neg -1 rcurveto }
+    ifelse not
+  }
+  % opening curve at 30° from the baseline
+  3 {
+    dup
+    { 0 0.1 ; 30 advance 0.9 mul 1 ; 30 advance 1 rcurveto }
+    { 30 advance neg 0.1 mul 0 ; 30 advance neg -0.9 ; 30 advance neg -1 rcurveto }
+    ifelse not
+  }
+  % tall loop at 52° from baseline then descending at like 60°?
+  4 {
+    52 advance 0.6 mul 0
+    52 advance 3.6 mul 3
+    52 advance 3 mul 3 rcurveto
+    60 advance neg 0.6 mul 0
+    60 advance neg 3.6 mul -3
+    60 advance neg 3 mul -3 rcurveto
+  }
+>> def
+
+% mark ... val below-mark :: val mark ...
+% puts the topmost stack element underneath the topmost mark
+/below-mark {
+  counttomark 1 add 1 roll
+} def
+
+% array drop-first :: array'
+% replaces array with a version where the first element has been deleted
+/drop-first {
+  mark exch aload pop
+  % stack is now mark arraycontents...
+  counttomark 1 sub array astore
+  % mark first rest
+  below-mark cleartomark
+} def
+
+/render-strokes {
+  { render-stroke } forall
+} def
+
+/debug {
+  =
+  stack
+  (-----) =
+} def
+
+/last {
+  dup length 1 sub get
+} def
+
+% letter [strokes] defletter :: -
+% defines a letter with the given name based on the given stroke sequence
+% strokes are looked up in the global <<strokes>> dict at render time
+/defletter {
+  exch
+  (defletter) == dup ==
+  dup mark exch /setshading cvx
+  % stack is now [strokes] /x [ /x setshading
+  5 -1 roll % bring [strokes] to the top
+  dup 0 get exch /coalesce cvx exch
+  % stack is now /x [ /x setshading $firststroke coalesce [strokes]
+  drop-first
+  /render-strokes cvx
+  % stack: /x [ /x setshading $first coalesce [strokes'] render-strokes
+  % push the last stroke for the stroke-joining algorithm
+  1 index last
+  % and then the letter name
+  counttomark 1 sub index
+  1 0 /rmoveto cvx
+  ] cvx dup == def
+} def
+
+<<
+  /a [3 3 2 1 2]
+  /b [4 2]
+  % /b [4 2 2]
+  /c [2 1 2 3 2]
+  /d [3 3 2 1 2]
+  /e [2 3 2]
+  /f [4 3 2 2]
+  /g [3 3 2 4]
+  /h [4 3 1 2]
+  /i [2 1 2]
+  /j [2 4]
+  /k [4 3 2 1 2]
+  /l [4 0]
+  /m [3 1 3 1 3 1 2]
+  /n [3 1 3 1 2]
+  /o [3 3 2 2]
+  /p [2 1 3 1 2]
+  /q [3 3 2 1 2 3]
+  /r [2 3 1 2]
+  /s [2 3 2 2]
+  /ss [4 4]
+  /t [2 1 2 1]
+  /u [2 1 2 1 2]
+  /v [3 1 2 2]
+  /w [2 1 2 1 2 2]
+  /x [3 2 3 2]
+  /y [3 1 2 4]
+  /z [3 1 4]
+>> { defletter } forall
+
+50 50 moveto
+30 30 scale
+1 setlinejoin % curved
+0.1 setlinewidth
+true 0 0
+
+a b c d e f g h i j k m n o p q r s t u v w x y z
+% s p h y n x o f b l a c k q u a r t z j u d g e m y v o w
+stroke
+ % n n m
+%quit
