@@ -21,20 +21,13 @@ volume "Narbonic Director's Cut - Perfect Collection Volume 1"
   RASTER_MODE=pdfimages
   original "$VOL1"
   css '
-    body { margin: 0; padding: 0; }
+    * { margin: 0; padding: 0; }
     img {
-      margin: 0;
-      padding: 0;
-      /*border: 0.5em solid red;*/
+      margin: 0 auto 0 auto;
+      display: block;
     }
     div.comic-strip-commentary {
-      font-size: 1.2em;
-      padding: 0 10%;
-      margin: 0;
-      /*border: 0.5em solid blue;*/
-    }
-    div.comic-strip-commentary img {
-      display: block;
+      font-size: 1.4em;
     }
   '
   # frontmatter
@@ -119,20 +112,17 @@ fi
 if [[ $VOL2 ]]; then
 volume "Narbonic Director's Cut - Perfect Collection Volume 2"
   original "$VOL2"
-  # The original seems to have the images at 300dpi. Rasterizing at 300dpi,
-  # however, results in noticeable jaggies, so we compromise: raster at 300 and
-  # then downscale to 150 for a 2xAA effect.
-  RASTER_MODE=imagemagick-aa
-  DPI=150
+  RASTER_MODE=pdfimages-html
   # 24px works well for 150dpi.
-  css 'div.comic-strip-commentary { font-size: 24px; }'
+  # css 'div.comic-strip-commentary { font-size: 24px; }'
   # Even if we skipped generating the first volume, make sure we're in the right
   # place in the commentary queue.
   sync 899
   copy 0 6
   # These manual splits are correct for 150dpi. Adjust as needed for other densities.
-  split-at 7 496 882 1275
-  split 8 37
+  # split-at 7 496 882 1275
+  # split 8 37
+  split 7 37
   whole 38
   split 39 128
   copy 129 138

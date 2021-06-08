@@ -110,6 +110,10 @@ function raster-page {
       mv tmp/raster-000.jpg "tmp/$SOURCE/$page.jpg"
       echo "$page.jpg"
       ;;
+    pdfimages-html)
+      pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" "tmp/$SOURCE/$page"
+      echo "$page"
+      ;;
     imagemagick)
       convert \
         -define registry:temporary-path="$PWD/tmp/" \
@@ -165,8 +169,12 @@ function whole {
   for i in $(seq $start $end); do
     local page="$(raster-page $i)"
     status "$page: annotating"
-    add-commentary "tmp/$SOURCE/$page" \
-      $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1)
+    if [[ $RASTER_MODE == pdfimages-html ]]; then
+      add-commentary-multi-image "tmp/$SOURCE/$page" LAST
+    else
+      add-commentary "tmp/$SOURCE/$page" \
+        $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g | tail -n1)
+    fi
   done
 }
 
@@ -184,8 +192,12 @@ function split {
   for i in $(seq $start $end); do
     local page="$(raster-page $i)"
     status "$page: splitting and annotating"
-    add-commentary "tmp/$SOURCE/$page" \
-      $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g)
+    if [[ $RASTER_MODE == pdfimages-html ]]; then
+      add-commentary-multi-image "tmp/$SOURCE/$page" ALL
+    else
+      add-commentary "tmp/$SOURCE/$page" \
+        $(find-splits "tmp/$SOURCE/$page" "$@" | sort -g)
+    fi
   done
 }
 
@@ -197,6 +209,7 @@ function split-at {
   local page="$(raster-page $1)"
   shift
   status "$page: splitting and annotating"
+  if [[ RASTER_MODE == pdfimages-html ]]; then die "split-at not supported in pdfimages-html mode"; fi
   add-commentary "tmp/$SOURCE/$page" "$@"
 }
 
@@ -205,8 +218,7 @@ function split-at {
 function endvolume {
   if [[ ! $VOLUME ]]; then die "endvolume without matching volume"; fi
   status "Packing $VOLUME.pdf"
-  cd "tmp/$VOLUME"
-  pdfunite *.pdf "../../out/$VOLUME.pdf"
+  (cd "tmp/$VOLUME" && pdfunite *.pdf "../../out/$VOLUME.pdf")
   status "Packed out/$VOLUME.pdf\\n"
   VOLUME=""
 }
@@ -270,7 +282,7 @@ function html-commentary {
   | sed -E 's,img src=",img src="../../tmp/commentary/,g'
 }
 
-# add-commentary IN OUT SPLITS
+# add-commentary IN SPLITS...
 # add commentary to IN and write the resulting image to OUT
 # n.b. IN and OUT probably have directory separators in them; handle with care
 # Redesign: rather than using image processing for all of this:
@@ -278,6 +290,11 @@ function html-commentary {
 # - output HTML combining the images and the commentary concatenated
 # - use wkhtmltopdf to write output.pdf
 function add-commentary {
+  if [[ $RASTER_MODE == pdfimages-html ]]; then
+    add-commentary-multi-image "$@"
+    return 0
+  fi
+
   local input="$1"
   local page="$(basename "$input")"
   local output="tmp/$VOLUME/${page%.*}.html"
@@ -288,18 +305,34 @@ function add-commentary {
   echo -n > "$output"
   for Y in "$@"; do
     cid=$(next-commentary-id)
-    status "$page: insert commentary %s @ %d" $cid $Y
+    status "$page: insert commentary %s @ %d-%d" $cid $old_y $Y
     local slice="${input}-${old_y}-$Y.$ext"
+    # This requires some explanation.
+    # We want to trim off the sides to eliminate margin whitespace as much as possible,
+    # and then re-add the whitespace as actual page margins when generating the PDF.
+    # So, we add a pure white border around the image, then put a magenta stripe down the
+    # right side to protect the right, top, and bottom before we trim, causing it to trim
+    # only the left side; then we do the same thing to trim only the right, then remove the white border.
+    # Finally we cut out the slice requested and save it. We don't need to adjust the slice
+    # heights because only the width of the image has changed, not the height.
     [[ -f $slice ]] || convert "$input" \
+      -bordercolor White -border 1x1 -fuzz "1%" -background Magenta \
+      -gravity East -splice 1x0 -trim -chop 1x0 \
+      -gravity West -splice 1x0 -trim -chop 1x0 \
+      -shave 0x1 -gravity Northwest \
       -crop x$((Y-old_y))+0+$((old_y)) +repage \
       "$slice"
-    printf '<img class="strip" src="../../%s"><br/>\n' "$slice" >> "$output"
+    printf '<img class="strip" src="../../%s">\n' "$slice" >> "$output"
     html-commentary $cid $width >> "$output"
     old_y=$Y
   done
   status "$page: slice footer"
   local slice="${input}-${old_y}-EOF.$ext"
   [[ -f $slice ]] || convert "$input" \
+    -bordercolor White -border 1x1 -fuzz "1%" -background Magenta \
+    -gravity East -splice 1x0 -trim -chop 1x0 \
+    -gravity West -splice 1x0 -trim -chop 1x0 \
+    -shave 0x1 -gravity Northwest \
     -crop +0+$((old_y)) +repage \
     "$slice"
   printf '<img src="../../%s">\n' "$slice" >> "$output"
@@ -308,10 +341,56 @@ function add-commentary {
   wkhtmltopdf --enable-local-file-access --quiet \
     --user-style-sheet tmp/style.css \
     -B 0 -T 0 -L 0 -R 0 \
-    --page-width 24cm \
-    --page-height 100cm \
+    --page-width 20cm \
+    --page-height 200cm \
     "$output" "${output%.*}.pdf"
-  pdfcrop "${output%.*}.pdf" "${output%.*}.pdf" >/dev/null
+  pdfcrop --margins "20 0 20 0" \
+    "${output%.*}.pdf" "${output%.*}.pdf" >/dev/null
+}
+
+# add-commentary-multi-image IN <ALL|LAST>
+# An alternate version of add-commentary for pdfimages-html mode.
+# Takes a page *prefix* as $1 and
+function add-commentary-multi-image {
+  local input="$1"
+  local inputdir="$(dirname "$input")"
+  local page="$(basename "$input")"
+  local output="tmp/$VOLUME/$page.html"
+  shift
+
+  local width=0
+  echo '<!-- MEDIA SIZE 24x200cm -->' > "$output"
+  # experimental: reverse extracted image order because pdfimages spits them
+  # out bottom to top
+  for img in $(cd "$inputdir" && printf '%s\n' "$page-"* | tac); do
+    printf '<img align="center" src="../../%s/%s"><br/>\n' "$inputdir" "$img" >> "$output"
+    local new_width=$(identify "$inputdir/$img" | egrep -o '[0-9]+x[0-9]+' | head -n1 | cut -dx -f1)
+    if (( new_width > width )); then
+      width=$new_width
+    fi
+    if [[ $1 == ALL ]]; then
+      cid=$(next-commentary-id)
+      status "$page: insert commentary %s after %s" $cid $img
+      html-commentary $cid >> "$output"
+    fi
+  done
+  if [[ $1 == LAST ]]; then
+    cid=$(next-commentary-id)
+    status "$page: insert commentary %s after %s" $cid $img
+    html-commentary $cid >> "$output"
+  fi
+  printf '<div align="center"><big>%d</big></div>\n' $(( 10#${page##page-} )) >> "$output"
+  status "$page: render commentary"
+  # We use htmldoc rather than wkhtmltopdf for the second volume; it is harder
+  # to use since it doesn't support CSS, but wkhtmltopdf will convert all the
+  # PNG images to JPEG and make the file size 5-8x larger.
+  htmldoc --webpage --continuous --quiet \
+    --footer . \
+    --browserwidth $width \
+    --fontsize 16 \
+    -f "${output%.*}.pdf" "$output"
+  pdfcrop --margins "20 50 20 50" \
+    "${output%.*}.pdf" "${output%.*}.pdf" >/dev/null
 }
 
 # Now the actual machinery of the program
