@@ -58,14 +58,20 @@ function page {
     local div="$(wring html $out "#$id")"
     [[ ! $div ]] && continue
     local dst="tmp/commentary/$(printf %04d $CHEAD)"
-    echo "$div" | sed -E 's,<br>,,g' > "$dst.html"
+    # we trim <br> tags here, because a lot of the commentary has hard linebreaks in it that
+    # mess up the formatting quite badly...but this also breaks song and poem lyrics and whatnot.
+    # We need to be smarter about this.
+    #echo "$div" | sed -E 's,<br>,,g' > "$dst.html"
+    echo "$div" > "$dst.html"
     ((++CHEAD))
     # fix up links in the comment fragment
-    for link in $(egrep -o '/wordpress/wp-content/uploads/[^"]+' "$dst.html"); do
+    for link in $(egrep -o 'src="/wordpress/wp-content/uploads/[^"]+"' "$dst.html"); do
+      local linkpath="$(echo "$link" | cut -d'"' -f2)"
+      local basename="$(basename "$linkpath")"
       status "Commentary %04d \"%s\" (%s) [fixup %s]" "$CHEAD" "$title" "$name" "$(basename $link)"
-      local file="$dst-$(basename "$link")"
-      [[ -f "$file" ]] || curl --retry 5 --silent "http://narbonic.com$link" > "$file"
-      sed -E -i "s;$link;$(basename "$file");g" "$dst.html"
+      local file="$dst-$basename"
+      [[ -f "$file" ]] || curl --retry 5 --silent "http://narbonic.com$linkpath" > "$file"
+      sed -E -i "s;$link;src=\"$(basename "$file")\";g" "$dst.html"
     done
 
   done
@@ -342,7 +348,7 @@ function add-commentary {
     --user-style-sheet tmp/style.css \
     -B 0 -T 0 -L 0 -R 0 \
     --page-width 20cm \
-    --page-height 200cm \
+    --page-height 400cm \
     "$output" "${output%.*}.pdf"
   pdfcrop --margins "20 0 20 0" \
     "${output%.*}.pdf" "${output%.*}.pdf" >/dev/null
@@ -359,7 +365,7 @@ function add-commentary-multi-image {
   shift
 
   local width=0
-  echo '<!-- MEDIA SIZE 24x200cm -->' > "$output"
+  echo '<!-- MEDIA SIZE 24x400cm -->' > "$output"
   # experimental: reverse extracted image order because pdfimages spits them
   # out bottom to top
   for img in $(cd "$inputdir" && printf '%s\n' "$page-"* | tac); do
