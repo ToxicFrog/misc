@@ -4,7 +4,7 @@
 
 # Comment these out to disable building that volume, or edit the name if your
 # PDFs have a different name.
-# VOL1="Narbonic - Perfect Collection Volume 1.pdf"
+VOL1="Narbonic - Perfect Collection Volume 1.pdf"
 VOL2="Narbonic - Perfect Collection Volume 2.pdf"
 
 #### No user serviceble parts below this line. ####
@@ -54,7 +54,7 @@ volume "Narbonic Director's Cut - Perfect Collection Volume 1"
   whole 179
   split 180 217
   # bonus Meet the Enemy
-  copy 218 227
+  copy 218 228
   split 229 243
   whole 244
   split 245 296
@@ -103,8 +103,7 @@ volume "Narbonic Director's Cut - Perfect Collection Volume 2"
   whole 364
   split 365 390
   copy 391
-  # TODO: this is the final page (of the main comic; there's backmatter after).
-  # We might want to write the final commentary to a page of its own after this?
-  copy 392 413
+  whole 392 # last annotated page!
+  copy 393 413
 endvolume
 fi

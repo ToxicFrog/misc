@@ -176,9 +176,16 @@ function copy {
   fi
   status "page %03d-%03d: copying" "$first" "$last"
   # The index file uses 0-indexing. pdfseparate uses 1-indexing. We standardize
-  # on 0-indexing at the interfaces and adjust here.
+  # on 0-indexing at the interfaces and adjust here, so that the numbers in the
+  # index file match up with the page numbers in the document (since the cover
+  # is page 0).
   pdfseparate -f $((first+1)) -l $((last+1)) \
     "$SOURCE" "tmp/$VOLUME/page-%03d.pdf"
+  for i in $(seq $first $last); do
+    mv \
+      "tmp/$VOLUME/page-$(printf %03d $((i+1))).pdf" \
+      "tmp/$VOLUME/page-$(printf %03d $i).pdf"
+  done
 }
 
 # TODO: as a speed optimization, we can just write HTML pages for everything but
