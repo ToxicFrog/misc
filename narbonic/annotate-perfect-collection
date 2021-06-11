@@ -329,7 +329,8 @@ function add-commentary {
   shift
 
   local old_y=0
-  echo -n > "$output"
+  local width=0
+  echo '<!-- MEDIA SIZE 24x400cm -->' > "$output"
   for Y in "$@"; do
     cid=$(next-commentary-id)
     status "$page: insert commentary %s @ %d-%d" $cid $old_y $Y
@@ -349,11 +350,15 @@ function add-commentary {
       -shave 0x1 -gravity Northwest \
       -crop x$((Y-old_y))+0+$((old_y)) +repage \
       "$slice"
-    printf '<img class="strip" src="../../%s">\n' "$slice" >> "$output"
+    printf '<div><img align="center" src="../../%s"></div>\n' "$slice" >> "$output"
     html-commentary $cid $width >> "$output"
     old_y=$Y
+    local new_width=$(identify -format "%w" "$slice")
+    if (( new_width > width )); then
+      width=$new_width
+    fi
   done
-  status "$page: slice footer"
+  status "$page: append footer"
   local slice="${input}-${old_y}-EOF.$ext"
   [[ -f $slice ]] || convert "$input" \
     -bordercolor White -border 1x1 -fuzz "1%" -background Magenta \
@@ -363,14 +368,17 @@ function add-commentary {
     -crop +0+$((old_y)) +repage \
     "$slice"
   printf '<img src="../../%s">\n' "$slice" >> "$output"
+  local new_width=$(identify -format "%w" "$slice")
+  if (( new_width > width )); then
+    width=$new_width
+  fi
 
-  status "$page: render commentary"
-  wkhtmltopdf --enable-local-file-access --quiet \
-    --user-style-sheet tmp/style.css \
-    -B 0 -T 0 -L 0 -R 0 \
-    --page-width 20cm \
-    --page-height 400cm \
-    "$output" "${output%.*}.pdf"
+  status "$page: render"
+  htmldoc --webpage --continuous --quiet \
+    --footer . --linkcolor blue \
+    --browserwidth $width \
+    --fontsize 16 \
+    -f "${output%.*}.pdf" "$output"
   pdfcrop --margins "20 0 20 0" \
     "${output%.*}.pdf" "${output%.*}.pdf" >/dev/null
 }
@@ -390,8 +398,8 @@ function add-commentary-multi-image {
   # experimental: reverse extracted image order because pdfimages spits them
   # out bottom to top
   for img in $(cd "$inputdir" && printf '%s\n' "$page-"* | tac); do
-    printf '<img align="center" src="../../%s/%s"><br/>\n' "$inputdir" "$img" >> "$output"
-    local new_width=$(identify "$inputdir/$img" | egrep -o '[0-9]+x[0-9]+' | head -n1 | cut -dx -f1)
+    printf '<div><img align="center" src="../../%s/%s"></div>\n' "$inputdir" "$img" >> "$output"
+    local new_width=$(identify -format "%w" "$inputdir/$img")
     if (( new_width > width )); then
       width=$new_width
     fi
@@ -407,12 +415,12 @@ function add-commentary-multi-image {
     html-commentary $cid >> "$output"
   fi
   printf '<div align="center"><big>%d</big></div>\n' $(( 10#${page##page-} )) >> "$output"
-  status "$page: render commentary"
+  status "$page: render"
   # We use htmldoc rather than wkhtmltopdf for the second volume; it is harder
   # to use since it doesn't support CSS, but wkhtmltopdf will convert all the
   # PNG images to JPEG and make the file size 5-8x larger.
   htmldoc --webpage --continuous --quiet \
-    --footer . \
+    --footer . --linkcolor blue \
     --browserwidth $width \
     --fontsize 16 \
     -f "${output%.*}.pdf" "$output"
@@ -427,11 +435,10 @@ shopt -s lastpipe
 
 function main {
   checkdeps \
-    wkhtmltopdf \
     convert identify \
     pdfimages pdfseparate pdfunite pdfcrop \
     wring \
-    gs \
+    htmldoc \
     curl zip fgrep egrep cut sed
   mkdir -p tmp/{commentary,html} out
   # Load commentary
