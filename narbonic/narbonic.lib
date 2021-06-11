@@ -28,3 +28,13 @@ function die {
   echo "$@" >&2
   exit 1
 }
+
+function width {
+  identify -format '%w\n' "$@"
+}
+
+# maxwidth image0..imageN
+# emit maximum pixel width of the images
+function maxwidth {
+  width "$@" | sort -gr | head -n1
+}

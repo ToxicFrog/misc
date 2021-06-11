@@ -181,6 +181,9 @@ function copy {
     "$SOURCE" "tmp/$VOLUME/page-%03d.pdf"
 }
 
+# TODO: as a speed optimization, we can just write HTML pages for everything but
+# copy, and then on copy or endvolume, render them all at once.
+
 # whole $start [$end]
 # copy the given pages, and for each one, pull commentary from the queue and
 # insert it between the main page content and the page number.
@@ -329,7 +332,6 @@ function add-commentary {
   shift
 
   local old_y=0
-  local width=0
   echo '<!-- MEDIA SIZE 24x400cm -->' > "$output"
   for Y in "$@"; do
     cid=$(next-commentary-id)
@@ -350,13 +352,9 @@ function add-commentary {
       -shave 0x1 -gravity Northwest \
       -crop x$((Y-old_y))+0+$((old_y)) +repage \
       "$slice"
-    printf '<div><img align="center" src="../../%s"></div>\n' "$slice" >> "$output"
+    printf '<div align=center><img src="../../%s"></div>\n' "$slice" >> "$output"
     html-commentary $cid $width >> "$output"
     old_y=$Y
-    local new_width=$(identify -format "%w" "$slice")
-    if (( new_width > width )); then
-      width=$new_width
-    fi
   done
   status "$page: append footer"
   local slice="${input}-${old_y}-EOF.$ext"
@@ -368,15 +366,11 @@ function add-commentary {
     -crop +0+$((old_y)) +repage \
     "$slice"
   printf '<img src="../../%s">\n' "$slice" >> "$output"
-  local new_width=$(identify -format "%w" "$slice")
-  if (( new_width > width )); then
-    width=$new_width
-  fi
 
   status "$page: render"
   htmldoc --webpage --continuous --quiet \
     --footer . --linkcolor blue \
-    --browserwidth $width \
+    --browserwidth $(width "$slice") \
     --fontsize 16 \
     -f "${output%.*}.pdf" "$output"
   pdfcrop --margins "20 0 20 0" \
@@ -393,16 +387,17 @@ function add-commentary-multi-image {
   local output="tmp/$VOLUME/$page.html"
   shift
 
-  local width=0
   echo '<!-- MEDIA SIZE 24x400cm -->' > "$output"
-  # experimental: reverse extracted image order because pdfimages spits them
-  # out bottom to top
+  # reverse extracted image order because pdfimages spits them out bottom to top
+  # ...usually.
+  local width=$(cd "$inputdir" && maxwidth "$page-"*)
+  if [[ $page == "page-364" ]]; then
+    # this page has one long narrow comic which looks really weird rendered at
+    # full page width
+    width=$(( width * 5 / 2 ))
+  fi
   for img in $(cd "$inputdir" && printf '%s\n' "$page-"* | tac); do
-    printf '<div><img align="center" src="../../%s/%s"></div>\n' "$inputdir" "$img" >> "$output"
-    local new_width=$(identify -format "%w" "$inputdir/$img")
-    if (( new_width > width )); then
-      width=$new_width
-    fi
+    printf '<div align=center><img src="../../%s/%s"></div>\n' "$inputdir" "$img" >> "$output"
     if [[ $1 == ALL ]]; then
       cid=$(next-commentary-id)
       status "$page: insert commentary %s after %s" $cid $img
