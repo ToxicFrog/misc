@@ -118,6 +118,25 @@ function raster-page {
       ;;
     pdfimages-html)
       pdfimages -all -f $(($1+1)) -l $(($1+1)) "$SOURCE" "tmp/$SOURCE/$page"
+      if ls "tmp/$SOURCE/$page-"* | fgrep -q .jpg; then
+        # JPEGs are stored inverted in volume 2 for some reason
+        mogrify -negate "tmp/$SOURCE/$page-"*.jpg
+      fi
+      # page 52: images need to go in the order 000 002 001; -000 needs to be
+      # rescaled to be 750px high rather than 750px wide
+      if (( $1 == 52 )); then
+        mogrify -resize x750 "tmp/$SOURCE/$page-000.png"
+        mv "tmp/$SOURCE/$page"-{000,003}.png
+      fi
+      # page 233: images need to go in the order 000 002 001
+      if (( $1 == 233 )); then
+        mv "tmp/$SOURCE/$page"-{000,003}.png
+      fi
+      # page 282: 002 000 001
+      if (( $1 == 282 )); then
+        mv "tmp/$SOURCE/$page"-{002,003}.png
+        mv "tmp/$SOURCE/$page"-{000,002}.png
+      fi
       echo "$page"
       ;;
     imagemagick)
