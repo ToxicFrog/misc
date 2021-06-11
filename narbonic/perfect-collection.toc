@@ -1,42 +1,27 @@
-# Index page for adding commentary to Narbonic: The Perfect Collection
-# This is not compatible with build-narbonic, since the way pages are referenced
-# is very different.
+# Master index page for inserting commentary into Narbonic: The Perfect Collection.
+# See perfect-collection-commentary.toc for the list of which commentary to fetch
+# from the website and in what order.
 
-# Format is volume to declare a volume, then:
-# fetch <list of website page names> to fetch those pages and add their commentary
-# to the queue
-# copy START-END to copy these pages as is from the PDF
-# annotate START-END to copy these pages and pull commentary from the queue for them
-# split-annotate START-END to split these pages into strips and pull commentary from the queue
-# drop N to drop the next N commentary blocks
-
-# Settings.
-#format=jpeg
-
-VOL1="Narbonic - Perfect Collection Volume 1.pdf"
+# Comment these out to disable building that volume, or edit the name if your
+# PDFs have a different name.
+# VOL1="Narbonic - Perfect Collection Volume 1.pdf"
 VOL2="Narbonic - Perfect Collection Volume 2.pdf"
+
+#### No user serviceble parts below this line. ####
 
 if [[ $VOL1 ]]; then
 volume "Narbonic Director's Cut - Perfect Collection Volume 1"
+  # Each page is a single massive JPEG image. This mode extracts that image
+  # and then slices it up with imagemagick.
   RASTER_MODE=pdfimages
   original "$VOL1"
-  css '
-    * { margin: 0; padding: 0; }
-    img {
-      margin: 0 auto 0 auto;
-      display: block;
-    }
-    div.comic-strip-commentary {
-      font-size: 1.4em;
-    }
-  '
   # frontmatter
   # TODO: insert a page explaining that this copy has been modified?
   copy 0 10
   # Interview, Antonio Smith, New Digs, Brain Scans, and Crystal of Marinia
   split 11
   # page 12 does not correctly annotate the final strip because it has
-  # artistic bits that hang down below the page number, ruining everything
+  # artistic bits that hang down below the page number
   split 12 12 1240
   whole 13
   # page 20 tries to insert commentary in front of the topmost strip for some reason?
@@ -73,7 +58,7 @@ volume "Narbonic Director's Cut - Perfect Collection Volume 1"
   split 229 243
   whole 244
   split 245 296
-  whole 297
+  STRIP_LINEBREAKS=true whole 297
   split 298 322
   whole 323
   split 324 343
@@ -86,43 +71,22 @@ fi
 # Unlike volume 1, which adopts a simple 1 page == 1 jpeg image approach and
 # just uses the PDF format as a container, volume 2 uses actual PDF structure
 # and places high-res PNG images on the page.
-# I have a few options here.
-# I can pre-render the pages to JPEG and then use the same pipeline as for the
-# first book. This is easiest.
-# A better approach is to use pdfseparate to split off just the pages I want to
-# edit, then pdfunite to combine the edited versions back together with the
-# originals. This preserves non-edited pages at full quality and keeps them
-# relatively small.
-# I can raster out the pages as PNG, and splice them back together as PNG. That
-# might actually be smaller, and there will definitely be less quality loss.
-# E: it's definitely like 10x smaller, I should do this if anything.
-# I can decompile the PDF to PS, and edit the PS to enlarge pages, move images
-# and footers around, and insert commentary, then compile it back to PDF. This
-# would probably give the best results, but is also probably the most difficult.
-# I could edit the PDF structure directly. Ok, I think *this* is the best results/
-# highest difficulty option.
-# I could extract the images and use LaTeX to generate the commentary ex nihilo.
-# This would give excellent-quality results but be a lot of work to set up and
-# add a bunch more dependencies, plus I'd need to spend a lot of time tweaking
-# the LaTeX to get things to come out approximately the same as the original, and
-# it would probably never exactly match.
+# We solve this by using the same approach as volume 1 for assembling the final
+# document (images+text -> html -> pdf), but rather than using pdfimages to
+# extract entire pages and then slicing them up with imagemagick, we use it to
+# extract individual strips and then weave them back together.
+# This results in more deviation from the original PDF (e.g the page footer
+# looks different) but smaller file sizes and higher quality.
 
-# TODO: rewrite to extract just the strip images and use wkhtmltopdf to
-# weave them back together
 if [[ $VOL2 ]]; then
 volume "Narbonic Director's Cut - Perfect Collection Volume 2"
   original "$VOL2"
   RASTER_MODE=pdfimages-html
-  # 24px works well for 150dpi.
-  # css 'div.comic-strip-commentary { font-size: 24px; }'
-  # Even if we skipped generating the first volume, make sure we're in the right
-  # place in the commentary queue.
   sync 899
   copy 0 6
-  # These manual splits are correct for 150dpi. Adjust as needed for other densities.
-  # split-at 7 496 882 1275
-  # split 8 37
+  STRIP_LINEBREAKS=true
   split 7 37
+  STRIP_LINEBREAKS=false
   whole 38
   split 39 128
   copy 129 138
@@ -140,10 +104,7 @@ volume "Narbonic Director's Cut - Perfect Collection Volume 2"
   split 365 390
   copy 391
   # TODO: this is the final page (of the main comic; there's backmatter after).
-  # We might want to write the final commentary to a page of its own after this.
+  # We might want to write the final commentary to a page of its own after this?
   copy 392 413
-  # copy 392 393
-  # split-at 394 100
-  # copy 395 413
 endvolume
 fi

@@ -1,13 +1,12 @@
 # Commentary queue for the Perfect Collection, moved to a separate file because
 # it's absolutely massive.
-# This is basically just the master index for build-narbonic with all the stuff
-# that isn't included in the Perfect Collection stripped out, and the stuff that
-# is reordered to match the Perfect Collection ordering.
-# 'chapter' here is a no-op and 'page' downloads the named page, extracts all
-# the commentary blocks from it, and adds them to the queue in order.
-# If you change this file, you need to delete tmp/commentary/ to get it to
-# rebuild the commentary cache. TODO: automate this by comparing the timestamp
-# on this file to the one on tmp/commentary/.complete
+# 'chapter' is a no-op but is left in because it makes it easier to read.
+# 'page' fetches the given page from the website and extracts all the commentary
+# from it. The second argument is just used for status messages.
+# Arguments 3+ can be provided to list element IDs for commentary; those elements
+# will be extracted in exactly the order given and all others ignored. This is
+# needed in one place where the strips on the website show up in a different order
+# than in the print collection.
 
 chapter "The Job Interview"
   page "july-31-august-5-2000" "The Job Interview"
@@ -39,7 +38,6 @@ chapter "Professor Madblood and the Crystal of Marinia"
   page "december-18-23-2000" "A Week of December 18 Story"
   page "conclusion-to-a-week-of-december-18-story" "Conclusion to \"A Week of December 18 Story\""
   page "december-25-30-2000" "Professor Madblood and the Crystal of Marinia"
-  #page "dave-in-slumberland" "Dave in Slumberland"
 
 chapter "Smart Gerbils"
   page "january-1-6-2001" "Smart Gerbils"
@@ -50,7 +48,6 @@ chapter "Smart Gerbils"
   page "february-12-17-2001" "Smart Gerbils"
   page "february-19-24-2001" "Smart Gerbils"
   page "february-26-march-3-2001" "Smart Gerbils"
-  # page "mssgrm" "MSSGRM"
 chapter "Dr. Narbon"
   page "march-5-10-2001" "Dr. Narbon"
   page "march-12-17-2001" "Dr. Narbon"
@@ -64,7 +61,6 @@ chapter "Dr. Narbon"
   page "may-14-19-2001" "Dr. Narbon"
   page "may-21-26-2001" "Dr. Narbon"
 chapter "Dave's Dead, Dave"
-  # page "in-memory-of-dave" "In Memory of Dave"
   page "may-28-june-2-2001" "Dave's Dead, Dave"
   page "june-4-9-2001" "Dave's Dead, Dave"
   page "june-11-16-2001" "Dave's Dead, Dave"
@@ -107,7 +103,6 @@ chapter "Gender Swap"
   page "january-14-19-2002" "Gender Swap"
   page "january-21-26-2002" "Gender Swap"
   page "january-28-february-2-2002" "Gender Swap"
-  # page "dave-in-slumberland-2" "Dave in Slumberland"
 
 chapter "D-Con"
   page "february-4-9-2002" "D-Con"
@@ -159,7 +154,6 @@ chapter "Class Reunion"
   page "november-11-16-2002" "Class Reunion"
   page "november-18-23-2002" "Class Reunion"
   page "november-25-30-2002" "Class Reunion"
-  # page "dave-in-slumberland-3" "Dave in Slumberland"
 
 chapter "Professor Madblood and the Doppelganger Gambit"
   page "december-2-7-2002" "Professor Madblood and the Doppelganger Gambit"
@@ -184,7 +178,6 @@ chapter "Professor Madblood and the Doppelganger Gambit"
   page "april-14-19-2003" "Professor Madblood and the Doppelganger Gambit"
   page "april-21-26-2003" "Professor Madblood and the Doppelganger Gambit"
   page "april-28-may-3-2003" "Professor Madblood and the Doppelganger Gambit"
-  # page "the-cartoonist-has-a-birthday" "The Cartoonist Has a Birthday"
   page "may-5-10-2003" "Professor Madblood and the Doppelganger Gambit"
   page "may-12-17-2003" "Professor Madblood and the Doppelganger Gambit"
   page "may-19-24-2003" "Professor Madblood and the Doppelganger Gambit"
@@ -221,12 +214,10 @@ chapter "Dave Davenport Has Come Unstuck in Time"
   page "december-8-13-2003" "Dave Davenport Has Come Unstuck in Time"
   page "december-15-21-2003" "Dave Davenport Has Come Unstuck in Time"
   page "december-22-28-2003" "Dave Davenport Has Come Unstuck in Time"
-  # page "dave-in-slumberland-4" "Dave in Slumberland"
 
 chapter "Demons"
   page "december-29-2003-january-3-2004" "Demons"
   page "january-5-10-2004" "Demons"
-  # page "continuity-repairs-with-rob-and-andy" "Continuity Repairs with Rob and Andy"
   page "january-12-17-2004" "Demons"
   page "january-19-24-2004" "Demons"
   page "january-26-31-2004" "Demons"
@@ -234,7 +225,6 @@ chapter "Demons"
   page "february-16-21-2004" "Demons"
   page "february-23-28-2004" "Demons"
   page "march-1-6-2004" "Demons"
-  # page "dangling-plot-thread-roundup" "Dangling Plot Thread Roundup"
   page "march-8-13-2004" "Demons"
   page "march-15-20-2004" "Demons"
   page "march-22-27-2004" "Demons"
@@ -280,7 +270,6 @@ chapter "Professor Madblood and the Lovelace Affair"
   page "december-13-18-2004" "Professor Madblood and the Lovelace Affair"
   page "december-20-25-2004" "Professor Madblood and the Lovelace Affair"
   page "december-27-january-1-2005" "Professor Madblood and the Lovelace Affair"
-  # page "dave-in-slumberland-5" "Dave in Slumberland"
 
 chapter "Professor Madblood and the Lovelace Affair (cont'd)"
   page "january-3-8-2005" "Professor Madblood and the Lovelace Affair"
@@ -298,7 +287,6 @@ chapter "Battle for the Lost Diamond Mines of Brazil"
   page "march-21-26-2005" "Battle for the Lost Diamond Mines of Brazil"
   page "march-28-april-2-2005" "Battle for the Lost Diamond Mines of Brazil"
   page "april-4-9-2005" "Battle for the Lost Diamond Mines of Brazil"
-  # page "continuity-repairs-with-rob-and-andy-2" "Continuity Repairs With Rob and Andy"
   page "april-11-16-2005" "Battle for the Lost Diamond Mines of Brazil"
   page "april-18-23-2005" "Battle for the Lost Diamond Mines of Brazil"
   page "april-25-30-2005" "Battle for the Lost Diamond Mines of Brazil"
@@ -329,7 +317,6 @@ chapter "H Is H"
   page "september-26-october-1-2005" "H Is H"
   page "october-3-8-2005" "H Is H"
   page "october-10-15-2005" "H Is H"
-#  page "deadmouse-guest-strip" "Deadmouse Guest Strip"
 chapter "Angels"
   page "october-17-22-2005" "Angels"
   page "october-24-29-2005" "Angels"
@@ -342,8 +329,6 @@ chapter "Angels"
   page "december-12-17-2005" "Angels"
   page "december-19-24-2005" "Angels"
   page "december-26-31-2005" "Angels"
-  # page "dave-in-slumberland-6" "Dave in Slumberland"
-  # page "last-call" "Last Call"
 
 chapter "The End"
   page "january-2-7-2006" "The End"
@@ -403,5 +388,4 @@ chapter "Genius"
   page "december-11-16-2006" "Genius"
   page "december-18-23-2006" "Genius"
   page "december-25-30-2006" "Genius"
-  # page "dave-in-slumberland-7" "Dave in Slumberland"
   page "endpaper" "Endpaper"
