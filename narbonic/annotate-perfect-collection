@@ -2,6 +2,7 @@
 set -e
 shopt -s lastpipe
 cd "$(dirname "$0")"
+source ./narbonic.lib
 
 ### functions for toc files ###
 
@@ -58,9 +59,8 @@ function page {
     local div="$(wring html $out "#$id")"
     [[ ! $div ]] && continue
     local dst="tmp/commentary/$(printf %04d $CHEAD)"
-    # we trim <br> tags here, because a lot of the commentary has hard linebreaks in it that
-    # mess up the formatting quite badly...but this also breaks song and poem lyrics and whatnot.
-    # We need to be smarter about this.
+    # Some of these have excess <br> tags, but rather than mangle them here, we
+    # instead strip them as needed at render time.
     #echo "$div" | sed -E 's,<br>,,g' > "$dst.html"
     echo "$div" > "$dst.html"
     ((++CHEAD))
@@ -281,20 +281,22 @@ function find-margins {
   printf '%d %d\n' $LM $RM
 }
 
-# TODO we get the width on $2; wrap the whole thing in a div or something that
-# has the necessary width or margins or something
 function html-commentary {
-  cat "tmp/commentary/$1.html" \
-  | sed -E 's,img src=",img src="../../tmp/commentary/,g'
+  if [[ $STRIP_LINEBREAKS == true ]]; then
+    cat "tmp/commentary/$1.html" \
+    | sed -E '
+      s,img src=",img src="../../tmp/commentary/,g
+      s,<br>,,g
+    '
+  else
+    cat "tmp/commentary/$1.html" \
+    | sed -E 's,img src=",img src="../../tmp/commentary/,g'
+  fi
 }
 
 # add-commentary IN SPLITS...
 # add commentary to IN and write the resulting image to OUT
 # n.b. IN and OUT probably have directory separators in them; handle with care
-# Redesign: rather than using image processing for all of this:
-# - do a series of crops to slice the image into subimages at the given lines
-# - output HTML combining the images and the commentary concatenated
-# - use wkhtmltopdf to write output.pdf
 function add-commentary {
   if [[ $RASTER_MODE == pdfimages-html ]]; then
     add-commentary-multi-image "$@"
@@ -425,37 +427,6 @@ function main {
   status "Done initializing commentary with $CHEAD entries; building images next.\\n"
   # Generate the actual volumes.
   source perfect-collection.toc
-}
-
-function status {
-  local fmt="$1"; shift
-  printf '\r\x1B[2K'"$fmt" "$@" >&2
-}
-
-if [[ $DEBUG ]]; then
-  function status {
-    local fmt="$1"; shift
-    printf "$fmt\n" "$@" >&2
-  }
-fi
-
-function checkdeps {
-  local missing=""
-  for command in "$@"; do
-    if ! type "$command" 2>/dev/null >/dev/null; then
-      missing+=" $command"
-    fi
-  done
-  if [[ "$missing" ]]; then
-    echo "You are missing the following commands:$missing" >&2
-    echo "Please install them and try again." >&2
-    exit 1
-  fi
-}
-
-function die {
-  echo "$@" >&2
-  exit 1
 }
 
 main

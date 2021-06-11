@@ -1,0 +1,30 @@
+function checkdeps {
+  local missing=""
+  for command in "$@"; do
+    if ! type "$command" 2>/dev/null >/dev/null; then
+      missing+=" $command"
+    fi
+  done
+  if [[ "$missing" ]]; then
+    echo "You are missing the following commands:$missing" >&2
+    echo "Please install them and try again." >&2
+    exit 1
+  fi
+}
+
+if [[ $DEBUG ]]; then
+  function status {
+    local fmt="$1"; shift
+    printf "$fmt\n" "$@" >&2
+  }
+else
+  function status {
+    local fmt="$1"; shift
+    printf '\r\x1B[2K'"$fmt" "$@" >&2
+  }
+fi
+
+function die {
+  echo "$@" >&2
+  exit 1
+}
