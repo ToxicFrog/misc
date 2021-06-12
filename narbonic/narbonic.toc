@@ -1,13 +1,5 @@
-# Default image format. "jpeg" or "png".
-# JPEG is recommended; PNG is slightly higher quality but also massively larger.
-format=jpeg
-
 # Commentary inclusion or not.
-# This can be overridden on a per-chapter basis by setting `commentary=on` or
-# `commentary=off`, but will reset to the default at the start of the next
-# chapter or volume.
-# e.g: chapter Extras; commentary=on
-default_commentary=on
+commentary=on
 
 # Whether to include extra content: fan submissions, mailbags, con reports, and
 # other content not part of the comic proper.
