@@ -11,6 +11,16 @@
 # 7x the size; it's usually not worth it, so they're disabled by default
 # to speed up the build.
 
+# Redesign notes
+# Rather than doing format settings, we'll pack things into PDFs the way
+# annotate-perfect-collection does it. This may even let us share some code.
+# This means that our approach is now:
+# - download each HTML page and extract just the comic container
+# - resolve and download images, and update links in the HTML page
+# - generate a no-commentary version by deleting the commentary divs
+# - render HTML to PDF, crop PDF
+# - at end of volume, concatenate PDFs together
+
 BUILD_JPEG='yes'
 BUILD_PNG='no'
 
@@ -20,16 +30,18 @@ DOWNLOAD_MUSIC='yes'
 
 #### No user serviceable parts below this line. ####
 
-cd "$(dirname "$0")"
 set -e
+shopt -s lastpipe
+cd "$(dirname "$0")"
+source ./narbonic.lib
 
 function main {
-  checkdeps wkhtmltoimage curl egrep sed wring zip
-  mkdir -p cache html img pages cbz
+  checkdeps htmldoc curl egrep sed wring pdfcrop identify
+  mkdir -p tmp/{html,img} out
   # Download splash screen.
   [[ -f "img/chapter_splash.jpeg" ]] || {
-    status "Downloading splash page...\n"
-    >img/chapter_splash.jpeg curl --silent \
+    status "Downloading splash page..."
+    >tmp/img/chapter_splash.jpeg curl --silent \
       "http://dlp2gfjvaz867.cloudfront.net/product_photos/2733272/narbonic1_big_400w.jpg"
   }
   # Generate the actual volumes.
@@ -38,31 +50,13 @@ function main {
   [[ $DOWNLOAD_MUSIC == yes ]] && download-music
 }
 
-function checkdeps {
-  local missing=()
-  for command in "$@"; do
-    if ! type "$command" 2>/dev/null >/dev/null; then
-      missing+="$command"
-    fi
-  done
-  if [[ "${missing[@]}" ]]; then
-    echo "You are missing the following commands: ${missing[@]}" >&2
-    echo "Please install them and try again." >&2
-    exit 1
-  fi
-}
-
-function status {
-  local fmt="$1"; shift
-  printf '\x1B[2K\r'"$fmt" "$@"
-}
-
 #### Handlers for the index file. ####
 
 CHAPTER_TEMPLATE='
 <!-- CHAPTER %s -->
+<!-- MEDIA SIZE 24x400cm -->
 <div align="center">
-  <img src="../../img/chapter_splash.jpeg"><br>
+  <img src="../img/chapter_splash.jpeg"><br>
   <h1>%s</h1>
 </div>'
 
@@ -74,21 +68,20 @@ commentary=off
 page=0
 skip_pages=no
 
-function die {
-  echo "Error reading narbonic.index: $@" >&2
-  exit 1
-}
-
+# Mark the start of a volume.
+# Mostly this just sets up metadata and makes sure the output directory exists.
 function volume {
   [[ $title ]] && die "'volume $@' while still inside another volume ($title)!"
-  status '%s\n' "$1"
+  status 'Volume: %s' "$1"
   title="$1"
-  outdir="html/$1"
+  outdir="tmp/$1"
   commentary=$default_commentary
   page=0
   mkdir -p "$outdir"
 }
 
+# Mark the start of a chapter within a volume.
+# This emits the start-of-chapter splash page.
 function chapter {
   [[ $title ]] || die "'chapter $@' outside a volume!"
   commentary=$default_commentary
@@ -99,28 +92,36 @@ function chapter {
     skip_pages=no
   fi
   ((++page))
-  status '  p.%03d - %s\n' "$page" "$1"
-  local outfile="$(printf "%s/%03d CHAPTER %s.html" "$outdir" "$page" "$1")"
-  [[ -f "$outfile" ]] || printf "$CHAPTER_TEMPLATE" "$1" "$1" > "$outfile"
+  status '%s p.%03d - %s' "$title" "$page" "$1"
+  local outfile="$(printf "%s/%03d CHAPTER %s" "$outdir" "$page" "$1")"
+  printf "$CHAPTER_TEMPLATE" "$1" "$1" > "$outfile.html"
+  html-to-pdf "$outfile.html" "$outfile.pdf"
 }
 
 # page <id> <title>
+# write the next page out to the currently generated volume
+# this includes fetching it if necessary, then extracting the necessary
+# pieces of it.
 function page {
   [[ $title ]] || die "'page $@' outside a volume!"
   [[ $skip_pages == yes ]] && return
   ((++page))
-  fetch-page "$1"
-  prepare-page "$1" "$2"
+  fetch-page "$1" "$2"
+  render-page "$1" "$2"
 }
 
+# Finalize a volume, rendering it into a PDF.
 function endvolume {
   [[ $title ]] || die "'endvolume' outside a volume!"
+  local out="out/${title}.pdf"
+  status "Packing %s" "$out"
   # Finalize the previous volume.
-  render-pages "$title"
-  status '  compile: %s\n' "cbz/$title.cbz"
-  rm -f "cbz/$title.cbz"
-  (cd pages && zip -q -r -0 "../cbz/$title.cbz" "$title")
-  title=""
+  (
+    cd "$outdir"
+    pdfunite *.pdf ../../"$out"
+  )
+  pdfcrop --margins "20 50 20 50" "$out" "$out" >/dev/null
+  status "Packed %s\n" "$out"
 }
 
 #### Downloading the HTML for each individual page. ####
@@ -129,84 +130,82 @@ function endvolume {
 # If page does not exist in the cache, downloads it.
 # Then normalizes image paths and downloads all images not in cache.
 function fetch-page {
-  local outpage="cache/$1"
-  [[ -f $outpage ]] || {
-    status "    download: %s" "$1"
-    echo "<!-- PAGE $1 -->" > "$outpage.tmp"
-    curl --retry 5 --silent "http://narbonic.com/comic/$1/" \
-      | wring html - .comic-strip-container >> "$outpage.tmp"
-
-    # Normalize image paths.
-    sed -E -i '
-      s,src="http://(www\.)?narbonic.com/,src="/,g;
-      s,src="/wordpress/wp-content/uploads/,src="../../img/,g;
-      s,\.JPG",.jpg",g;' "$outpage.tmp"
-
-    mv "$outpage.tmp" "$outpage"
-  }
-
-  # Fetch all missing images.
-  fetch-images "cache/$1"
+  local name="$1"
+  local title="$2"
+  shift 2
+  status "Fetch \"%s\" (%s)" "$name" "$title"
+  local out="tmp/html/$name"
+  if [[ ! -f $out ]]; then
+    status "Fetch \"%s\" (%s) [download]" "$name" "$title"
+    curl --retry 5 --silent "http://narbonic.com/comic/$name/" > "$out"
+    chmod a-w "$out"
+  else
+    status "Fetch \"%s\" (%s) [cached]" "$name" "$title"
+  fi
+  fetch-images "$name"
 }
 
 # fetch-images <id>
 # Fetch all images referenced in the given page that don't already exist locally.
 function fetch-images {
-  egrep -rho 'src="../../img/[^"]+"' "$1" | cut -d\" -f2 \
-  | egrep -v '\.mp3$' \
-  | sed -E 's,../../img/,,' \
-  | while read image; do
-    [[ -f "img/$image" ]] && continue
-    status "    image: %s" "$image"
-    mkdir -p "$(dirname "img/$image")"
-    >"img/$image" curl --silent "http://narbonic.com/wordpress/wp-content/uploads/$image"
+  egrep -rho 'img src="[^"]+"' "tmp/html/$1" \
+  | cut -d\" -f2 \
+  | sed -E 's,^/,http://narbonic.com/,' \
+  | while read link; do
+      local tail="${link#*wp-content/uploads/}"
+      if [[ -f "tmp/img/$tail" ]]; then
+        status "Fetch $tail [cached]"
+      else
+        status "Fetch $tail [download]"
+        mkdir -p "tmp/img/$(dirname "$tail")"
+        curl --retry 5 --silent "$link" > "tmp/img/$tail"
+      fi
   done
 }
 
 #### Converting the raw HTML into with and without-commentary versions ####
 
-# prepare-page <id> <title>
-# Given a cache ID, generate one or more output pages in html/ based on the
-# contents of the cached file and whether commentary=on.
-# Emits the paths to all the generated files on stdout.
-function prepare-page {
+function exists? {
+  while read file; do
+    [[ -f $file ]] && echo "$file"
+  done
+}
+
+function maxwidth-imgs {
+  local html="$1"
+  (
+    cd "$(dirname "$html")"
+    maxwidth $(egrep -o 'img src="[^"]+"' "$(basename "$html")" | cut -d'"' -f2 | exists?)
+  )
+}
+
+# render-page <id> <title>
+# Render the given page to tmp/$volume/$page
+function render-page {
+  local outfile="$(printf "%s/%03d %s %s" "$outdir" "$page" "$1" "$2")"
+  status "Render $1"
+  local infile="tmp/html/$1"
+  echo "<!-- PAGE $1 -->" > "$outfile.html"
+  echo "<!-- MEDIA SIZE 24x400cm -->" >> "$outfile.html"
   if [[ $commentary = on ]]; then
-    extract-commentary "$1" "$2"
+    wring html "$infile" .comic-area-wrapper
   else
-    local outfile="$(printf "%s/%03d %s %s.html" "$outdir" "$page" "$1" "$2")"
-    [[ "cache/$1" -ot "$outfile" ]] && return 0
-    status "     prepare: %s" "$1"
-    wring html "cache/$1" .comic-strip-image >"$outfile"
-  fi
+    wring html "$infile" .comic-strip-image
+  fi \
+  | sed -E '
+    s,img src=".*/wp-content/uploads/([^"]+)",img src="../img/\1",g
+  ' >> "$outfile.html"
+  html-to-pdf "$outfile.html" "$outfile.pdf"
 }
 
-# extract-commentary <id> <title>
-# Used by prepare-page to generate multiple subpages for pages with commentary.
-function extract-commentary {
-  local subpage=1
-  cat "cache/$1" | egrep -o "comic-strip-container-[0-9]+" | while read id; do
-    local outfile="$(printf "%s/%03d.%02d %s %s.html" "$outdir" "$page" "$subpage" "$1" "$2")"
-    ((++subpage))
-    [[ "cache/$1" -ot "$outfile" ]] && continue
-    status "    prepare: %s/%02d" "$1" "$subpage"
-    wring html "cache/$1" "#$id" > "$outfile"
-  done
-}
-
-# render-pages <title>
-# render all HTML pages in html/<title>/ into pages/<title>
-# controlled by format=
-function render-pages {
-  mkdir -p "pages/$1"
-  ls "html/$1" | while read html; do
-    local outfile="pages/$1/${html%.html}.$format"
-    [[ "html/$1/$html" -ot "$outfile" ]] && continue
-    status "  render: %s" "${html%.html}"
-    wkhtmltoimage --quiet --width 400 --quality 100 \
-      --format "$format" \
-      "html/$1/$html" \
-      "$outfile"
-  done
+function html-to-pdf {
+  local width="$(maxwidth-imgs "$1")"
+  htmldoc \
+    --webpage --quiet \
+    --footer . --linkcolor blue \
+    --browserwidth "$width" \
+    --fontsize 16 \
+    -f "$2" "$1"
 }
 
 #### Music downloads ####
