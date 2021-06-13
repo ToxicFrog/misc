@@ -1,32 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run to automatically download all of Narbonic and generate CBZs of it.
-# This downloads about 400MB of data from narbonic.com, and requires 4GB of
-# disk space (23GB if you build the PNG version, and 26GB for both).
-# The generated files are about 1.6GB (JPEG) or 13GB (PNG); the rest of the
-# space is used for temporary files and can be reclaimed afterwards.
 
-# CBZs are left in cbz.png/ for the PNG versions and cbz.jpeg/ for the JPEG
-# versions. The PNG versions are ever so slightly higher quality but about
-# 7x the size; it's usually not worth it, so they're disabled by default
-# to speed up the build.
-
-# Redesign notes
-# Rather than doing format settings, we'll pack things into PDFs the way
-# annotate-perfect-collection does it. This may even let us share some code.
-# This means that our approach is now:
-# - download each HTML page and extract just the comic container
-# - resolve and download images, and update links in the HTML page
-# - generate a no-commentary version by deleting the commentary divs
-# - render HTML to PDF, crop PDF
-# - at end of volume, concatenate PDFs together
-
-BUILD_JPEG='yes'
-BUILD_PNG='no'
-
-# It also downloads the Narbonic music tracks and podcasts to music/.
-
-DOWNLOAD_MUSIC='yes'
 
 #### No user serviceable parts below this line. ####
 
@@ -37,7 +11,7 @@ source ./narbonic.lib
 
 function main {
   checkdeps htmldoc curl egrep sed wring pdfcrop identify
-  mkdir -p tmp/{html,img} out
+  mkdir -p tmp/{html,img} out/Extras
   # Download splash screen.
   [[ -f "img/chapter_splash.jpeg" ]] || {
     status "Downloading splash page..."
@@ -47,7 +21,7 @@ function main {
   # Generate the actual volumes.
   source narbonic.toc
   # Download music and podcasts.
-  [[ $DOWNLOAD_MUSIC == yes ]] && download-music
+  [[ $download_music == yes ]] && download-music
 }
 
 #### Handlers for the index file. ####
@@ -63,10 +37,8 @@ CHAPTER_TEMPLATE='
 # State
 title=""
 outdir=""
-default_commentary=off
 commentary=off
 page=0
-skip_pages=no
 
 # Mark the start of a volume.
 # Mostly this just sets up metadata and makes sure the output directory exists.
@@ -74,8 +46,7 @@ function volume {
   [[ $title ]] && die "'volume $@' while still inside another volume ($title)!"
   status 'Volume: %s' "$1"
   title="$1"
-  outdir="tmp/$1"
-  commentary=$default_commentary
+  outdir="tmp/$(basename "$1")"
   page=0
   mkdir -p "$outdir"
 }
@@ -84,13 +55,6 @@ function volume {
 # This emits the start-of-chapter splash page.
 function chapter {
   [[ $title ]] || die "'chapter $@' outside a volume!"
-  commentary=$default_commentary
-  if [[ "$1" == "Extras" && "$include_extras" == "no" ]]; then
-    skip_pages=yes
-    return
-  else
-    skip_pages=no
-  fi
   ((++page))
   status '%s p.%03d - %s' "$title" "$page" "$1"
   local outfile="$(printf "%s/%03d CHAPTER %s" "$outdir" "$page" "$1")"
@@ -104,7 +68,6 @@ function chapter {
 # pieces of it.
 function page {
   [[ $title ]] || die "'page $@' outside a volume!"
-  [[ $skip_pages == yes ]] && return
   ((++page))
   fetch-page "$1" "$2"
   render-page "$1" "$2"
@@ -122,6 +85,8 @@ function endvolume {
   )
   pdfcrop --margins "20 50 20 50" "$out" "$out" >/dev/null
   status "Packed %s\n" "$out"
+  title=""
+  outdir=""
 }
 
 #### Downloading the HTML for each individual page. ####
@@ -148,7 +113,9 @@ function fetch-page {
 # fetch-images <id>
 # Fetch all images referenced in the given page that don't already exist locally.
 function fetch-images {
-  egrep -rho 'img src="[^"]+"' "tmp/html/$1" \
+  wring html "tmp/html/$1" .comic-area-wrapper \
+  | egrep -o '<img[^>]* src="[^"]+"' \
+  | egrep -o 'src="[^"]+"' \
   | cut -d\" -f2 \
   | sed -E 's,^/,http://narbonic.com/,' \
   | while read link; do
@@ -165,9 +132,15 @@ function fetch-images {
 
 #### Converting the raw HTML into with and without-commentary versions ####
 
-function exists? {
+function image? {
   while read file; do
-    [[ -f $file ]] && echo "$file"
+    if [[ -f $file ]]; then
+      if (file "$file" | fgrep -q image); then
+        echo "$file"
+      else
+        rm "$file"
+      fi
+    fi
   done
 }
 
@@ -175,7 +148,7 @@ function maxwidth-imgs {
   local html="$1"
   (
     cd "$(dirname "$html")"
-    maxwidth $(egrep -o 'img src="[^"]+"' "$(basename "$html")" | cut -d'"' -f2 | exists?)
+    maxwidth $(egrep -o '<img[^>]* src="[^"]+"' "$(basename "$html")" | egrep -o 'src="[^"]+"' | cut -d'"' -f2 | image?)
   )
 }
 
@@ -187,13 +160,13 @@ function render-page {
   local infile="tmp/html/$1"
   echo "<!-- PAGE $1 -->" > "$outfile.html"
   echo "<!-- MEDIA SIZE 24x400cm -->" >> "$outfile.html"
-  if [[ $commentary = on ]]; then
+  if [[ $commentary == on ]]; then
     wring html "$infile" .comic-area-wrapper
   else
     wring html "$infile" .comic-strip-image
   fi \
   | sed -E '
-    s,img src=".*/wp-content/uploads/([^"]+)",img src="../img/\1",g
+    s,<img([^>]*) src="[^"]*/wp-content/uploads/([^"]+)",<img\1 src="../img/\2",g
   ' >> "$outfile.html"
   html-to-pdf "$outfile.html" "$outfile.pdf"
 }
@@ -202,6 +175,7 @@ function html-to-pdf {
   local width="$(maxwidth-imgs "$1")"
   htmldoc \
     --webpage --quiet \
+    --no-jpeg \
     --footer . --linkcolor blue \
     --browserwidth "$width" \
     --fontsize 16 \
@@ -212,7 +186,7 @@ function html-to-pdf {
 
 function download-music {
   echo "Downloading music..."
-  mkdir -p music
+  mkdir -p out/Music
   for track in 2009/08/MadbloodBattleAnthem.mp3 2011/08/Narbonic_Battle.mp3 2013/05/epilogue.mp3; do
     [[ -f music/"$(basename $track)" ]] && continue
     curl --silent -o music/"$(basename $track)" \
