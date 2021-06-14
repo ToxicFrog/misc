@@ -11,7 +11,7 @@ source ./narbonic.lib
 
 function main {
   checkdeps htmldoc curl egrep sed wring pdfcrop identify
-  mkdir -p tmp/{html,img} out/Extras
+  mkdir -p tmp/{html,img} out
   # Download splash screen.
   [[ -f "img/chapter_splash.jpeg" ]] || {
     status "Downloading splash page..."
@@ -78,6 +78,7 @@ function endvolume {
   [[ $title ]] || die "'endvolume' outside a volume!"
   local out="out/${title}.pdf"
   status "Packing %s" "$out"
+  mkdir -p "$(dirname "$out")"
   # Finalize the previous volume.
   (
     cd "$outdir"

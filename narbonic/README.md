@@ -1,10 +1,10 @@
-This directory contains shell scripts for creating custom offline versions of the webcomic [Narbonic](http://narbonic.com/) by Shaenon Garrity.
+This directory contains shell scripts for creating custom offline versions of the webcomic [Narbonic](http://narbonic.com/) by Shaenon K. Garrity.
 
 **If you just want to read Narbonic right now**, there's no need for these tools; you can just head over to the website and [start reading at the beginning](http://narbonic.com/comic/july-31-august-5-2000/). (If this is your first time through, you may want to turn off commentary; spoilers abound.)
 
-**If you want an offline, DRM-free copy of the main Narbonic storyline**, these tools will do that, but it is much faster and easier to visit the Narbonic store and buy [*Narbonic: The Perfect Collection*](https://couscouscollective.storenvy.com/collections/256382-e-books/products/1607759-complete-narbonic-perfect-collection-e-books). That gets you the complete run of Narbonic (as well as a few bonus stories) in two PDF volumes. It's also higher-quality *and* takes up less disk space than the output of these tools.
+**If you want an offline, DRM-free copy of the main Narbonic storyline**, rather than using these tools, it is much faster and easier to visit the Narbonic store and buy [*Narbonic: The Perfect Collection*](https://couscouscollective.storenvy.com/collections/256382-e-books/products/1607759-complete-narbonic-perfect-collection-e-books). That gets you the complete run of Narbonic (as well as some artwork and bonus stories not found elsewhere!) in two PDF volumes. It's also higher-quality *and* takes up less disk space.
 
-If neither of these options meet your requirements, see below.
+If neither of these options are what you're after, read on.
 
 **You already have the Perfect Collection, but wish it included the authorial commentary from Narbonic: Director's Cut.** Use `annotate-perfect-collection`, which downloads the commentary and splices it into the Perfect Collection PDFs.
 
@@ -15,18 +15,9 @@ If neither of these options meet your requirements, see below.
 
 This tool will automatically download all of the commentary from *Narbonic: Director's Cut*, then edit the Perfect Collection PDFs to add that commentary. You will, of course, need to already have both volumes of the Perfect Collection handy.
 
-Compared to `cbz-narbonic` below, this:
+It does not include anything not already part of the Perfect Collection, such as the non-canon Sunday strips.
 
-  - runs much faster, building both volumes in about 30 minutes (on my computer) rather than taking an entire afternoon;
-  - produces higher quality output (by virtue of using the high-res scans in the Perfect Collection as a starting point)
-  - includes all the bonus stories from the Perfect Collection (albeit without commentary)
-  - takes up much less disk space
-
-However, it has the following caveats:
-
-  - some quality loss occurs during the editing (hopefully not a noticeable amount, though; the results are still noticeably crisper than the web version in any case)
-  - everything is in greyscale (because the Perfect Collection itself is), which means that some of the commentary refers to colour in the strips that does not appear
-  - anything not included in the Perfect Collection to start with is omitted, which means most of the sunday strips -- mailbags, fanart showcases, *Atonishing Excursions*, etc
+No attempt is made to edit the commentary, so, for example, the commentary for some strips refers to colour that does not appear in the Perfect Collection.
 
 
 ### Prerequisites
@@ -37,8 +28,8 @@ In addition to the Perfect Collection, you will also need the following tools:
 
   - `pdfimages`, `pdfseparate`, and `pdfunite` (from `poppler-utils`)
   - `identify` and `convert` (from `imagemagick`)
-  - `gs` (from `ghostscript`)
-  - `wkhtmltoimage`
+  - `pdfcrop` (usually included in TeXlive)
+  - `htmldoc`
   - `wring`
   - the standard utilities `curl`, `fgrep`, `egrep`, `sed`, and `cut`
 
@@ -60,13 +51,13 @@ Run `annotate-perfect-collection`. It will put all of its temporary files in `tm
 When it's done, the finished PDFs will be in `out/`. Read and enjoy!
 
 
-## `cbz-narbonic`
+## `pdf-narbonic`
 
-This is a tool for generating an offline, comic-reader-compatible, CBZ format copy of Narbonic.
+This is a tool for generating an offline, comic-reader-compatible, PDF format copy of Narbonic.
 
 By default, it generates:
 
- - *Narbonic: Director's Cut*, in 13 volumes, one page per strip, with commentary
+ - *Narbonic: Director's Cut*, in seven volumes, one page per week, with commentary
  - And separate files (with commentary) for:
    - *A Brief Moment of Culture*
    - *The Astonishing Excursions of Helen Narbon & Co*
@@ -74,10 +65,9 @@ By default, it generates:
    - *Edie in Orbit*
    - Fanart and fan-writing showcases
    - Haiku and gerbil photography contests
+   - other Sunday extras in seven volumes
 
-Extras that don't get their own volumes (such as Shaenon's con reports, the paper dolls, etc) are located at the end of their respective main volumes.
-
-Compared to `annotate-perfect-collection` above, it gets you all of the sunday strips, but at lower quality, and takes much longer to run.
+You can also ask it to generate versions of all of the above without commentary.
 
 
 ### Prerequisites
@@ -85,35 +75,26 @@ Compared to `annotate-perfect-collection` above, it gets you all of the sunday s
 This is written for Linux, although it will probably work on Windows (via WSL or Cygwin) or OSX, if you have the right packages installed.
 
 You will need the following tools:
-  - `wkhtmltoimage`
+  - `pdfunite` (from `poppler-utils`)
+  - `identify` (from `imagemagick`)
+  - `pdfcrop` (usually included in TeXlive)
+  - `htmldoc`
   - `wring`
-  - the standard utilities `zip`, `curl`, `egrep`, `sed`, and `cut`
+  - the standard utilities `curl`, `egrep`, `sed`, and `cut`
 
 The script will check for the presence of these tools when it starts up and exit with an error message if it can't find any of them.
 
-You will also need about 4GB of free space and several hours.
+It will also need about 3GB of temporary space to run, and the generated files take up about 1GB; if you want to create both Original and ~~Extra Crispy~~ Director's Cut versions, it won't need any more temporary space, but will produce 2GB of output.
 
 
 ### Usage
 
-Download this whole directory somewhere convenient and run `cbz-narbonic`.
+Download this whole directory somewhere convenient.
 
-It will (eventually) create six directories:
+Edit the setting at the start of `narbonic.toc`; you can control whether commentary is included, whether or not to download the extras, and whether to download the music. If you want to get really into the weeds, you can edit the rest of the file to change how things are organized into volumes.
 
- - `cache`: downloaded HTML from narbonic.com
- - `img`: downloaded images from narbonic.com
- - `html`: individual generated pages, HTML format
- - `pages`: individual generated pages, JPEG or PNG format
- - `cbz`: the generated comic files
- - `music`: the Narbonic soundtrack
+When you're ready, run `pdf-narbonic`.
 
-When it's done, everything you need should be in `cbz` and `music`. If it's interrupted halfway through, it'll pick up where it left off; similarly, if you edit the toc file, it'll regenerate only the pages that it needs to (or should; this is not well tested).
+All the generated files will be stored in `out/`. Intermediate files and downloaded HTML and images will be stored in `tmp/`, and can be safely deleted once it's done.
 
-Once you're done you can delete all the intermediate files in `cache`, `img`, `html`, and `pages`, which will reclaim about 2GB of space -- but if you do that and later want to run it again, it'll have to download and generate everything all over again.
-
-
-### Fine Tuning
-
-All the configuration settings are in `narbonic.toc`. At the start you can change whether or not commentary is generated, whether each volume contains extras at the end, and what image format is used; there are further details in the comments in that file.
-
-By rearranging the contents of the file more extensively, you can change how it's volumized, such as packing the entire main run into a single massive file, or each storyline into a separate file.
+If you want both no-commentary and with-commentary versions, run it once with one setting, then edit `narbonic.toc` and run it again -- the files have different names so it won't overwrite anything.
