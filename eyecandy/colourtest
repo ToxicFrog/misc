@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 # First, do 8-colour palette, in both ANSI (30-37) and AIX (90-97) colours
 
@@ -7,6 +7,10 @@ codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
 function bg { echo $(( $1+10 )); }
 function fgbg { echo "$1;$(( $1+10 ))"; }
 function map { f=$1; shift; while [[ $1 ]]; do $f $1; shift; done; }
+function printf3 {
+  local fmt="$1"; shift
+  for arg in "$@"; do printf "$fmt" "$arg" "$arg" "$arg"; done
+}
 
 printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
   "ANSI & AIXTerm 8-colour palettes (dim - plain - bright)" \
@@ -16,15 +20,15 @@ printf ' %3d' ${codes[@]}
 printf '\n'
 
 printf '%10s ' 'fg'
-printf ' \x1B[%1$d;2m#\x1B[0;%1$dm#\x1B[%1$d;1m#' ${codes[@]}
+printf3 ' \x1B[%d;2m#\x1B[0;%dm#\x1B[%d;1m#' ${codes[@]}
 printf '\x1B[0m\n'
 
 printf '%10s ' 'bg'
-printf '\x1B[0m \x1B[%1$d;2m \x1B[0;%1$dm \x1B[%1$d;1m ' $(map bg ${codes[@]})
+printf3 '\x1B[0m \x1B[%d;2m \x1B[0;%dm \x1B[%d;1m ' $(map bg ${codes[@]})
 printf '\x1B[0m\n'
 
 printf '%10s ' 'fg+bg'
-printf '\x1B[0m \x1B[%1$s;2m#\x1B[0;%1$sm#\x1B[%1$s;1m#' $(map fgbg ${codes[@]})
+printf3 '\x1B[0m \x1B[%s;2m#\x1B[0;%sm#\x1B[%s;1m#' $(map fgbg ${codes[@]})
 printf '\x1B[0m\n\n'
 
 # 256-colour palette is usually laid out as:
