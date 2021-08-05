@@ -10,6 +10,7 @@ declare -A presets=(
   [genderqueer]="b57edc b57edc ffffff 498022 498022 ffffff"
   [agender]="000000 BABABA BAF584 000000 BABABA FFFFFF"
   [asexual]="000000 000000 FFFFFF 810081 810081 A4A4A4"
+  [pansexual]="FF1B8D FFDA00 1BB3FF FF1B8D FFDA00 1BB3FF"
 )
 
 size=large
