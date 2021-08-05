@@ -1,13 +1,30 @@
 #!/usr/bin/env bash
 
+declare -A presets=(
+  [pride]="ff0018 ffa52c ffff41 008018 0000f9 86007d"
+  [trans]="55CDFC F7A8B8 FFFFFF F7A8B8 55CDFC FFFFFF"
+  [transbright]="00FFFF FF00FF FFFFFF FF00FF 00FFFF FFFFFF"
+  [lesbian]="D62900 FF9B55 FFFFFF D461A6 A50062 FFFFFF"
+  [bi]="D60270 D60270 9B4F96 0038A8 0038A8 9B4F96"
+  [nonbinary]="FFF430 FFF430 9C59D1 000000 000000 FFFFFF"
+  [genderqueer]="b57edc b57edc ffffff 498022 498022 ffffff"
+  [agender]="000000 BABABA BAF584 000000 BABABA FFFFFF"
+  [asexual]="000000 000000 FFFFFF 810081 810081 A4A4A4"
+)
+
+size=large
+preset=""
+
 function xrgb {
+  # Remap full black to mostly black so it's still visible in the tty
+  set -- $(echo $1 | sed 's,000000,202020,')
   local R=$(echo $1 | cut -c1-2)
   local G=$(echo $1 | cut -c3-4)
   local B=$(echo $1 | cut -c5-6)
   printf '\x1B[38;2;%d;%d;%dm' "0x$R" "0x$G" "0x$B"
 }
 
-function nixflake {
+function nixflake-small {
   set -- $(xrgb $1) $(xrgb $2) $(xrgb $3) $(xrgb $4) $(xrgb $5) $(xrgb $6) ""
   # The $7s are just so that everything is spaced consistently
   # For reference: it's 25 cols, 12 rows as displayed
@@ -26,9 +43,64 @@ $7   $5  ▝█▛  ▜█▙ $4   ▜█▙
 EOF
 }
 
+function nixflake-large {
+  # Large nixflake graphic taken from Neofetch, under MIT license.
+  set -- $(xrgb $1) $(xrgb $2) $(xrgb $3) $(xrgb $4) $(xrgb $5) $(xrgb $6) ""
+  cat <<EOF
+$1          ▗▄▄▄       $2▗▄▄▄▄    ▄▄▄▖
+$1          ▜███▙       $2▜███▙  ▟███▛
+$1           ▜███▙       $2▜███▙▟███▛
+$1            ▜███▙       $2▜██████▛
+$1     ▟█████████████████▙ $2▜████▛     $3▟▙
+$1    ▟███████████████████▙ $2▜███▙    $3▟██▙
+$6           ▄▄▄▄▖           $2▜███▙  $3▟███▛
+$6          ▟███▛             $2▜██▛ $3▟███▛
+$6         ▟███▛               $2▜▛ $3▟███▛
+$6▟███████████▛         $7         $3▟██████████▙
+$6▜██████████▛          $7        $3▟███████████▛
+$6      ▟███▛ $5▟▙               $3▟███▛
+$6     ▟███▛ $5▟██▙             $3▟███▛
+$6    ▟███▛  $5▜███▙           $3▝▀▀▀▀
+$6    ▜██▛    $5▜███▙ $4▜██████████████████▛
+$6     ▜▛     $5▟████▙ $4▜████████████████▛
+$7           $5▟██████▙       $4▜███▙
+$7          $5▟███▛▜███▙       $4▜███▙
+$7         $5▟███▛  ▜███▙       $4▜███▙
+$7         $5▝▀▀▀    ▀▀▀▀▘       $4▀▀▀▘
+EOF
+}
+
+while [[ $1 ]]; do
+  case $1 in
+    --small) size=small; shift;;
+    --large) size=large; shift;;
+    --presets)
+      for preset in "${!presets[@]}"; do
+        printf -- "%16s: %s\n" "--$preset" "${presets[$preset]}"
+      done
+      exit 0;;
+    --help) set --; break;;
+    --*)
+      preset="${1#--}"
+      if [[ ! "${presets[$preset]}" ]]; then
+        >&2 echo "Unknown command line flag $1"
+        exit 1
+      fi
+      shift;;
+    *)
+      break;;
+  esac
+done
+
+if [[ $preset ]]; then
+  set -- ${presets[$preset]}
+fi
+
 if [[ $6 ]]; then
-  nixflake "$@"
+  nixflake-$size "$@"
 else
-  >&2 echo "Usage: nixflake R1G1B1 R2G2B2 ... R6G6B6"
+  >&2 echo "Usage: nixflake [--small|--large] R1G1B1 R2G2B2 ... R6G6B6"
+  >&2 echo "       nixflake [--small|--large] --PRESET-NAME"
+  >&2 echo "  or:  nixflake --presets    to list presets"
   exit 1
 fi
