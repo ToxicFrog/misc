@@ -20,6 +20,7 @@ declare -A presets=(
   [genderqueer]="b57edc ffffff 498022"
   [agender]="000000 bababa ffffff BAF584 ffffff bababa 000000"
   [asexual]="000000 A4A4A4 FFFFFF 810081"
+  [pansexual]="FF1B8D FFDA00 1BB3FF"
 )
 
 function parse-colour {
