@@ -112,12 +112,12 @@ Note that the filter has an implicit +COMPLETED on it, i.e. only books that are
 finished will be counted no matter what the filter is.
 EOF
 function books/bookstats {
-  local FILTER=(+COMPLETED -DNF)
+  local FILTER=()
   while [[ $1 ]]; do
     if [[ $1 == bookstats ]] || [[ $1 == stats ]]; then
       shift; break;
     fi
-    FILTER+="$1"
+    FILTER+=("$1")
     shift
   done
 
@@ -126,8 +126,8 @@ function books/bookstats {
   # So instead we use task/select, which does, and run it through uniq.
   # We also strip off "(tr)" and "(ed)" suffixes, so someone who is credited as
   # both an author and an editor is only counted once.
-  local NROF_DNF=$(\task +COMPLETED +DNF count)
-  local NROF_BOOKS=$(\task "${FILTER[@]}" count)
+  local NROF_DNF=$(\task +COMPLETED +DNF "${FILTER[@]}" count)
+  local NROF_BOOKS=$(\task +COMPLETED -DNF "${FILTER[@]}" count)
   local NROF_AUTHORS=$(task/select author author+ "${FILTER[@]}" \
     | sed -E 's, \(ed\),,g; s, \(tr\),,g' | sort | uniq | wc -l)
   printf '\x1B[1m%24s  %-4d (by %d authors)\x1B[0m (%d DNF)\n' "BOOKS" "$NROF_BOOKS" "$NROF_AUTHORS" "$NROF_DNF"
