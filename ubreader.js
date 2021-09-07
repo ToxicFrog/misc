@@ -60,9 +60,10 @@ function updateAllReadStatus(_) {
     let pagelabel = document.getElementById("pagelabel");
     pagelabel.innerHTML =
       (all_read ?
-        '<a href="#" onclick="markAllUnread()" style="font-size:40px;"><b>❎</b></a>'
-        : '<a href="#" onclick="markAllRead()" style="font-size:40px;"><b>✅</b></a>')
-      + '<a href="#" onclick="location.reload();" style="font-size:40px;"><b>🔄</b></a>'
+        '<a href="#" onclick="markAllUnread()" style="font-size:40px;"><b>✘</b></a>'
+
+        : '<a href="#" onclick="markAllRead()" style="font-size:40px;"><b>✔</b></a>')
+      + '<a href="#" onclick="location.reload();" style="font-size:40px;"><b>⟳</b></a>'
     pagelabel.setAttribute("class", "");
   })
 }
@@ -87,6 +88,10 @@ window.markAllUnread = function() {
       }
     });
   Promise.all(promises).then(_ => updateAllReadStatus());
+}
+
+function getBubble(cell) {
+  return cell.getElementsByClassName("numberblock")[0].innerText;
 }
 
 // Fetch and display read marker for one comic, identified by cell (the div
@@ -127,9 +132,9 @@ function updateReadStatus(cell, id) {
       // It's a book.
       cell.is_book = true;
       if (page <= 0) {
-        addBubble(cell, total + " 📕");
+        addBubble(cell, total + " 📕"); // CLOSED BOOK
       } else if (page < total) {
-        addBubble(cell, "<b>" + page + "/" + total + " 📖</b>");
+        addBubble(cell, "<b>" + page + "/" + total + " 📖</b>"); // OPEN BOOK
       } else {
         addBubble(cell, "✓");
       }
@@ -138,14 +143,18 @@ function updateReadStatus(cell, id) {
       // It's a directory.
       cell.is_book = false;
       if (page <= 0) {
-        addBubble(cell, (total>0? total:"?") + " 📁");
+        // We don't know how much stuff is in it -- but we should be able to
+        // tell from the contents of the bubble before we overwrite it.
+        // For now just slap down a "?".
+        if (total <= 0) total = getBubble(cell);
+        addBubble(cell, (total>0? total:"?") + " 📁"); // CLOSED FOLDER
       } else if (page < total) {
-        addBubble(cell, "<b>" + page + "/" + total + " 📂</b>");
+        addBubble(cell, "<b>" + page + "/" + total + " 📂</b>"); // OPEN FOLDER
       } else {
         addBubble(cell, total + " ✓"); //✔
       }
     }
-    return page == total;
+    return page == total && total > 0;
   })
 }
 
@@ -246,6 +255,10 @@ function installPageSeekBar(_) {
   let bar = document.getElementById("progressbar");
   if (!bar) return; // Not currently reading a book.
 
+  // Adjust the lower margin so that the Chrome status bar doesn't cover actual
+  // content.
+  // document.getElementById("contentCanvas").style = "padding: 0 0 2em 0;";
+
   // Install a wrapper around $scope.loadPage() that properly updates the
   // page counter and seek bar. This is called every time a new page is
   // loaded, so it should keep things in sync...
@@ -271,6 +284,13 @@ function installPageSeekBar(_) {
   let val = $scope.currPageNb + 1;
   let max = $scope.nbPages;
   bar.innerHTML = '<input id="pageseekbar" type="range" name="page" min="1" max="'+max+'" value="'+val+'" onchange="seekPage(this.value)" oninput="updatePageCounter(this.value)">';
+
+  // Delete the empty 'href' attributes from the hotspots on the read page
+  // so that FF/chrome don't helpfully display a URL bar and cut off part
+  // of the comic.
+  document.getElementById('leftbar').removeAttribute('href');
+  document.getElementById('centerbar').removeAttribute('href');
+  document.getElementById('rightbar').removeAttribute('href');
 }
 
 // Add "resume last comic" functionality.
@@ -295,6 +315,28 @@ function enableResumeSupport(_) {
 
   let [_str,dirID] = window.location.pathname.match("/comics/([0-9]+)");
   localStorage.setItem('ubreader:resume', '/comics/' + dirID);
+function getUser() {
+  let info = document.getElementById('userinfo');
+  if (!info) return localStorage.getItem('ubreader:user');
+
+  let user = info.innerText.match('Connected as (.*) - Log out')[1];
+  localStorage.setItem('ubreader:user', user);
+  return user;
+}
+
+// TODO -- this doesn't actually set the taskbar icon when using chromium.
+// Investigate using Konquerer instead, which reportedly supports this.
+function setFavicon(_) {
+  var link;
+  while (link = document.querySelector("link[rel*='icon']")) {
+    link.parentNode.removeChild(link);
+  }
+  link = document.createElement('link');
+  link.type = 'image/x-icon';
+  link.rel = 'shortcut icon';
+  link.href = '/u/' + getUser() + '.png';
+  document.getElementsByTagName('head')[0].appendChild(link);
+  document.title = getUser() + " - " + document.title;
 }
 
 // It sometimes takes a few hundred millis after closing a book for the read
@@ -303,3 +345,4 @@ function enableResumeSupport(_) {
 window.addEventListener('load', _ => { setTimeout(updateAllReadStatus, 1000); });
 window.addEventListener('load', installPageSeekBar);
 window.addEventListener('load', enableResumeSupport);
+window.addEventListener('load', setFavicon)
