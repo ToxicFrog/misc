@@ -25,11 +25,25 @@ function map(xs, f) {
 }
 
 // Ubooq isn't always served from /, so this lets us detect what the base URL is.
-let baseURL = window.location.pathname.match("(/.*)/(comics/[0-9]+|comicreader/reader)");
+// Ubooq URLs look like:
+//  $baseURL/comics/$id
+//  $baseURL/comicreader/reader.html#$state
+// or, for the book library, replace "comic" with "book"
+let baseURL = window.location.pathname.match("(/.*)/((?:comics|books)/[0-9]+|(?:comic|book)reader/reader)");
 if (baseURL) {
   baseURL = baseURL[1];
 } else {
   baseURL = window.location.pathname.replace(/\/+$/, '');
+}
+console.log("Detected baseURL as ", baseURL);
+
+let isBook = window.location.pathname.match('/books/([0-9]+)');
+if (isBook) {
+  var detailsURL = baseURL + '/bookdetails/';
+  var bookmarkURL = baseURL + '/user-api/bookmark?isBook=true&docId='
+} else {
+  var detailsURL = baseURL + '/comicdetails/';
+  var bookmarkURL = baseURL + '/user-api/bookmark?docId='
 }
 
 // Fetch and display the read marker for all comics, if we're in a comic screen,
@@ -37,12 +51,13 @@ if (baseURL) {
 function updateAllReadStatus(_) {
   if (!document.getElementById("group")) return;
   if (document.getElementsByClassName("cell").length == 0) return;
-  let [_str,dirID] = window.location.pathname.match("/comics/([0-9]+)");
+
+  let [_str,dirID] = window.location.pathname.match("/(?:comics|books)/([0-9]+)");
   let promises = map(
     document.getElementsByClassName("cell"),
     cell => {
       let img = cell.getElementsByTagName("img")[0];
-      let id = img.src.match("/comics/([0-9]+)/")[1];
+      let id = img.src.match("/(?:comics|books)/([0-9]+)/")[1];
       return updateReadStatus(cell, id);
     });
 
@@ -96,8 +111,11 @@ function getBubble(cell) {
 
 // Fetch and display read marker for one comic, identified by cell (the div
 // containing the thumbnail for that comic) and server-side ID.
+// Returns a Promise for the fetch->decode->update chain.
 function updateReadStatus(cell, id) {
-  return fetch(baseURL + "/user-api/bookmark?docId=" + id)
+  console.log(sleep);
+  return sleep((id % 50) * 10)
+  .then(_ => fetch(bookmarkURL + id))
   .then(response => {
     if (response.status != 200) {
       if (!cell.getElementsByTagName("a")[0].onclick) {
@@ -118,7 +136,7 @@ function updateReadStatus(cell, id) {
       // It's a normal ubooq bookmark stored 0-indexed, we need to fetch the
       // page count separately.
       let page = parseInt(json.mark) + 1
-      return fetch(baseURL + "/comicdetails/" + id).then(r => r.text()).then(text => {
+      return fetch(detailsURL + id).then(r => r.text()).then(text => {
         let total = parseInt(text.match("nbPages=([0-9]+)")[1]);
         return [page, total, text];
       })
@@ -170,7 +188,7 @@ function put(url, body) {
 }
 
 function saveBookmark(id, mark) {
-  return put(baseURL + "/user-api/bookmark?docId=" + id,
+  return put(bookmarkURL + id,
      {docId: id,
      isBook: false,
      mark: mark,
@@ -198,10 +216,10 @@ function addBubble(cell, text) {
 function fixupLinks(cell, details) {
   let a = cell.getElementsByTagName("a")[0];
   if (!a.onclick) return; // Doesn't need fixing
-  let reader_url = details.match('/comicreader/reader.html[^"]+')[0];
+  let reader_url = details.match('/(?:comic|book)reader/reader.html[^"]+')[0];
   a.onclick = null;
   a.href = baseURL + reader_url.replace(/&amp;/g, "&");
-  let download_url = details.match('href="([^"]*/comics/[0-9]+/[^"]+cb[zrta])"')[1];
+  let download_url = details.match('href="([^"]*/(?:comics|books)/[0-9]+/[^"]+)"')[1];
   let label = cell.getElementsByClassName("label")[0];
   label.innerHTML = '<a style="color:#ADF;" href="' + download_url + '">' + label.innerText + '</a>';
 }
@@ -300,11 +318,11 @@ function installPageSeekBar(_) {
 // because it relies on browser history for "close book" to take you from the
 // comic back to the folder list, and if we just jump straight to the book the
 // history isn't there; TODO: fix this, probably using history.pushState.)
-function enableResumeSupport(_) {
+function enableResumeSupport(kind) {
   if (!document.getElementById("group")) return;
-  console.log("enable resume support");
-  let latest = document.getElementById("latest-comics");
-  let resume = localStorage.getItem('ubreader:resume') || "/comics/";
+  console.log("enable resume support for " + kind);
+  let latest = document.getElementById("latest-" + kind);
+  let resume = localStorage.getItem('ubreader:resume:' + kind) || "/"+kind+"/";
   if (latest) {
     latest.style.backgroundImage = 'url("' + baseURL + '/theme/read.png")';
     latest.style.height = "100%";
@@ -313,8 +331,11 @@ function enableResumeSupport(_) {
     return;
   }
 
-  let [_str,dirID] = window.location.pathname.match("/comics/([0-9]+)");
-  localStorage.setItem('ubreader:resume', '/comics/' + dirID);
+  let match = window.location.pathname.match("/"+kind+"/([0-9]+)");
+  if (match)
+    localStorage.setItem('ubreader:resume:'+kind, '/'+kind+'/'+match[1]);
+}
+
 function getUser() {
   let info = document.getElementById('userinfo');
   if (!info) return localStorage.getItem('ubreader:user');
@@ -344,5 +365,5 @@ function setFavicon(_) {
 // the read status.
 window.addEventListener('load', _ => { setTimeout(updateAllReadStatus, 1000); });
 window.addEventListener('load', installPageSeekBar);
-window.addEventListener('load', enableResumeSupport);
+window.addEventListener('load', _ => { enableResumeSupport('comics'); enableResumeSupport('books'); });
 window.addEventListener('load', setFavicon)
