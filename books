@@ -151,7 +151,7 @@ function books/bookstats {
     fi
 
     # FIXME: when processing authors, we should strip out (tr) and (ed) here too.
-    task/select "$field" "$field+" "${FILTER[@]}" \
+    task/select "$field" "$field+" "+COMPLETED -DNF ${FILTER[@]}" \
       | sed -E "s,$SPLIT,\n,g" | sed -E 's, +\((tr|ed)\),,g' \
       | sort | uniq -c | sed -E "s,( +[0-9]+ +),\1${FIELD_PREFIX},"
   done | sort -r -g | while read count field; do
