@@ -1,0 +1,271 @@
+#!/usr/bin/env zsh
+#
+# Linux launcher for eXoDOS games
+#
+
+set -e
+#shopt -s lastpipe
+
+>/dev/null cat <<NOTES
+Directory structure:
+$EXO
+  Images/
+  Music/
+  Plugins/
+  Content/
+    ...stuff we don't care about right now...
+  Manuals/MS-DOS/
+    ...manuals referenced from the XML...
+  xml/
+    MS-DOS.xml -- game definitions
+    DOSFAMILY.xml -- "family-friendly" gameset
+  eXo/
+    util/
+      ...windows tools like unzip...
+    dosbox/
+      ...various dosbox builds...
+    eXoDOS/
+      ...zip files for individual games...
+      !dos/
+        $GAMEDIR/
+          install.bat -- download and install zip
+          $GAMENAME.bat -- launch game; minor variations per game
+          dosbox.conf
+          Extras/
+            ...varies per game...
+
+Stuff is expected to run from $EXO/eXo
+The install.bat in each game directory is identical, responsible for downloading
+the zip or finding it in !dos, then unpacking it to $EXO/eXo/eXoDOS/$GAMEDIR
+
+The launcher is not identical but has only minor variations; the basic idea is:
+- cd $EXO/eXo
+- run install.bat if the game hasn't been unpacked
+- run dosbox -conf $EXO/eXo/eXoDOS/!dos/$GAMEDIR/dosbox.conf -noconsole -exit
+  (may run dosbox-SVN, dosbox-ECE, etc depending on game)
+- delete stderr.txt, stdout.txt, glide*.*, and eXoDOS/CWSDPMI.SWP
+- a few do special weird things, e.g. A.D. Cop queries the network settings and
+  writes that information to $GAMEINSTALLDIR/ExtIP2.txt
+- a few have special launch options, e.g. After Burner prompts if you want IBM or
+  TANDY mode and picks a different config file depending
+
+XML format notes
+Sequence of <Game> elements. The <ApplicationPath> is the path to the launcher bat,
+and the <RootFolder> is where the launcher lives. <Title> is the title.
+the <Id> is used to link up <AdditionalApplication> entries -- the <GameId> in an
+AA block is the game it should show up as a subprogram of.
+
+Images are in Images/MS-DOS/*/$(true makewinsafe $GAMENAME)-??.*
+
+To do the thing -- scan the XML file and blorf out the data to a cachedir; each file
+is named $GAMEDIR and contains info for GAMEDIR, GAMENAME, GAMEID, maybe try to find the AdditionalApplications as well?
+then build a menufile of $GAMEDIR "$GAMENAME" pairs
+based on the menu entry selected, read the info from it and do the thing
+
+probably want dialog --keep-tite and/or --erase-on-exit
+TODO: how do we configure the colours in dialog?
+run with --create-rc dialogrc, then export DIALOGRC=dialogrc
+NOTES
+
+# Usage: exodos-ll xml/MS-DOS.xml (or some other gamelist xml like DOSFAMILY)
+function main {
+  set -e
+  require dialog dosbox dos2unix sed egrep unzip || exit 1
+  if [[ ! $1 ]]; then
+    >&2 echo "Warning: no XML file specified, defaulting to MS-DOS.xml..."
+    set -- xml/MS-DOS.xml
+  fi
+  cd "$(dirname "$(readlink -f $0)")"
+  init-dialogrc
+  export DIALOGRC="$PWD/cache/dialogrc"
+  # TODO: emit a warning if dosbox-ece or dosbox-svn are missing
+  # TODO: support other options like --game <gameid> to instantly launch a game
+  local cachedir="cache/$(basename $1)"
+  xml-to-cachedir $cachedir $1
+  shift
+  while true; do
+    if [[ $1 ]]; then
+      gameid="$1"; shift
+    else
+      gameid="$(select-game $cachedir)"
+    fi
+    [[ $gameid ]] || break
+    run-game "$cachedir/$gameid"
+  done
+}
+
+function require {
+  local failed=""
+  while [[ $1 ]]; do
+    if ! whence $1 >/dev/null; then
+      failed="$failed $1"
+    fi
+    shift
+  done
+  if [[ $failed ]]; then
+    >&2 echo "You are missing the following required commands:$failed"
+    >&2 echo "The script won't work without them. Please install them and try again."
+    return 1
+  fi
+  return 0
+}
+
+function init-dialogrc {
+  mkdir -p cache
+  >cache/dialogrc cat <<EOF
+use_shadow = OFF
+use_colors = ON
+screen_color = (BLACK,BLACK,ON)
+shadow_color = (BLACK,BLACK,ON)
+dialog_color = (GREEN,BLACK,OFF)
+title_color = (GREEN,BLACK,ON)
+position_indicator_color = title_color
+border_color = (GREEN,BLACK,ON)
+button_active_color = (BLACK,CYAN,OFF)
+button_inactive_color = (CYAN,BLACK,ON)
+button_key_active_color = button_active_color
+button_key_inactive_color = (CYAN,BLACK,ON)
+button_label_active_color = (BLACK,CYAN,OFF)
+button_label_inactive_color = (BLUE,BLACK,OFF)
+# mb background
+menubox_color = (GREEN,BLACK,OFF)
+# mb lower border
+menubox_border_color = (GREEN,BLACK,OFF)
+item_color = (GREEN,BLACK,ON)
+tag_color = (BLUE,BLACK,OFF)
+tag_selected_color = (BLACK,BLUE,OFF)
+tag_key_color = (CYAN,BLACK,ON)
+tag_key_selected_color = (BLACK,CYAN,ON)
+uarrow_color = (GREEN,WHITE,ON)
+gauge_color = (GREEN,BLACK,ON)
+border2_color = (GREEN,BLACK,ON)
+menubox_border2_color = border2_color
+EOF
+}
+
+# xml-to-cachedir cachedir xml
+function xml-to-cachedir {
+  if [[ -f $1/.menudef ]]; then
+    # Directory already exists
+    echo "Gamedata cache for $2 already exists, loading cached info..."
+    return 0
+  fi
+  echo "Gamedata cache for $2 doesn't exist, creating it..."
+  if [[ ! -f $2 ]]; then
+    >&2 echo "Error: couldn't find XML gamelist file $2, giving up."
+    exit 1
+  fi
+  rm -rf $1
+  mkdir -p $1
+  cat "$2" \
+  | dos2unix \
+  | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate /Game \
+  | to-cachedir "$1" "$(fgrep '<Game>' $2 | wc -l)"
+}
+
+# xml-stream keys
+# returns a line-oriented stream of xml data of the given keys
+# fragile!
+function xml-stream {
+  sed -E '
+    /.*<[a-zA-Z0-9]+ \/>$/ d
+    s,.*<([a-zA-Z0-9]+)>(.*)</.*>$,\1 \2,
+    s,.*<(/?[a-zA-Z0-9]+)>$,\1,
+    s,\\,/,g
+  ' | egrep "^($(echo "$*" | tr ' ' '|'))"
+}
+
+# to-cachedir dir nrof_entries
+# reads an xml-stream and writes a cachedir entry for each /Game
+function to-cachedir {
+  local cachedir="$1"
+  local nrof_entries="$2"
+  local n=0
+  local info=()
+  while read key val; do
+    if [[ $key == RootFolder ]]; then
+      GameId="$(basename "$val")"
+    fi
+    if [[ $key == /Game ]]; then
+      if [[ $GameId ]]; then
+        printf '%s\n' "${info[@]}" > "$cachedir/$GameId"
+        printf 'XXX\n%d\nImporting game data: %s\n' "$((++n * 100 / nrof_entries))" "$GameId"
+        # echo "$((++n * 100 / nrof_entries))" # update gauge
+      else
+        >&2 echo "WARNING: /Game with no RootFolder!"
+      fi
+      info=""
+      GameId=""
+    else
+      info+=("$(printf "%s=%q" $key $val)")
+    fi
+  done | dialog --keep-tite --gauge "Importing game data..." 0 $((COLUMNS-4)) 0
+  build-menudef "$cachedir"
+}
+
+function build-menudef {
+  ( # subshell
+  cd "$1"
+  rm -f .menudef
+  local nrof_entries="$(ls | wc -l)"
+  for info in *; do
+    source $info
+    FullTitle="$Title (${ReleaseDate%%-*})"
+    printf "%s=%q\n" FullTitle $FullTitle >> $info
+    # We can't use %q here because dialog(1) requires all arguments with whitespace
+    # to be enclosed in double quotes.
+    printf '%s "%s"\n' $info $FullTitle >> .menudef
+    printf 'XXX\n%d\nBuilding menu definitions: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
+  done | dialog --keep-tite --gauge "Building menu definitions..." 0 $((COLUMNS-4)) 0
+  sort -k2 .menudef -o .menudef # sort by title rather than gameid
+  )
+}
+
+function select-game {
+  dialog --keep-tite --menu "Select a Game" -1 0 -1 --file $1/.menudef 2>/tmp/$$ >/dev/tty
+  cat /tmp/$$
+}
+
+# run-game info-file
+# Notes on game execution.
+# The DOSBOX config files and whatnot expect that you are cd'd into $EXO/eXo when
+# starting the game.
+# install.bat in each directory is identical, and handles downloading the zip (if needed)
+# and unpacking it to $EXO/eXo/eXoDOS/ -- the zip will create the necessary subdir.
+# install.bat also handles configuring some game settings by editing *.conf in the !dos dir:
+# - aspect=true/false (also forces output=overlay if true)
+# - fullscreen=true/false
+# - scaler=FOO, any of none normal3x hq2x hq3x 2xsai super2xsai advmame2x advmame3x tv2x normal2x
+# The startup bat is not identical, but has only minor variations across games;
+# the basic idea is:
+# - cd $EXO/eXo
+# - run install.bat if the game hasn't been unpacked
+# - run dosbox -conf $EXO/eXo/eXoDOS/!dos/$GAMEDIR/dosbox.conf -noconsole -exit
+#   (may run dosbox-SVN, dosbox-ECE, etc depending on game)
+# - delete stderr.txt, stdout.txt, glide*.*, and eXoDOS/CWSDPMI.SWP
+# - a few do special weird things, e.g. A.D. Cop queries the network settings and
+#   writes that information to $GAMEINSTALLDIR/ExtIP2.txt
+# - a few have special launch options, e.g. After Burner prompts if you want IBM or
+#   TANDY mode and picks a different config file depending
+function run-game {
+  # TODO replace this with an interstitial menu that allows configuration options,
+  # viewing the manual, etc
+  source $1
+  local GameId="$(basename "$RootFolder")"
+  if [[ ! -d eXo/eXoDOS/$GameId ]]; then
+    local ZipName="$(basename "${ApplicationPath%.bat}").zip"
+    if [[ -f eXo/eXoDOS/$ZipName ]]; then
+      unzip -d eXo/eXoDOS eXo/eXoDOS/$ZipName | dialog --keep-tite --progressbox "Installing $Title from $ZipName..." -1 -1
+    else
+      dialog --keep-tite --msgbox "$Title is not installed, and I couldn't find the zip file ($ZipName) to install it from." 0 0
+      return 1
+    fi
+  fi
+  # if CHOICE.EXE is present, it overrides the dosbox builtin and breaks everything
+  # since it's not actually a DOS program! so we move it out of the way until we're done
+  [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]] && mv eXo/eXoDOS/$GameId/CHOICE.{EXE,WIN32}
+  (cd eXo && dosbox -exit -conf ../$RootFolder/dosbox.conf)
+  [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]] && mv eXo/eXoDOS/$GameId/CHOICE.{WIN32,EXE}
+}
+
+main "$@"
