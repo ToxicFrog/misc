@@ -6,78 +6,36 @@
 set -e
 #shopt -s lastpipe
 
->/dev/null cat <<NOTES
-Directory structure:
-$EXO
-  Images/
-  Music/
-  Plugins/
-  Content/
-    ...stuff we don't care about right now...
-  Manuals/MS-DOS/
-    ...manuals referenced from the XML...
-  xml/
-    MS-DOS.xml -- game definitions
-    DOSFAMILY.xml -- "family-friendly" gameset
-  eXo/
-    util/
-      ...windows tools like unzip...
-    dosbox/
-      ...various dosbox builds...
-    eXoDOS/
-      ...zip files for individual games...
-      !dos/
-        $GAMEDIR/
-          install.bat -- download and install zip
-          $GAMENAME.bat -- launch game; minor variations per game
-          dosbox.conf
-          Extras/
-            ...varies per game...
-
-Stuff is expected to run from $EXO/eXo
-The install.bat in each game directory is identical, responsible for downloading
-the zip or finding it in !dos, then unpacking it to $EXO/eXo/eXoDOS/$GAMEDIR
-
-The launcher is not identical but has only minor variations; the basic idea is:
-- cd $EXO/eXo
-- run install.bat if the game hasn't been unpacked
-- run dosbox -conf $EXO/eXo/eXoDOS/!dos/$GAMEDIR/dosbox.conf -noconsole -exit
-  (may run dosbox-SVN, dosbox-ECE, etc depending on game)
-- delete stderr.txt, stdout.txt, glide*.*, and eXoDOS/CWSDPMI.SWP
-- a few do special weird things, e.g. A.D. Cop queries the network settings and
-  writes that information to $GAMEINSTALLDIR/ExtIP2.txt
-- a few have special launch options, e.g. After Burner prompts if you want IBM or
-  TANDY mode and picks a different config file depending
-
-XML format notes
-Sequence of <Game> elements. The <ApplicationPath> is the path to the launcher bat,
-and the <RootFolder> is where the launcher lives. <Title> is the title.
-the <Id> is used to link up <AdditionalApplication> entries -- the <GameId> in an
-AA block is the game it should show up as a subprogram of.
-
-Images are in Images/MS-DOS/*/$(true makewinsafe $GAMENAME)-??.*
-
-To do the thing -- scan the XML file and blorf out the data to a cachedir; each file
-is named $GAMEDIR and contains info for GAMEDIR, GAMENAME, GAMEID, maybe try to find the AdditionalApplications as well?
-then build a menufile of $GAMEDIR "$GAMENAME" pairs
-based on the menu entry selected, read the info from it and do the thing
-
-probably want dialog --keep-tite and/or --erase-on-exit
-TODO: how do we configure the colours in dialog?
-run with --create-rc dialogrc, then export DIALOGRC=dialogrc
-NOTES
-
 # Usage: exodos-ll xml/MS-DOS.xml (or some other gamelist xml like DOSFAMILY)
 function main {
   set -e
   require dialog dosbox dos2unix sed egrep unzip || exit 1
+  cd "$(dirname "$0")"
+  init-dialogrc
+  export DIALOGRC="$PWD/cache/dialogrc"
+
+  if [[ ! -d 'eXo/eXoDOS/!dos' ]] || [[ $1 == --setup ]]; then
+    case $(dialog-ask --menu "It looks like eXoDOS hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
+      0 0 2 \
+      ALL "Unpack all the files for Windows+Linux support" \
+      LIN "Only unpack the files needed to run on Linux") in
+      ALL) setup-exodos ;;
+      LIN) setup-exodos-linuxonly ;;
+      *)
+        >&2 echo "eXoDOS not installed, exiting."
+        exit 0
+        ;;
+    esac
+  fi
+  if [[ $1 == --config ]]; then
+    setup-exodos-defaults
+  fi
+  [[ $1 == --setup || $1 == --config ]]&& shift
+
   if [[ ! $1 ]]; then
     >&2 echo "Warning: no XML file specified, defaulting to MS-DOS.xml..."
     set -- xml/MS-DOS.xml
   fi
-  cd "$(dirname "$(readlink -f $0)")"
-  init-dialogrc
-  export DIALOGRC="$PWD/cache/dialogrc"
   # TODO: emit a warning if dosbox-ece or dosbox-svn are missing
   # TODO: support other options like --game <gameid> to instantly launch a game
   local cachedir="cache/$(basename $1)"
@@ -141,6 +99,61 @@ gauge_color = (GREEN,BLACK,ON)
 border2_color = (GREEN,BLACK,ON)
 menubox_border2_color = border2_color
 EOF
+}
+
+# This replicates the behaviour of setup.bat and should be run from the same directory
+# The goal is to produce an eXoDOS setup that works in both linux and windows
+function setup-exodos {
+  unzip -o Content/LaunchBox.zip | progressbox "eXoDOS setup: unpacking LaunchBox..."
+  unzip -o Content/XODOSMetadata.zip | progressbox "eXoDOS setup: unpacking LaunchBox configuration..."
+  unzip -o Content/Magazines.zip -d eXo/ | progressbox "eXoDOS setup: unpacking magazines..."
+  unzip -o Content/'!DOSmetadata.zip' | progressbox "eXoDOS setup: unpacking game configurations..."
+  (
+    cd eXo
+    rm -rf DataCache.txt dosbox scummvm Update
+    unzip -o -d util/ util/util.zip
+    for zip in mt32 SHADERS scummvm dosbox Update; do
+      unzip -o util/${zip}.zip
+    done
+    [[ -f util/aria.zip ]] && unzip -o -d util/ util/aria.zip
+    unzip -o -d util/ util/GBC.zip
+  ) | progressbox "eXoDOS setup: unpacking support programs and extras..."
+
+  if dialog-ask --yesno "Include 'adult' (erotic or pornographic) games in the index? Note: this does not filter out violent games." 0 0; then
+    cp xml/MS-DOS.xml Data/Platforms/MS-DOS.xml
+  else
+    cp xml/DOSFAMILY.xml Data/Platforms/MS-DOS.xml
+  fi
+  cp xml/Playlists/* Data/Playlists/
+  find . \( -iname '*.exe' -or -iname '*.dll' -or -iname '*.bat' \) \
+    \( -print -and -exec chmod a+x '{}' '+' \) \
+  | progressbox "Fixing permissions..."
+
+  setup-exodos-defaults
+}
+
+function setup-exodos-linuxonly {
+  unzip -o Content/XODOSMetadata.zip 'xml/*' 'Manuals/*' | progressbox 'eXoDOS setup: unpacking game info...'
+  unzip -o Content/'!DOSmetadata.zip' | progressbox "eXoDOS setup: unpacking game configurations..."
+  setup-exodos-defaults
+}
+
+function setup-exodos-defaults {
+  local sed=''
+  case $(dialog-ask --menu "What do you want your default video mode to be?" 0 -1 3 \
+    FULL "Fullscreen" BIG "Windowed (1280x960)" SMALL "Windowed (640x480)") in
+    FULL) sed+="s,fullscreen=false,fullscreen=true,;" ;;
+    BIG) set+="s,fullscreen=true,fullscreen=false;s,windowresolution=.*,windowresolution=1280x960,;" ;;
+    SMALL) set+="s,fullscreen=true,fullscreen=false;s,windowresolution=.*,windowresolution=640x480,;" ;;
+    *) exit 1 ;;
+  esac
+  if dialog-ask --yesno "Enable aspect correction?" 0 0; then
+    sed+="s,aspect=false,aspect=true,;s,output=surface,output=overlay,;"
+  else
+    sed+="s,aspect=true,aspect=false,;s,output=overlay,output=surface,;"
+  fi
+  find 'eXo/eXoDOS/!dos' -name '*.conf' \( -print -and -exec sed -E -i -s "$sed" '{}' '+' \) \
+  | progressbox "Applying default settings, please wait..."
 }
 
 # xml-to-cachedir cachedir xml
@@ -221,9 +234,13 @@ function build-menudef {
   )
 }
 
-function select-game {
-  dialog --keep-tite --menu "Select a Game" -1 0 -1 --file $1/.menudef 2>/tmp/$$ >/dev/tty
+function dialog-ask {
+  dialog --keep-tite "$@" 2>/tmp/$$ >/dev/tty
   cat /tmp/$$
+}
+
+function select-game {
+  dialog-ask --menu "Select a Game" -1 0 -1 --file $1/.menudef
 }
 
 # run-game info-file
@@ -255,7 +272,7 @@ function run-game {
   if [[ ! -d eXo/eXoDOS/$GameId ]]; then
     local ZipName="$(basename "${ApplicationPath%.bat}").zip"
     if [[ -f eXo/eXoDOS/$ZipName ]]; then
-      unzip -d eXo/eXoDOS eXo/eXoDOS/$ZipName | dialog --keep-tite --progressbox "Installing $Title from $ZipName..." -1 -1
+      unzip -d eXo/eXoDOS eXo/eXoDOS/$ZipName | progressbox "Installing $Title from $ZipName..."
     else
       dialog --keep-tite --msgbox "$Title is not installed, and I couldn't find the zip file ($ZipName) to install it from." 0 0
       return 1
@@ -266,6 +283,10 @@ function run-game {
   [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]] && mv eXo/eXoDOS/$GameId/CHOICE.{EXE,WIN32}
   (cd eXo && dosbox -exit -conf ../$RootFolder/dosbox.conf)
   [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]] && mv eXo/eXoDOS/$GameId/CHOICE.{WIN32,EXE}
+}
+
+function progressbox {
+  dialog --keep-tite --progressbox "$1" -1 -1
 }
 
 main "$@"
