@@ -341,6 +341,7 @@ function run-game {
   # viewing the manual, etc
   source $1
   local GameId="$(basename "$RootFolder")"
+  >&2 echo "Launching game: $GameId ($Title)"
   if [[ ! -d eXo/eXoDOS/$GameId ]]; then
     local ZipName="$(basename "${ApplicationPath%.bat}").zip"
     if [[ -f eXo/eXoDOS/$ZipName ]]; then
@@ -352,9 +353,35 @@ function run-game {
   fi
   # if CHOICE.EXE is present, it overrides the dosbox builtin and breaks everything
   # since it's not actually a DOS program! so we move it out of the way until we're done
-  [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]] && mv eXo/eXoDOS/$GameId/CHOICE.{EXE,WIN32}
-  (cd eXo && dosbox -exit -conf ../$RootFolder/dosbox.conf)
-  [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]] && mv eXo/eXoDOS/$GameId/CHOICE.{WIN32,EXE}
+  if [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]]; then
+    mv eXo/eXoDOS/$GameId/CHOICE.{EXE,WIN32}
+  fi
+  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf ../$RootFolder/dosbox.conf)
+  if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
+    mv eXo/eXoDOS/$GameId/CHOICE.{WIN32,EXE}
+  fi
+  >&2 echo "Game exited: $GameId"
+}
+
+# find-dosbox-version <launcher.bat>
+function find-dosbox-version {
+  # dosbox version selection is best-effort:
+  # - if it asked for dosbox-ece, dosbox-x, or dosbox-svn, we look for that
+  # - if it doesn't, or we can't find the above, we try dosbox-staging
+  # - if we don't even have dosbox-staging we try normal dosbox
+  # variants actually used by eXoDOS are: plain, 0.73, SVN, SVN2, ECE, X, and FatmanTh.
+  local variant="$(egrep -o '[^\\]+\\dosbox.exe' "$1" | head -n1 | cut -d/ -f1 | tr A-Z a-z)"
+  >&2 echo "Game wants dosbox variant: dosbox/$variant/dosbox.exe"
+  case $variant in
+    *ece*) variant=dosbox-ece ;;
+    *svn*) variant=dosbox-svn ;;
+    x) variant=dosbox-x ;;
+    *) variant=dosbox-staging ;;
+  esac
+  >&2 echo "Our best guess at what we should run is: $variant"
+  variant="$(whence $variant || whence dosbox-staging || whence dosbox)"
+  >&2 echo "We will actually run: $variant"
+  echo "$variant"
 }
 
 function progressbox {
