@@ -1,7 +1,15 @@
 #!/usr/bin/env zsh
 #
-# Linux launcher for eXoDOS games
+# Simple Linux launcher for eXoDOS games
 #
+# Quick start:
+# - put in the same directory you downloaded eXoDOS to (alongside Setup.bat)
+# - run with --help for more details, or no arguments to get started
+#
+# Note that this is much more basic than the official Linux patch for eXoDOS,
+# which you can download here: https://www.retro-exo.com/linux.html
+# This script has fewer dependencies, but also fewer features, and intentionally
+# does not attempt to support the full breadth of games included in eXoDOS.
 
 set -e
 #shopt -s lastpipe
@@ -9,12 +17,16 @@ set -e
 # Usage: exodos-ll xml/MS-DOS.xml (or some other gamelist xml like DOSFAMILY)
 function main {
   set -e
-  require dialog dosbox dos2unix sed egrep unzip || exit 1
+  parse-argv "$@"
+
+  require dialog dosbox dos2unix sed egrep fgrep unzip || exit 1
+  suggest dosbox-staging dosbox-ece dosbox-svn
+
   cd "$(dirname "$0")"
   init-dialogrc
   export DIALOGRC="$PWD/cache/dialogrc"
 
-  if [[ ! -d 'eXo/eXoDOS/!dos' ]] || [[ $1 == --setup ]]; then
+  if [[ ! -d 'eXo/eXoDOS/!dos' ]] || ((DO_SETUP)); then
     case $(dialog-ask --menu "It looks like eXoDOS hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
       0 0 2 \
       ALL "Unpack all the files for Windows+Linux support" \
@@ -27,29 +39,74 @@ function main {
         ;;
     esac
   fi
-  if [[ $1 == --config ]]; then
+  if ((DO_CONFIG)); then
     setup-exodos-defaults
   fi
-  [[ $1 == --setup || $1 == --config ]]&& shift
 
-  if [[ ! $1 ]]; then
-    >&2 echo "Warning: no XML file specified, defaulting to MS-DOS.xml..."
-    set -- xml/MS-DOS.xml
-  fi
+  >&2 echo "Loading game data from $DO_XML..."
   # TODO: emit a warning if dosbox-ece or dosbox-svn are missing
   # TODO: support other options like --game <gameid> to instantly launch a game
-  local cachedir="cache/$(basename $1)"
-  xml-to-cachedir $cachedir $1
-  shift
+  local cachedir="cache/$(basename "$DO_XML")"
+  xml-to-cachedir "$cachedir" "$DO_XML"
+
+  if [[ $DO_GAME ]]; then
+    run-game "$cachedir/$gameid"
+    exit $?
+  fi
+
   while true; do
-    if [[ $1 ]]; then
-      gameid="$1"; shift
-    else
-      gameid="$(select-game $cachedir)"
-    fi
+    gameid="$(select-game $cachedir)"
     [[ $gameid ]] || break
     run-game "$cachedir/$gameid"
   done
+}
+
+DO_SETUP=0
+DO_CONFIG=0
+DO_XML="xml/MS-DOS.xml"
+DO_GAME=""
+function parse-argv {
+  while [[ $1 ]]; do
+    case "$1" in
+      --help) help; exit 0;;
+      --setup) DO_SETUP=1; DO_CONFIG=1; shift;;
+      --config) DO_CONFIG=1; shift;;
+      --xml) DO_XML="${2:?--xml requires an argument}"; shift 2;;
+      --game) DO_GAME="${2:?--game requires an argument}"; shift 2;;
+      *) help; exit 1;;
+    esac
+  done
+}
+
+function help {
+  cat <<EOF
+Usage: exodos-ll [--setup|--config] [--xml MS-DOS.xml] [--game lemmings]
+
+Simple curses-based launcher for eXoDOS on linux. Put it in the eXoDOS install
+directory and run it.
+
+Some caveats:
+- alternate launchers are not supported
+- alternate dosbox versions have very limited support
+- download-on-demand is not supported; you need to have the zip files already
+
+Flags:
+      --setup  Perform initial setup by unpacking eXoDOS zip files, similar to
+               Setup.bat on windows. It should do this automatically if needed,
+               but you can use this flag to force it to do it again.
+     --config  Configure default settings for games, like fullscreen and scaler.
+               Automatically happens after --setup, but you can use this flag to
+               do it again without re-installing all of eXoDOS.
+    --xml XML  Load this list of games. Optional; if you don't specify this it
+               will try to load xml/MS-DOS.xml automatically. The first time it
+               loads a given XML file it needs to build a gamedata cache, which
+               can take several minutes.
+  --game GAME  Skip displaying the menu and just run this game, then exit. The
+               game needs to be a game ID like "alienleg", not a full game name
+               like "Alient Legacy". Note that it still needs an XML file to get
+               the game info from!
+       --help  This text.
+EOF
 }
 
 function require {
@@ -66,6 +123,21 @@ function require {
     return 1
   fi
   return 0
+}
+
+function suggest {
+  local failed=""
+  while [[ $1 ]]; do
+    if ! whence $1 >/dev/null; then
+      failed="$failed $1"
+    fi
+    shift
+  done
+  if [[ $failed ]]; then
+    >&2 echo "You are missing the following dosbox variants:$failed"
+    >&2 echo "The script will work without them, but you are likely to run into more malfunctioning games than you would otherwise."
+    sleep 5
+  fi
 }
 
 function init-dialogrc {
@@ -160,7 +232,7 @@ function setup-exodos-defaults {
 function xml-to-cachedir {
   if [[ -f $1/.menudef ]]; then
     # Directory already exists
-    echo "Gamedata cache for $2 already exists, loading cached info..."
+    echo "Gamedata cache for $2 already exists, loading cached info."
     return 0
   fi
   echo "Gamedata cache for $2 doesn't exist, creating it..."
