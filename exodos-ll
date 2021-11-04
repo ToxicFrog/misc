@@ -27,10 +27,11 @@ function main {
   export DIALOGRC="$PWD/cache/dialogrc"
 
   if [[ ! -d 'eXo/eXoDOS/!dos' ]] || ((DO_SETUP)); then
-    case $(dialog-ask --menu "It looks like eXoDOS hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
-      0 0 2 \
-      ALL "Unpack all the files for Windows+Linux support" \
-      LIN "Only unpack the files needed to run on Linux") in
+    case "$(dialog-ask --menu "It looks like eXoDOS hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
+          0 0 2 \
+          ALL "Unpack all the files for Windows+Linux support" \
+          LIN "Only unpack the files needed to run on Linux")"
+    in
       ALL) setup-exodos ;;
       LIN) setup-exodos-linuxonly ;;
       *)
@@ -55,13 +56,13 @@ function main {
   fi
 
   if [[ $DO_GAME ]]; then
-    launch-game "$cachedir/$DO_GAME"
+    launch-game "$cachedir/$DO_GAME" || true
   fi
 
   while true; do
-    gameid="$(select-game $cachedir)"
+    gameid="$(select-game "$cachedir")"
     [[ $gameid ]] || break
-    launch-game "$cachedir/$gameid"
+    launch-game "$cachedir/$gameid" || true
   done
 }
 
@@ -120,7 +121,7 @@ EOF
 function require {
   local failed=""
   while [[ $1 ]]; do
-    if ! whence $1 >/dev/null; then
+    if ! whence "$1" >/dev/null; then
       failed="$failed $1"
     fi
     shift
@@ -136,7 +137,7 @@ function require {
 function suggest {
   local failed=""
   while [[ $1 ]]; do
-    if ! whence $1 >/dev/null; then
+    if ! whence "$1" >/dev/null; then
       failed="$failed $1"
     fi
     shift
@@ -193,7 +194,7 @@ function setup-exodos {
     rm -rf DataCache.txt dosbox scummvm Update
     unzip -o -d util/ util/util.zip
     for zip in mt32 SHADERS scummvm dosbox Update; do
-      unzip -o util/${zip}.zip
+      unzip -o "util/${zip}.zip"
     done
     [[ -f util/aria.zip ]] && unzip -o -d util/ util/aria.zip
     unzip -o -d util/ util/GBC.zip
@@ -220,8 +221,9 @@ function setup-exodos-linuxonly {
 
 function setup-exodos-defaults {
   local sed=''
-  case $(dialog-ask --menu "What do you want your default video mode to be?" 0 -1 3 \
-    FULL "Fullscreen" BIG "Windowed (1280x960)" SMALL "Windowed (640x480)") in
+  case "$(dialog-ask --menu "What do you want your default video mode to be?" 0 -1 3 \
+      FULL "Fullscreen" BIG "Windowed (1280x960)" SMALL "Windowed (640x480)")"
+  in
     FULL) sed+="s,fullscreen=false,fullscreen=true,;" ;;
     BIG) set+="s,fullscreen=true,fullscreen=false;s,windowresolution=.*,windowresolution=1280x960,;" ;;
     SMALL) set+="s,fullscreen=true,fullscreen=false;s,windowresolution=.*,windowresolution=640x480,;" ;;
@@ -248,8 +250,8 @@ function xml-to-cachedir {
     >&2 echo "Error: couldn't find XML gamelist file $2, giving up."
     exit 1
   fi
-  rm -rf $1
-  mkdir -p $1
+  rm -rf "$1"
+  mkdir -p "$1"
   cat "$2" \
   | dos2unix \
   | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate /Game \
@@ -260,6 +262,7 @@ function xml-to-cachedir {
 # returns a line-oriented stream of xml data of the given keys
 # fragile!
 function xml-stream {
+  # TODO: extract the <Notes> field as well; this can be multiline, so it's harder
   sed -E '
     /.*<[a-zA-Z0-9]+ \/>$/ d
     s,.*<([a-zA-Z0-9]+)>(.*)</.*>$,\1 \2,
@@ -302,12 +305,12 @@ function build-menudef {
   rm -f .menudef
   local nrof_entries="$(ls | wc -l)"
   for info in *; do
-    source $info
+    source "$info"
     FullTitle="$Title (${ReleaseDate%%-*})"
-    printf "%s=%q\n" FullTitle $FullTitle >> $info
+    printf "%s=%q\n" FullTitle "$FullTitle" >> "$info"
     # We can't use %q here because dialog(1) requires all arguments with whitespace
     # to be enclosed in double quotes.
-    printf '%s "%s"\n' $info $FullTitle >> .menudef
+    printf '%s "%s"\n' "$info" "$FullTitle" >> .menudef
     printf 'XXX\n%d\nBuilding menu definitions: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
   done | dialog --keep-tite --gauge "Building menu definitions..." 0 $((COLUMNS-4)) 0
   sort -k2 .menudef -o .menudef # sort by title rather than gameid
@@ -317,6 +320,7 @@ function build-menudef {
 function dialog-ask {
   dialog --keep-tite "$@" 2>/tmp/$$ >/dev/tty
   cat /tmp/$$
+  rm /tmp/$$
 }
 
 function select-game {
@@ -450,7 +454,7 @@ function run-game {
   if [[ ! -d eXo/eXoDOS/$GameId ]]; then
     local ZipName="$(basename "${ApplicationPath%.bat}").zip"
     if [[ -f eXo/eXoDOS/$ZipName ]]; then
-      unzip -d eXo/eXoDOS eXo/eXoDOS/$ZipName | progressbox "Installing $Title from $ZipName..."
+      unzip -d eXo/eXoDOS "eXo/eXoDOS/$ZipName" | progressbox "Installing $Title from $ZipName..."
     else
       dialog --keep-tite --msgbox "$Title is not installed, and I couldn't find the zip file ($ZipName) to install it from." 0 0
       return 1
@@ -459,11 +463,11 @@ function run-game {
   # if CHOICE.EXE is present, it overrides the dosbox builtin and breaks everything
   # since it's not actually a DOS program! so we move it out of the way until we're done
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]]; then
-    mv eXo/eXoDOS/$GameId/CHOICE.{EXE,WIN32}
+    mv "eXo/eXoDOS/$GameId/CHOICE".{EXE,WIN32}
   fi
-  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf ../$RootFolder/dosbox.conf)
+  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf "../$RootFolder/dosbox.conf")
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
-    mv eXo/eXoDOS/$GameId/CHOICE.{WIN32,EXE}
+    mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
   fi
   >&2 echo "Game exited: $GameId"
 }
@@ -477,7 +481,7 @@ function find-dosbox-version {
   # variants actually used by eXoDOS are: plain, 0.73, SVN, SVN2, ECE, X, and FatmanTh.
   local variant="$(egrep -o '[^\\]+\\dosbox.exe' "$1" | head -n1 | cut -d/ -f1 | tr A-Z a-z)"
   >&2 echo "Game wants dosbox variant: dosbox/$variant/dosbox.exe"
-  case $variant in
+  case "$variant" in
     *ece*) variant=dosbox-ece ;;
     *svn*) variant=dosbox-svn ;;
     x) variant=dosbox-x ;;
