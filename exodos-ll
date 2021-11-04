@@ -49,15 +49,19 @@ function main {
   local cachedir="cache/$(basename "$DO_XML")"
   xml-to-cachedir "$cachedir" "$DO_XML"
 
-  if [[ $DO_GAME ]]; then
-    run-game "$cachedir/$gameid"
+  if [[ $DO_PLAY ]]; then
+    run-game "$cachedir/$DO_PLAY"
     exit $?
+  fi
+
+  if [[ $DO_GAME ]]; then
+    launch-game "$cachedir/$DO_GAME"
   fi
 
   while true; do
     gameid="$(select-game $cachedir)"
     [[ $gameid ]] || break
-    run-game "$cachedir/$gameid"
+    launch-game "$cachedir/$gameid"
   done
 }
 
@@ -65,6 +69,7 @@ DO_SETUP=0
 DO_CONFIG=0
 DO_XML="xml/MS-DOS.xml"
 DO_GAME=""
+DO_PLAY=""
 function parse-argv {
   while [[ $1 ]]; do
     case "$1" in
@@ -73,6 +78,7 @@ function parse-argv {
       --config) DO_CONFIG=1; shift;;
       --xml) DO_XML="${2:?--xml requires an argument}"; shift 2;;
       --game) DO_GAME="${2:?--game requires an argument}"; shift 2;;
+      --play) DO_PLAY="${2:?--play requires an argument}"; shift 2;;
       *) help; exit 1;;
     esac
   done
@@ -101,10 +107,12 @@ Flags:
                will try to load xml/MS-DOS.xml automatically. The first time it
                loads a given XML file it needs to build a gamedata cache, which
                can take several minutes.
-  --game GAME  Skip displaying the menu and just run this game, then exit. The
+  --play GAME  Skip displaying the menu and just run this game, then exit. The
                game needs to be a game ID like "alienleg", not a full game name
-               like "Alient Legacy". Note that it still needs an XML file to get
+               like "Alien Legacy". Note that it still needs an XML file to get
                the game info from!
+  --game GAME  Skip the menu and display the info/configuration screen for the
+               game; when the player is done with that, return to the menu.
        --help  This text.
 EOF
 }
@@ -312,7 +320,104 @@ function dialog-ask {
 }
 
 function select-game {
-  dialog-ask --menu "Select a Game" -1 0 -1 --file $1/.menudef
+  dialog-ask --menu "Select a Game" -1 0 -1 --file "$1/.menudef"
+}
+
+# launch-game info-file
+# interstitial dialog that offers to run the game, view the manual, or configure
+# various settings.
+function launch-game {
+  source "$1"
+  local defaultitem="PLAY"
+  local conf="$(dirname "$ApplicationPath")/dosbox.conf"
+  while true; do
+    action="$(launch-game-menu "$ApplicationPath")"
+    defaultitem="$action"
+    case $action in
+      PLAY) run-game "$1" ;;
+      DOCS) xdg-open "$ManualPath" ;;
+      MODE) cycle-screen-mode "$1";;
+      ASPC) cycle-aspect-correction "$1";;
+      SCLR) cycle-scaler "$1";;
+      *) return 0 ;;
+    esac
+  done
+}
+
+function launch-game-menu {
+  local args=(PLAY "Run game")
+  if [[ $ManualPath ]]; then
+    args+=(DOCS "View game manual")
+  fi
+  args+=(
+    MODE "Change screen mode [currently: $(get-screen-mode $conf)]"
+    ASPC "Toggle aspect correction [currently: $(get-aspect-correction $conf)]"
+    SCLR "Change scaler [currently: $(get-scaler $conf)]"
+  )
+  dialog-ask --default-item "$defaultitem" --menu "$FullTitle" 0 0 0 "${args[@]}"
+}
+
+# TODO: this whole configuration mess could probably use refactoring to be more general
+function get-screen-mode {
+  if fgrep -q fullscreen=true "$1"; then
+    echo "fullscreen"
+  else
+    echo "windowed $(cat "$1" | dos2unix | egrep -o 'windowresolution=.*' | cut -d= -f2)"
+  fi
+}
+
+function cycle-screen-mode {
+  local mode="$(get-screen-mode $conf)"
+  case $mode in
+    "windowed 640x480") set-conf "$conf" fullscreen false windowresolution 1280x960 ;;
+    "windowed 1280x960") set-conf "$conf" fullscreen true ;;
+    fullscreen) set-conf "$conf" fullscreen false windowresolution 640x480 ;;
+    *) set-conf "$conf" fullscreen true ;;
+  esac
+}
+
+function get-aspect-correction {
+  if fgrep -q aspect=true "$1"; then
+    echo "enabled"
+  else
+    echo "disabled"
+  fi
+}
+
+function cycle-aspect-correction {
+  if fgrep -q aspect=true "$conf"; then
+    set-conf "$conf" aspect false
+  else
+    set-conf "$conf" aspect true
+  fi
+}
+
+function get-scaler {
+  cat "$1" | dos2unix | fgrep scaler= | cut -d= -f2
+}
+
+function cycle-scaler {
+  local scaler="$(get-scaler "$conf")"
+  set -- none normal3x hq2x hq3x 2xsai super2xsai advmame2x advmame3x tv2x normal2x none
+  while [[ $1 ]]; do
+    if [[ $1 == $scaler ]]; then
+      shift
+      set-conf "$conf" scaler "$1"
+      return 0
+    fi
+    shift
+  done
+  set-conf "$conf" scaler none
+}
+
+# set-conf config key val [key val..]
+function set-conf {
+  local conf="$1"; shift
+  while [[ $1 ]]; do
+    >&2 echo "Updating $conf: $1=$2"
+    sed -E -i "s,$1=.*,$1=$2," "$conf"
+    shift 2
+  done
 }
 
 # run-game info-file
