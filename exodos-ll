@@ -145,7 +145,7 @@ function suggest {
   if [[ $failed ]]; then
     >&2 echo "You are missing the following dosbox variants:$failed"
     >&2 echo "The script will work without them, but you are likely to run into more malfunctioning games than you would otherwise."
-    sleep 5
+    read -t 5 || true
   fi
 }
 
