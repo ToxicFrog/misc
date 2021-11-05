@@ -48,8 +48,6 @@ function main {
   fi
 
   >&2 echo "Loading game data from $DO_XML..."
-  # TODO: emit a warning if dosbox-ece or dosbox-svn are missing
-  # TODO: support other options like --game <gameid> to instantly launch a game
   local cachedir="cache/$(basename "$DO_XML")"
   xml-to-cachedir "$cachedir" "$DO_XML"
 
@@ -266,6 +264,8 @@ function xml-to-cachedir {
 # fragile!
 function xml-stream {
   # TODO: extract the <Notes> field as well; this can be multiline, so it's harder
+  # TODO: scan for <AdditionalApplication> blocks and match them up with their
+  # corresponding games, so we can display those in the launcher too
   sed -E '
     /.*<[a-zA-Z0-9]+ \/>$/ d
     s,.*<([a-zA-Z0-9]+)>(.*)</.*>$,\1 \2,
@@ -449,8 +449,6 @@ function set-conf {
 # - a few have special launch options, e.g. After Burner prompts if you want IBM or
 #   TANDY mode and picks a different config file depending
 function run-game {
-  # TODO replace this with an interstitial menu that allows configuration options,
-  # viewing the manual, etc
   source $1
   local GameId="$(basename "$RootFolder")"
   >&2 echo "Launching game: $GameId ($Title)"
@@ -468,28 +466,36 @@ function run-game {
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]]; then
     mv "eXo/eXoDOS/$GameId/CHOICE".{EXE,WIN32}
   fi
-  # TODO: the dosbox.conf may have paths in it that use backslashes instead of forward slashes,
-  # which is fine for [autoexec] but may cause problems with e.g. soundfont paths; generate a new
-  # one with the correct settings on the fly.
-  fix-config "$RootFolder/dosbox.conf" > /tmp/$$.conf
-  >&2 echo "Temporary config written to /tmp/$$.conf"
-  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf /tmp/$$.conf)
-  rm /tmp/$$.conf
+  # TODO: optional support for linux-specific config files, so people can drop a
+  # dosbox_linux.conf in their game directory and have it do the right thing
+  # TODO: support for alternate config files, since some games have multiple
+  # completely different dosbox configs rather than in-dosbox launch options
+  local conf="$(fix-config "$RootFolder/dosbox.conf")"
+  >&2 echo "Temporary config written to $conf"
+  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf "$conf")
+  rm "$conf"
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
     mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
   fi
   >&2 echo "Game exited: $GameId"
 }
 
-# given a dosbox config file, fix it up to (a) use linux paths and (b) avoid foo.bar=
-# config syntax in favour of [foo]\nbar=, since dosbox-staging only understands
-# the latter.
+# given a dosbox config file, fix it up so that:
+# - windows paths with \ are converted to linux paths with /
+# - if the file has mt32.* or fluid.* settings, copy them to [fluidsynth] and
+#   [mt32] blocks at the end so dosbox-staging can understand them
 function fix-config {
-  cat "$1" | sed -E '
-    s,\\,/,g
-    s,^fluid\.([^=]+)=,[fluidsynth]\n\1=,
-    s,^([^.]+)\.([^=]+)=,[\1]\n\2=,
-  '
+  local conf=/tmp/$$.conf
+  cat "$1" | sed -E 's,\\,/,g' > $conf
+  if egrep -q '^fluid' "$conf"; then
+    echo '[fluidsynth]'
+    cat "$conf" | egrep '^fluid' | sed -E 's,^fluid\.([^=]+)=,\1=,'
+  fi >> $conf
+  if egrep -q '^mt32' "$conf"; then
+    echo '[mt32]'
+    cat "$conf" | egrep '^mt32' | sed -E 's,^mt32\.([^=]+)=,\1=,'
+  fi >> $conf
+  echo "$conf"
 }
 
 # find-dosbox-version <launcher.bat>
