@@ -62,6 +62,7 @@ function main {
 
   if [[ $DO_GAME ]]; then
     launch-game "$cachedir/$DO_GAME" || true
+    exit $?
   fi
 
   while true; do
