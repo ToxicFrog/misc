@@ -26,8 +26,7 @@ function main {
   suggest dosbox-staging dosbox-ece dosbox-svn
 
   cd "$(dirname "$0")"
-  init-dialogrc
-  export DIALOGRC="$PWD/cache/dialogrc"
+  export DIALOGRC="$(init-dialogrc)"
 
   if [[ ! -d 'eXo/eXoDOS/!dos' ]] || ((DO_SETUP)); then
     case "$(dialog-ask --menu "It looks like eXoDOS hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
@@ -65,6 +64,8 @@ function main {
     [[ $gameid ]] || break
     launch-game "$cachedir/$gameid" || true
   done
+
+  rm "$DIALOGRC"
 }
 
 DO_SETUP=0
@@ -151,8 +152,7 @@ function suggest {
 }
 
 function init-dialogrc {
-  mkdir -p cache
-  >cache/dialogrc cat <<EOF
+  >/tmp/$$.dialogrc cat <<EOF
 use_shadow = OFF
 use_colors = ON
 screen_color = (BLACK,BLACK,ON)
@@ -181,6 +181,7 @@ gauge_color = (GREEN,BLACK,ON)
 border2_color = (GREEN,BLACK,ON)
 menubox_border2_color = border2_color
 EOF
+  echo "/tmp/$$.dialogrc"
 }
 
 # This replicates the behaviour of setup.bat and should be run from the same directory
