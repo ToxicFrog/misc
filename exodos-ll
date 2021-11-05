@@ -339,7 +339,7 @@ function launch-game {
     defaultitem="$action"
     case $action in
       PLAY) run-game "$1" ;;
-      DOCS) xdg-open "$ManualPath" ;;
+      DOCS) xdg-open "$ManualPath" >/dev/null 2>&1;;
       MODE) cycle-screen-mode "$1";;
       ASPC) cycle-aspect-correction "$1";;
       SCLR) cycle-scaler "$1";;
