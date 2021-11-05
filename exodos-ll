@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 #
 # Simple Linux launcher for eXoDOS games
 #
@@ -12,9 +12,12 @@
 # does not attempt to support the full breadth of games included in eXoDOS.
 
 set -e
-#shopt -s lastpipe
+shopt -s lastpipe
 
-# Usage: exodos-ll xml/MS-DOS.xml (or some other gamelist xml like DOSFAMILY)
+function whence {
+  type -p "$@"
+}
+
 function main {
   set -e
   parse-argv "$@"
