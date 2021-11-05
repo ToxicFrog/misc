@@ -465,7 +465,12 @@ function run-game {
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]]; then
     mv "eXo/eXoDOS/$GameId/CHOICE".{EXE,WIN32}
   fi
-  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf "../$RootFolder/dosbox.conf")
+  # TODO: the dosbox.conf may have paths in it that use backslashes instead of forward slashes,
+  # which is fine for [autoexec] but may cause problems with e.g. soundfont paths; generate a new
+  # one with the correct settings on the fly.
+  sed -E 's,\\,/,g' "$RootFolder/dosbox.conf" > /tmp/$$.conf
+  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf /tmp/$$.conf)
+  rm /tmp/$$.conf
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
     mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
   fi
