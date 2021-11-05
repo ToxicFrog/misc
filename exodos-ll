@@ -471,13 +471,25 @@ function run-game {
   # TODO: the dosbox.conf may have paths in it that use backslashes instead of forward slashes,
   # which is fine for [autoexec] but may cause problems with e.g. soundfont paths; generate a new
   # one with the correct settings on the fly.
-  sed -E 's,\\,/,g' "$RootFolder/dosbox.conf" > /tmp/$$.conf
+  fix-config "$RootFolder/dosbox.conf" > /tmp/$$.conf
+  >&2 echo "Temporary config written to /tmp/$$.conf"
   (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf /tmp/$$.conf)
   rm /tmp/$$.conf
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
     mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
   fi
   >&2 echo "Game exited: $GameId"
+}
+
+# given a dosbox config file, fix it up to (a) use linux paths and (b) avoid foo.bar=
+# config syntax in favour of [foo]\nbar=, since dosbox-staging only understands
+# the latter.
+function fix-config {
+  cat "$1" | sed -E '
+    s,\\,/,g
+    s,^fluid\.([^=]+)=,[fluidsynth]\n\1=,
+    s,^([^.]+)\.([^=]+)=,[\1]\n\2=,
+  '
 }
 
 # find-dosbox-version <launcher.bat>
