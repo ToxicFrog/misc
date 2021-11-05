@@ -50,6 +50,11 @@ function main {
   local cachedir="cache/$(basename "$DO_XML")"
   xml-to-cachedir "$cachedir" "$DO_XML"
 
+  if ((DO_SHARED)); then
+    chmod ug+w cache
+    chmod ug+w eXo/eXoDOS
+  fi
+
   if [[ $DO_PLAY ]]; then
     run-game "$cachedir/$DO_PLAY"
     exit $?
@@ -73,6 +78,7 @@ DO_CONFIG=0
 DO_XML="xml/MS-DOS.xml"
 DO_GAME=""
 DO_PLAY=""
+DO_SHARED=0
 function parse-argv {
   while [[ $1 ]]; do
     case "$1" in
@@ -82,6 +88,7 @@ function parse-argv {
       --xml) DO_XML="${2:?--xml requires an argument}"; shift 2;;
       --game) DO_GAME="${2:?--game requires an argument}"; shift 2;;
       --play) DO_PLAY="${2:?--play requires an argument}"; shift 2;;
+      --shared) DO_SHARED=1; shift;;
       *) help; exit 1;;
     esac
   done
@@ -116,6 +123,14 @@ Flags:
                the game info from!
   --game GAME  Skip the menu and display the info/configuration screen for the
                game; when the player is done with that, return to the menu.
+     --shared  Run in "shared ownership" mode: mark the eXoDOS directory and the
+               game install directories within it as group-writeable. This lets
+               multiple users share the same eXoDOS install (for example, on a
+               network drive) as long as they aren't both trying to play the
+               same games at once. Note that with or without this, installed
+               games (and thus settings and save files) are still stored in the
+               eXoDOS directory; all this changes is how the file permissions
+               are set.
        --help  This text.
 EOF
 }
@@ -479,6 +494,9 @@ function run-game {
     mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
   fi
   >&2 echo "Game exited: $GameId"
+  if ((DO_SHARED)); then
+    chmod -R g+w "eXo/eXoDOS/$GameId/"
+  fi
 }
 
 # given a dosbox config file, fix it up so that:
