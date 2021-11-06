@@ -584,6 +584,8 @@ function progressbox {
   dialog --keep-tite --progressbox "$1" -1 -1
 }
 
-trap 'echo Something went wrong -- please report this as a bug, along with the log and a description of what you were doing.' EXIT
-main "$@"
-trap '' EXIT
+if [[ ! $DEBUG ]]; then
+  trap 'echo Something went wrong -- please report this as a bug, along with the log and a description of what you were doing.' EXIT
+  main "$@"
+  trap '' EXIT
+fi
