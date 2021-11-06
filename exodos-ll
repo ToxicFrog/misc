@@ -18,6 +18,11 @@ function whence {
   type -p "$@"
 }
 
+# TODO: logfile option?
+function log {
+  >&2 echo "$@"
+}
+
 function main {
   set -e
   parse-argv "$@"
@@ -46,7 +51,7 @@ function main {
     setup-exodos-defaults
   fi
 
-  >&2 echo "Loading game data from $DO_XML..."
+  log "Loading game data from $DO_XML..."
   local cachedir="cache/$(basename "$DO_XML")"
   xml-to-cachedir "$cachedir" "$DO_XML"
 
@@ -145,8 +150,8 @@ function require {
     shift
   done
   if [[ $failed ]]; then
-    >&2 echo "You are missing the following required commands:$failed"
-    >&2 echo "The script won't work without them. Please install them and try again."
+    log "You are missing the following required commands:$failed"
+    log "The script won't work without them. Please install them and try again."
     return 1
   fi
   return 0
@@ -161,8 +166,8 @@ function suggest {
     shift
   done
   if [[ $failed ]]; then
-    >&2 echo "You are missing the following dosbox variants:$failed"
-    >&2 echo "The script will work without them, but you are likely to run into more malfunctioning games than you would otherwise."
+    log "You are missing the following dosbox variants:$failed"
+    log "The script will work without them, but you are likely to run into more malfunctioning games than you would otherwise."
     read -t 5 || true
   fi
 }
@@ -265,7 +270,7 @@ function xml-to-cachedir {
   fi
   echo "Gamedata cache for $2 doesn't exist, creating it..."
   if [[ ! -f $2 ]]; then
-    >&2 echo "Error: couldn't find XML gamelist file $2, giving up."
+    log "Error: couldn't find XML gamelist file $2, giving up."
     exit 1
   fi
   rm -rf "$1"
@@ -313,7 +318,7 @@ function to-cachedir {
           if [[ ${xml[ID]} ]]; then ln -s "../$GameDir" "$cachedir/by-uuid/${xml[ID]}"; fi
           printf 'XXX\n%d\nImporting game data: %s\n' "$((++n * 100 / nrof_entries))" "$GameDir"
         else
-          >&2 echo "WARNING: /Game with no RootFolder!"
+          log "WARNING: /Game with no RootFolder!"
         fi
         info=(); xml=(); continue
         ;;
@@ -463,7 +468,7 @@ function cycle-scaler {
 function set-conf {
   local conf="$1"; shift
   while [[ $1 ]]; do
-    >&2 echo "Updating $conf: $1=$2"
+    log "Updating $conf: $1=$2"
     sed -E -i "s,$1=.*,$1=$2," "$conf"
     shift 2
   done
@@ -493,7 +498,7 @@ function set-conf {
 function run-game {
   source $1
   local GameId="$(basename "$RootFolder")"
-  >&2 echo "Launching game: $GameId ($Title)"
+  log "Launching game: $GameId ($Title)"
   if [[ ! -d eXo/eXoDOS/$GameId ]]; then
     local ZipName="$(basename "${ApplicationPath%.bat}").zip"
     if [[ -f eXo/eXoDOS/$ZipName ]]; then
@@ -513,13 +518,13 @@ function run-game {
   # TODO: support for alternate config files, since some games have multiple
   # completely different dosbox configs rather than in-dosbox launch options
   local conf="$(fix-config "$RootFolder/dosbox.conf")"
-  >&2 echo "Temporary config written to $conf"
+  log "Temporary config written to $conf"
   (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf "$conf")
   rm "$conf"
   if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
     mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
   fi
-  >&2 echo "Game exited: $GameId"
+  log "Game exited: $GameId"
   if ((DO_SHARED)); then
     chmod -R g+w "eXo/eXoDOS/$GameId/"
   fi
@@ -551,16 +556,16 @@ function find-dosbox-version {
   # - if we don't even have dosbox-staging we try normal dosbox
   # variants actually used by eXoDOS are: plain, 0.73, SVN, SVN2, ECE, X, and FatmanTh.
   local variant="$(egrep -o '[^\\]+\\dosbox.exe' "$1" | head -n1 | cut -d/ -f1 | tr A-Z a-z)"
-  >&2 echo "Game wants dosbox variant: dosbox/$variant/dosbox.exe"
+  log "Game wants dosbox variant: dosbox/$variant/dosbox.exe"
   case "$variant" in
     *ece*) variant=dosbox-ece ;;
     *svn*) variant=dosbox-svn ;;
     x) variant=dosbox-x ;;
     *) variant=dosbox-staging ;;
   esac
-  >&2 echo "Our best guess at what we should run is: $variant"
+  log "Our best guess at what we should run is: $variant"
   variant="$(whence $variant || whence dosbox-staging || whence dosbox)"
-  >&2 echo "We will actually run: $variant"
+  log "We will actually run: $variant"
   echo "$variant"
 }
 
