@@ -366,7 +366,7 @@ function build-menudef {
     printf '%s "%s"\n' "$info" "$FullTitle" >> .menudef
     printf 'XXX\n%d\nBuilding index: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
   done | dialog --keep-tite --gauge "Building index..." 0 $((COLUMNS-4)) 0
-  sort -k2 .menudef -o .menudef # sort by title rather than gameid
+  sort -f -k2 .menudef -o .menudef # sort by title rather than gameid, ignoring case
   )
 }
 
