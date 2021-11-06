@@ -378,7 +378,42 @@ function dialog-ask {
 }
 
 function select-game {
-  dialog-ask --default-item "$gameid" --menu "Select a Game" -1 0 -1 --file "$1/.menudef"
+  local selected="$(dialog-ask --default-item "$gameid" --menu "Select a Game" -1 0 -1 \
+    /SRC "=== TITLE SEARCH ===" \
+    /FSR "=== FULL SEARCH ===" \
+    --file "$1/.menudef")"
+  case "$selected" in
+    /SRC)
+      selected="$(search-results "$(title-search)")"
+      [[ $selected ]] && echo "$selected" || select-game
+      ;;
+    /FSR)
+      selected="$(search-results "$(full-search)")"
+      [[ $selected ]] && echo "$selected" || select-game
+      ;;
+    *) echo "$selected"; return;;
+  esac
+}
+
+function search-results {
+  dialog-ask --menu "Select a Game" -1 0 -1 --file "$1"
+}
+
+function title-search {
+  local search="$(dialog-ask --inputbox 'Search game titles and IDs.' 0 0)"
+  if [[ ! $search ]]; then return; fi
+  cat "$cachedir/.menudef" | fgrep -i "$search" > "/tmp/$$.search"
+  echo "/tmp/$$.search"
+}
+
+function full-search {
+  local search="$(dialog-ask --inputbox 'Search all available game metadata, including description, publisher, rating, etc. This can be very slow, especially on a networked drive.' 0 0)"
+  if [[ ! $search ]]; then return; fi
+  (cd "$cachedir" && fgrep -irl "$search") \
+  | fgrep -v .menudef | sed -E 's,(.*),^\1 ,' \
+  | egrep -f - "$cachedir/.menudef" \
+  | tee "/tmp/$$.search" | progressbox "Searching for [$search]..."
+  echo "/tmp/$$.search"
 }
 
 # launch-game info-file
@@ -582,11 +617,15 @@ function find-dosbox-version {
 }
 
 function progressbox {
-  dialog --keep-tite --progressbox "$1" -1 -1
+  dialog --keep-tite --progressbox "$1" -1 -1 >/dev/tty
+}
+
+function cleanup {
+  rm -f /tmp/$$ /tmp/$$.search /tmp/$$.dialogrc
 }
 
 if [[ ! $DEBUG ]]; then
-  trap 'echo Something went wrong -- please report this as a bug, along with the log and a description of what you were doing.' EXIT
+  trap 'cleanup; echo Something went wrong -- please report this as a bug, along with the log and a description of what you were doing.' EXIT
   main "$@"
-  trap '' EXIT
+  trap 'cleanup' EXIT
 fi
