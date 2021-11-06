@@ -272,7 +272,7 @@ function xml-to-cachedir {
   mkdir -p "$1"
   cat "$2" \
   | dos2unix \
-  | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate /Game \
+  | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate ID /Game GameID Name /AdditionalApplication \
   | to-cachedir "$1" "$(fgrep '<Game>' $2 | wc -l)"
 }
 
@@ -288,6 +288,7 @@ function xml-stream {
     s,.*<([a-zA-Z0-9]+)>(.*)</.*>$,\1 \2,
     s,.*<(/?[a-zA-Z0-9]+)>$,\1,
     s,\\,/,g
+    s,&amp;,\&,g
   ' | egrep "^($(echo "$*" | tr ' ' '|'))"
 }
 
@@ -297,25 +298,42 @@ function to-cachedir {
   local cachedir="$1"
   local nrof_entries="$2"
   local n=0
-  local info=()
+  local -a info=()
+  local -A xml=()
+  rm -rf "$cachedir"
+  mkdir -p "$cachedir/by-uuid"
   while read key val; do
-    if [[ $key == RootFolder ]]; then
-      GameId="$(basename "$val")"
-    fi
-    if [[ $key == /Game ]]; then
-      if [[ $GameId ]]; then
-        printf '%s\n' "${info[@]}" > "$cachedir/$GameId"
-        printf 'XXX\n%d\nImporting game data: %s\n' "$((++n * 100 / nrof_entries))" "$GameId"
-        # echo "$((++n * 100 / nrof_entries))" # update gauge
-      else
-        >&2 echo "WARNING: /Game with no RootFolder!"
-      fi
-      info=""
-      GameId=""
-    else
-      info+=("$(printf "%s=%q" $key $val)")
-    fi
+    # printf "\n---kv---\n$key=$val\n" >> cache/xml.log
+    case "$key" in
+      /Game)
+        # printf '===write===\n%s\n' "${info[*]}" >> cache/xml.log
+        local GameDir="$(basename "${xml[RootFolder]}")"
+        if [[ $GameDir ]]; then
+          printf '%s\n' "${info[@]}" "AdditionalApplications=()" > "$cachedir/$GameDir"
+          if [[ ${xml[ID]} ]]; then ln -s "../$GameDir" "$cachedir/by-uuid/${xml[ID]}"; fi
+          printf 'XXX\n%d\nImporting game data: %s\n' "$((++n * 100 / nrof_entries))" "$GameDir"
+        else
+          >&2 echo "WARNING: /Game with no RootFolder!"
+        fi
+        info=(); xml=(); continue
+        ;;
+      /AdditionalApplication)
+        if [[ ${xml[ApplicationPath]} != *.bat && ${xml[ApplicationPath]} != *.exe ]]; then
+          printf 'AdditionalApplications+=(%q %q)\n' "${xml[Name]}" "${xml[ApplicationPath]}" \
+            >> "$cachedir/by-uuid/${xml[GameID]}"
+          printf 'XXX\n%d\nImporting game data: Extras\n' 100
+        fi
+        info=(); xml=(); continue
+        ;;
+      RootFolder) GameDir="$(basename "$val")" ;;
+      GameID) GameID="$val" ;;
+      ID) ID="$val" ;;
+    esac
+    info+=("$(printf "%s=%q" "$key" "$val")")
+    xml[$key]="$val"
+    # printf '###info###\n%s\n' "${info[*]}" >> cache/xml.log
   done | dialog --keep-tite --gauge "Importing game data..." 0 $((COLUMNS-4)) 0
+  rm -rf "$cachedir/by-uuid" | dialog --keep-tite --gauge "Importing game data: cleaning up" 0 $((COLUMNS-4)) 100
   build-menudef "$cachedir"
 }
 
@@ -325,7 +343,7 @@ function build-menudef {
   rm -f .menudef
   local nrof_entries="$(ls | wc -l)"
   for info in *; do
-    source "$info"
+    source "./$info"
     FullTitle="$Title (${ReleaseDate%%-*})"
     printf "%s=%q\n" FullTitle "$FullTitle" >> "$info"
     # We can't use %q here because dialog(1) requires all arguments with whitespace
@@ -363,6 +381,10 @@ function launch-game {
       MODE) cycle-screen-mode "$1";;
       ASPC) cycle-aspect-correction "$1";;
       SCLR) cycle-scaler "$1";;
+      EXT*)
+        local n="$(( ${action#EXT} * 2 + 1 ))"
+        xdg-open "${AdditionalApplications[$n]}"
+        ;;
       *) return 0 ;;
     esac
   done
@@ -373,6 +395,9 @@ function launch-game-menu {
   if [[ $ManualPath ]]; then
     args+=(DOCS "View game manual")
   fi
+  for i in $(seq 0 2 "$(( ${#AdditionalApplications[@]} - 1 ))"); do
+    args+=("EXT$((i/2))" "${AdditionalApplications[$i]}")
+  done
   args+=(
     MODE "Change screen mode [currently: $(get-screen-mode $conf)]"
     ASPC "Toggle aspect correction [currently: $(get-aspect-correction $conf)]"
