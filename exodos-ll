@@ -386,11 +386,11 @@ function select-game {
   case "$selected" in
     /SRC)
       selected="$(search-results "$(title-search)")"
-      [[ $selected ]] && echo "$selected" || select-game
+      [[ $selected ]] && echo "$selected" || select-game "$1"
       ;;
     /FSR)
       selected="$(search-results "$(full-search)")"
-      [[ $selected ]] && echo "$selected" || select-game
+      [[ $selected ]] && echo "$selected" || select-game "$1"
       ;;
     *) echo "$selected"; return;;
   esac
