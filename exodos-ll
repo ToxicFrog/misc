@@ -396,25 +396,40 @@ function select-game {
   esac
 }
 
+# HACK HACK HACK
+# title-search/full-search emit <resultsfile>:<originalsearch>, which is passed here
+# as $1 and needs to be split
 function search-results {
-  dialog-ask --menu "Select a Game" -1 0 -1 --file "$1"
+  local results="${1%:*}"
+  local search="${1#*:}"
+  dialog-ask --menu "Search results for [$search]" -1 0 -1 --file "$results"
 }
 
 function title-search {
-  local search="$(dialog-ask --inputbox 'Search game titles and IDs.' 0 0)"
+  local grep=fgrep
+  local search="$(dialog-ask --inputbox 'Search game titles and IDs. Use a leading / to do a regex search.' 0 0)"
   if [[ ! $search ]]; then return; fi
-  cat "$cachedir/.menudef" | fgrep -i "$search" > "/tmp/$$.search"
-  echo "/tmp/$$.search"
+  if [[ $search == /* ]]; then
+    grep=egrep
+    search="${search#/}"
+  fi
+  cat "$cachedir/.menudef" | $grep -i "$search" > "/tmp/$$.search"
+  echo "/tmp/$$.search:$search"
 }
 
 function full-search {
-  local search="$(dialog-ask --inputbox 'Search all available game metadata, including description, publisher, rating, etc. This can be very slow, especially on a networked drive.' 0 0)"
+  local grep=fgrep
+  local search="$(dialog-ask --inputbox 'Search all available game metadata, including description, publisher, rating, etc. Use a leading / to do a regex search. Warning: this can be very slow on a networked drive!' 0 0)"
   if [[ ! $search ]]; then return; fi
-  (cd "$cachedir" && fgrep -irl "$search") \
+  if [[ $search == /* ]]; then
+    grep=egrep
+    search="${search#/}"
+  fi
+  (cd "$cachedir" && $grep -irl "$search") \
   | fgrep -v .menudef | sed -E 's,(.*),^\1 ,' \
   | egrep -f - "$cachedir/.menudef" \
   | tee "/tmp/$$.search" | progressbox "Searching for [$search]..."
-  echo "/tmp/$$.search"
+  echo "/tmp/$$.search:$search"
 }
 
 # launch-game info-file
