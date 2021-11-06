@@ -277,7 +277,7 @@ function xml-to-cachedir {
   mkdir -p "$1"
   cat "$2" \
   | dos2unix \
-  | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate ID /Game GameID Name /AdditionalApplication \
+  | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate ID Notes /Game GameID Name /AdditionalApplication \
   | to-cachedir "$1" "$(fgrep '<Game>' $2 | wc -l)"
 }
 
@@ -289,9 +289,19 @@ function xml-stream {
   # TODO: scan for <AdditionalApplication> blocks and match them up with their
   # corresponding games, so we can display those in the launcher too
   sed -E '
+    # trim empty tags like <foo />
     /.*<[a-zA-Z0-9]+ \/>$/ d
+    # handle multiline entries by stuffing them into the hold buffer
+    # we cat them together, then turn newlines into <br> so they make it out the
+    # other end intact and turn them back into newlines at display time
+    / *<([a-zA-Z0-9]+)>([^<]+)$/ { s,.*<([a-zA-Z0-9]+)>(.*),\1 \2,; h; d }
+    /^[^<]+$/ { H; d; }
+    /^[^<]+[^ ]<\/.*>$/ { H; g; s,</.*>$,,; s,\n,<br>,g; }
+    # turn <foo>bar</foo> into: foo bar
     s,.*<([a-zA-Z0-9]+)>(.*)</.*>$,\1 \2,
-    s,.*<(/?[a-zA-Z0-9]+)>$,\1,
+    # turn <foo> and </foo> by themselves into foo and /foo
+    s, *<(/?[a-zA-Z0-9]+)>$,\1,
+    # turn \ into / and &amp; into &
     s,\\,/,g
     s,&amp;,\&,g
   ' | egrep "^($(echo "$*" | tr ' ' '|'))"
@@ -326,7 +336,7 @@ function to-cachedir {
         if [[ ${xml[ApplicationPath]} != *.bat && ${xml[ApplicationPath]} != *.exe ]]; then
           printf 'AdditionalApplications+=(%q %q)\n' "${xml[Name]}" "${xml[ApplicationPath]}" \
             >> "$cachedir/by-uuid/${xml[GameID]}"
-          printf 'XXX\n%d\nImporting game data: Extras\n' 100
+          printf 'XXX\n%d\nImporting game data: Extras (%d)\n' 100 "$((++n))"
         fi
         info=(); xml=(); continue
         ;;
@@ -354,8 +364,8 @@ function build-menudef {
     # We can't use %q here because dialog(1) requires all arguments with whitespace
     # to be enclosed in double quotes.
     printf '%s "%s"\n' "$info" "$FullTitle" >> .menudef
-    printf 'XXX\n%d\nBuilding menu definitions: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
-  done | dialog --keep-tite --gauge "Building menu definitions..." 0 $((COLUMNS-4)) 0
+    printf 'XXX\n%d\nBuilding index: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
+  done | dialog --keep-tite --gauge "Building index..." 0 $((COLUMNS-4)) 0
   sort -k2 .menudef -o .menudef # sort by title rather than gameid
   )
 }
@@ -397,6 +407,7 @@ function launch-game {
 
 function launch-game-menu {
   local args=(PLAY "Run game")
+  local info="$(echo "${FullTitle}<br><br>${Notes}" | sed -E 's,<br>,\n,g' | head -n24)"
   if [[ $ManualPath ]]; then
     args+=(DOCS "View game manual")
   fi
@@ -408,7 +419,7 @@ function launch-game-menu {
     ASPC "Toggle aspect correction [currently: $(get-aspect-correction $conf)]"
     SCLR "Change scaler [currently: $(get-scaler $conf)]"
   )
-  dialog-ask --default-item "$defaultitem" --menu "$FullTitle" 0 0 0 "${args[@]}"
+  dialog-ask --default-item "$defaultitem" --menu "$info" 0 0 "$(( ${#args[@]}/2 ))" "${args[@]}"
 }
 
 # TODO: this whole configuration mess could probably use refactoring to be more general
