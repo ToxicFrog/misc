@@ -398,7 +398,7 @@ function launch-game {
       SCLR) cycle-scaler "$1";;
       EXT*)
         local n="$(( ${action#EXT} * 2 + 1 ))"
-        xdg-open "${AdditionalApplications[$n]}"
+        xdg-open "${AdditionalApplications[$n]}" >/dev/null 2>&1
         ;;
       *) return 0 ;;
     esac
