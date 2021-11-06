@@ -407,7 +407,7 @@ function launch-game {
 
 function launch-game-menu {
   local args=(PLAY "Run game")
-  local info="$(echo "${FullTitle}<br><br>${Notes}" | sed -E 's,<br>,\n,g' | head -n24)"
+  local info="$(echo "${FullTitle}<br>${Notes}" | sed -E 's,<br>,\n\n,g' | head -n24)"
   if [[ $ManualPath ]]; then
     args+=(DOCS "View game manual")
   fi
