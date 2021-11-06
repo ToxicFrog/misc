@@ -285,9 +285,6 @@ function xml-to-cachedir {
 # returns a line-oriented stream of xml data of the given keys
 # fragile!
 function xml-stream {
-  # TODO: extract the <Notes> field as well; this can be multiline, so it's harder
-  # TODO: scan for <AdditionalApplication> blocks and match them up with their
-  # corresponding games, so we can display those in the launcher too
   sed -E '
     # trim empty tags like <foo />
     /.*<[a-zA-Z0-9]+ \/>$/ d
@@ -366,7 +363,11 @@ function build-menudef {
     printf '%s "%s"\n' "$info" "$FullTitle" >> .menudef
     printf 'XXX\n%d\nBuilding index: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
   done | dialog --keep-tite --gauge "Building index..." 0 $((COLUMNS-4)) 0
-  sort -f -k2 .menudef -o .menudef # sort by title rather than gameid, ignoring case
+  # sort by title rather than gameid; -f ignores case, and the LC_ALL setting
+  # is needed to turn off unicode collation, which otherwise gives us some
+  # surprising results, like games starting with "Ultimate" sorting in the
+  # *middle* of the Ultima series.
+  LC_ALL=C sort -f -k2 .menudef -o .menudef
   )
 }
 
