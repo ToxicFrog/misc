@@ -278,7 +278,7 @@ function xml-to-cachedir {
   cat "$2" \
   | dos2unix \
   | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate ID Notes /Game GameID Name /AdditionalApplication \
-  | to-cachedir "$1" "$(fgrep '<Game>' $2 | wc -l)"
+  | to-cachedir "$1" "$(egrep '<Game>|<AdditionalApplication>' $2 | wc -l)"
 }
 
 # xml-stream keys
@@ -315,10 +315,8 @@ function to-cachedir {
   rm -rf "$cachedir"
   mkdir -p "$cachedir/by-uuid"
   while read key val; do
-    # printf "\n---kv---\n$key=$val\n" >> cache/xml.log
     case "$key" in
       /Game)
-        # printf '===write===\n%s\n' "${info[*]}" >> cache/xml.log
         local GameDir="$(basename "${xml[RootFolder]}")"
         if [[ $GameDir ]]; then
           printf '%s\n' "${info[@]}" "AdditionalApplications=()" > "$cachedir/$GameDir"
@@ -333,17 +331,20 @@ function to-cachedir {
         if [[ ${xml[ApplicationPath]} != *.bat && ${xml[ApplicationPath]} != *.exe ]]; then
           printf 'AdditionalApplications+=(%q %q)\n' "${xml[Name]}" "${xml[ApplicationPath]}" \
             >> "$cachedir/by-uuid/${xml[GameID]}"
-          printf 'XXX\n%d\nImporting game data: Extras (%d)\n' 100 "$((++n))"
+          printf 'XXX\n%d\nImporting game data: Extras\n' "$((n * 100 / nrof_entries))"
         fi
+        ((++n))
         info=(); xml=(); continue
         ;;
       RootFolder) GameDir="$(basename "$val")" ;;
       GameID) GameID="$val" ;;
       ID) ID="$val" ;;
     esac
+    # TODO the use of %q here means that entries are difficult to search for,
+    # since full search works by grepping the file rather than loading it into
+    # bash and searching the results
     info+=("$(printf "%s=%q" "$key" "$val")")
     xml[$key]="$val"
-    # printf '###info###\n%s\n' "${info[*]}" >> cache/xml.log
   done | dialog --keep-tite --gauge "Importing game data..." 0 $((COLUMNS-4)) 0
   rm -rf "$cachedir/by-uuid" | dialog --keep-tite --gauge "Importing game data: cleaning up" 0 $((COLUMNS-4)) 100
   build-menudef "$cachedir"
