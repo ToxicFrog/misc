@@ -71,7 +71,7 @@ function main {
   fi
 
   while true; do
-    gameid="$(select-game "$cachedir")"
+    local gameid="$(select-game "$cachedir")"
     [[ $gameid ]] || break
     launch-game "$cachedir/$gameid" || true
   done
@@ -134,7 +134,7 @@ Flags:
                multiple users share the same eXoDOS install (for example, on a
                network drive) as long as they aren't both trying to play the
                same games at once. Note that with or without this, installed
-               games (and thus settings and save files) are still stored in the
+               games (and thus settings and save files) are always stored in the
                eXoDOS directory; all this changes is how the file permissions
                are set.
        --help  This text.
@@ -377,7 +377,7 @@ function dialog-ask {
 }
 
 function select-game {
-  dialog-ask --menu "Select a Game" -1 0 -1 --file "$1/.menudef"
+  dialog-ask --default-item "$gameid" --menu "Select a Game" -1 0 -1 --file "$1/.menudef"
 }
 
 # launch-game info-file
