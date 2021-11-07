@@ -242,6 +242,9 @@ function setup-exodos-linuxonly {
   setup-exodos-defaults
 }
 
+# TODO: instead of asking a bunch of yes or no questions, give them a config
+# menu like the game configurator, then apply those settings to the whole
+# game collection
 function setup-exodos-defaults {
   local sed=''
   case "$(dialog-ask --menu "What do you want your default video mode to be?" 0 -1 3 \
@@ -395,11 +398,11 @@ function select-game {
   case "$selected" in
     /:search)
       selected="$(search-results "$(title-search)")"
-      [[ $selected ]] && echo "$selected" || select-game "$1"
+      [[ $selected ]] && echo "${selected#?:}" || select-game "$1"
       ;;
     /:fsearch)
       selected="$(search-results "$(full-search)")"
-      [[ $selected ]] && echo "$selected" || select-game "$1"
+      [[ $selected ]] && echo "${selected#?:}" || select-game "$1"
       ;;
     *) echo "${selected#?:}"; return;;
   esac
