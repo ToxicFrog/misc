@@ -23,12 +23,17 @@ function log {
   >&2 echo "$@"
 }
 
+function die {
+  trap 'cleanup' EXIT
+  exit "$1"
+}
+
 function main {
   set -e
   parse-argv "$@"
 
-  require dialog dos2unix sed egrep fgrep unzip || exit 1
-  suggest dosbox dosbox-staging dosbox-ece dosbox-svn
+  require dialog dos2unix sed egrep fgrep unzip || die 1
+  suggest dosbox dosbox-staging dosbox-ece dosbox-svn || die 1
 
   cd "$(dirname "$0")"
   export DIALOGRC="$(init-dialogrc)"
@@ -62,12 +67,12 @@ function main {
 
   if [[ $DO_PLAY ]]; then
     run-game "$cachedir/$DO_PLAY"
-    exit $?
+    return
   fi
 
   if [[ $DO_GAME ]]; then
     launch-game "$cachedir/$DO_GAME" || true
-    exit $?
+    return
   fi
 
   while true; do
@@ -75,8 +80,6 @@ function main {
     [[ $gameid ]] || break
     launch-game "$cachedir/$gameid" || true
   done
-
-  rm "$DIALOGRC"
 }
 
 DO_SETUP=0
@@ -88,14 +91,14 @@ DO_SHARED=0
 function parse-argv {
   while [[ $1 ]]; do
     case "$1" in
-      --help) help; exit 0;;
+      --help) help; die 0;;
       --setup) DO_SETUP=1; DO_CONFIG=1; shift;;
       --config) DO_CONFIG=1; shift;;
       --xml) DO_XML="${2:?--xml requires an argument}"; shift 2;;
       --game) DO_GAME="${2:?--game requires an argument}"; shift 2;;
       --play) DO_PLAY="${2:?--play requires an argument}"; shift 2;;
       --shared) DO_SHARED=1; shift;;
-      *) help; exit 1;;
+      *) help; die 1;;
     esac
   done
 }
@@ -171,7 +174,7 @@ function suggest {
   if !((passed)); then
     log "You have no dosbox variants installed. I looked for:$failed"
     log "You need at least 'dosbox' or 'dosbox-staging' installed, although having all of these is recommended for full functionality."
-    exit 1
+    return 1
   fi
   if [[ $failed ]]; then
     log "You are missing the following dosbox variants:$failed"
@@ -282,7 +285,7 @@ function xml-to-cachedir {
   echo "Gamedata cache for $2 doesn't exist, creating it..."
   if [[ ! -f $2 ]]; then
     log "Error: couldn't find XML gamelist file $2, giving up."
-    exit 1
+    die 1
   fi
   rm -rf "$1"
   mkdir -p "$1"
@@ -491,6 +494,8 @@ function launch-game-menu {
     args+=("EXT$((i/2))" "${AdditionalApplications[$i]}")
   done
   args+=(
+    # TODO: support for mouse sensitivity tweaks, since the mouse is way too
+    # twitchy in some games like Island of Doctor Brain
     MODE "Change screen mode [currently: $(get-screen-mode $conf)]"
     ASPC "Toggle aspect correction [currently: $(get-aspect-correction $conf)]"
     SCLR "Change scaler [currently: $(get-scaler $conf)]"
@@ -582,6 +587,7 @@ function set-conf {
 #   writes that information to $GAMEINSTALLDIR/ExtIP2.txt
 # - a few have special launch options, e.g. After Burner prompts if you want IBM or
 #   TANDY mode and picks a different config file depending
+# TODO: a bunch of this needs to be changed for eXoWin3x support
 function run-game {
   source $1
   local GameId="$(basename "$RootFolder")"
@@ -591,6 +597,7 @@ function run-game {
     if [[ -f eXo/eXoDOS/$ZipName ]]; then
       unzip -d eXo/eXoDOS "eXo/eXoDOS/$ZipName" | progressbox "Installing $Title from $ZipName..."
     else
+      # TODO: download on demand support
       dialog --keep-tite --msgbox "$Title is not installed, and I couldn't find the zip file ($ZipName) to install it from." 0 0
       return 1
     fi
