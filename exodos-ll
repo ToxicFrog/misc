@@ -411,6 +411,10 @@ function select-game {
 function search-results {
   local results="${1%:*}"
   local search="${1#*:}"
+  if [[ $(cat "$results" | wc -l) == 0 ]]; then
+    dialog-ask --msgbox "No results for [$search], sorry." 0 0
+    return 0
+  fi
   dialog-ask --menu "Search results for [$search]" -1 0 -1 --file "$results"
 }
 
