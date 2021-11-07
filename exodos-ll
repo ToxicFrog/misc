@@ -334,8 +334,9 @@ function to-cachedir {
         if [[ ${xml[ApplicationPath]} != *.bat && ${xml[ApplicationPath]} != *.exe ]]; then
           printf 'AdditionalApplications+=(%q %q)\n' "${xml[Name]}" "${xml[ApplicationPath]}" \
             >> "$cachedir/by-uuid/${xml[GameID]}"
-          printf 'XXX\n%d\nImporting game data: Extras\n' "$((++nextras * 100 / nrof_extras))"
+          printf 'XXX\n%d\nImporting game data: Extras\n' "$((nextras * 100 / nrof_extras))"
         fi
+        ((++nextras))
         info=(); xml=(); continue
         ;;
       RootFolder) GameDir="$(basename "$val")" ;;
