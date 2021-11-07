@@ -27,8 +27,8 @@ function main {
   set -e
   parse-argv "$@"
 
-  require dialog dosbox dos2unix sed egrep fgrep unzip || exit 1
-  suggest dosbox-staging dosbox-ece dosbox-svn
+  require dialog dos2unix sed egrep fgrep unzip || exit 1
+  suggest dosbox dosbox-staging dosbox-ece dosbox-svn
 
   cd "$(dirname "$0")"
   export DIALOGRC="$(init-dialogrc)"
@@ -159,12 +159,20 @@ function require {
 
 function suggest {
   local failed=""
+  local passed=0
   while [[ $1 ]]; do
     if ! whence "$1" >/dev/null; then
       failed="$failed $1"
+    else
+      passed=1
     fi
     shift
   done
+  if !((passed)); then
+    log "You have no dosbox variants installed. I looked for:$failed"
+    log "You need at least 'dosbox' or 'dosbox-staging' installed, although having all of these is recommended for full functionality."
+    exit 1
+  fi
   if [[ $failed ]]; then
     log "You are missing the following dosbox variants:$failed"
     log "The script will work without them, but you are likely to run into more malfunctioning games than you would otherwise."
