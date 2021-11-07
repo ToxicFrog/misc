@@ -277,8 +277,10 @@ function xml-to-cachedir {
   mkdir -p "$1"
   cat "$2" \
   | dos2unix \
-  | xml-stream ApplicationPath ManualPath RootFolder Title ReleaseDate ID Notes /Game GameID Name /AdditionalApplication \
-  | to-cachedir "$1" "$(egrep '<Game>|<AdditionalApplication>' $2 | wc -l)"
+  | xml-stream \
+      ApplicationPath ManualPath RootFolder Title ReleaseDate ID Notes Publisher Developer Genre /Game \
+      GameID Name /AdditionalApplication \
+  | to-cachedir "$1" "$(fgrep '<Game>' $2 | wc -l)" "$(fgrep '<AdditionalApplication>' $2 | wc -l)"
 }
 
 # xml-stream keys
@@ -308,8 +310,9 @@ function xml-stream {
 # reads an xml-stream and writes a cachedir entry for each /Game
 function to-cachedir {
   local cachedir="$1"
-  local nrof_entries="$2"
-  local n=0
+  local nrof_games="$2"
+  local nrof_extras="$3"
+  local ngames=0; local nextras=0;
   local -a info=()
   local -A xml=()
   rm -rf "$cachedir"
@@ -321,7 +324,7 @@ function to-cachedir {
         if [[ $GameDir ]]; then
           printf '%s\n' "${info[@]}" "AdditionalApplications=()" > "$cachedir/$GameDir"
           if [[ ${xml[ID]} ]]; then ln -s "../$GameDir" "$cachedir/by-uuid/${xml[ID]}"; fi
-          printf 'XXX\n%d\nImporting game data: %s\n' "$((++n * 100 / nrof_entries))" "$GameDir"
+          printf 'XXX\n%d\nImporting game data: %s\n' "$((++ngames * 100 / nrof_games))" "$GameDir"
         else
           log "WARNING: /Game with no RootFolder!"
         fi
@@ -331,19 +334,23 @@ function to-cachedir {
         if [[ ${xml[ApplicationPath]} != *.bat && ${xml[ApplicationPath]} != *.exe ]]; then
           printf 'AdditionalApplications+=(%q %q)\n' "${xml[Name]}" "${xml[ApplicationPath]}" \
             >> "$cachedir/by-uuid/${xml[GameID]}"
-          printf 'XXX\n%d\nImporting game data: Extras\n' "$((n * 100 / nrof_entries))"
+          printf 'XXX\n%d\nImporting game data: Extras\n' "$((++nextras * 100 / nrof_extras))"
         fi
-        ((++n))
         info=(); xml=(); continue
         ;;
       RootFolder) GameDir="$(basename "$val")" ;;
       GameID) GameID="$val" ;;
       ID) ID="$val" ;;
     esac
-    # TODO the use of %q here means that entries are difficult to search for,
-    # since full search works by grepping the file rather than loading it into
-    # bash and searching the results
-    info+=("$(printf "%s=%q" "$key" "$val")")
+    # This is gross, but necessary.
+    # We emit the info file as a series of key='value' lines so that it can be
+    # read back in by the shell. We could use ", but then we need to be a lot
+    # more careful about what we escape. But some games have ' in the title or
+    # description, so we need to escape ' in the value. But bash, unlike zsh,
+    # doesn't have a convenient syntax for that, so we need to terminate the
+    # string, insert a literal singlequote, then resume the string, turning
+    # ' into '\''.
+    info+=("$(printf "%s='%s'" "$key" "${val//\'/\'\\\'\'}")")
     xml[$key]="$val"
   done | dialog --keep-tite --gauge "Importing game data..." 0 $((COLUMNS-4)) 0
   rm -rf "$cachedir/by-uuid" | dialog --keep-tite --gauge "Importing game data: cleaning up" 0 $((COLUMNS-4)) 100
