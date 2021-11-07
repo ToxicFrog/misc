@@ -369,7 +369,8 @@ function build-menudef {
     printf "%s=%q\n" FullTitle "$FullTitle" >> "$info"
     # We can't use %q here because dialog(1) requires all arguments with whitespace
     # to be enclosed in double quotes.
-    printf '%s "%s"\n' "$info" "$FullTitle" >> .menudef
+    local prefix="$(echo "${FullTitle:0:1}" | tr A-Z a-z)"
+    printf '%s:%s "%s"\n' "$prefix" "$info" "$FullTitle" >> .menudef
     printf 'XXX\n%d\nBuilding index: %s\n' "$((++n * 100 / nrof_entries))" "$FullTitle"
   done | dialog --keep-tite --gauge "Building index..." 0 $((COLUMNS-4)) 0
   # sort by title rather than gameid; -f ignores case, and the LC_ALL setting
@@ -388,19 +389,19 @@ function dialog-ask {
 
 function select-game {
   local selected="$(dialog-ask --default-item "$gameid" --menu "Select a Game" -1 0 -1 \
-    /SRC "=== TITLE SEARCH ===" \
-    /FSR "=== FULL SEARCH ===" \
+    /:search "=== TITLE SEARCH ===" \
+    /:fsearch "=== FULL SEARCH ===" \
     --file "$1/.menudef")"
   case "$selected" in
-    /SRC)
+    /:search)
       selected="$(search-results "$(title-search)")"
       [[ $selected ]] && echo "$selected" || select-game "$1"
       ;;
-    /FSR)
+    /:fsearch)
       selected="$(search-results "$(full-search)")"
       [[ $selected ]] && echo "$selected" || select-game "$1"
       ;;
-    *) echo "$selected"; return;;
+    *) echo "${selected#?:}"; return;;
   esac
 }
 
@@ -434,7 +435,7 @@ function full-search {
     search="${search#/}"
   fi
   (cd "$cachedir" && $grep -irl "$search") \
-  | fgrep -v .menudef | sed -E 's,(.*),^\1 ,' \
+  | fgrep -v .menudef | sed -E 's,(.*),^.:\1 ,' \
   | egrep -f - "$cachedir/.menudef" \
   | tee "/tmp/$$.search" | progressbox "Searching for [$search]..."
   echo "/tmp/$$.search:$search"
