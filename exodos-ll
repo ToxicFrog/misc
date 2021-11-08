@@ -38,31 +38,28 @@ function main {
   cd "$(dirname "$0")"
   export DIALOGRC="$(init-dialogrc)"
 
-  if [[ ! -d 'eXo/eXoDOS/!dos' ]] || ((DO_SETUP)); then
-    case "$(dialog-ask --menu "It looks like eXoDOS hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
-          0 0 2 \
-          ALL "Unpack all the files for Windows+Linux support" \
-          LIN "Only unpack the files needed to run on Linux")"
-    in
-      ALL) setup-exodos ;;
-      LIN) setup-exodos-linuxonly ;;
-      *)
-        >&2 echo "eXoDOS not installed, exiting."
-        exit 0
-        ;;
-    esac
+  local installed=0
+  if check-exodos; then ((++installed)); fi
+  if check-exowin3x; then ((++installed)); fi
+  if ! ((installed)); then
+    log "Neither eXoDOS nor eXoWin3x are installed, and I can't find the files to install them from."
+    die 1
   fi
+
   if ((DO_CONFIG)); then
     setup-exodos-defaults
   fi
 
+  # TODO: support for multiple XML files, so we can load the exodos and exowin
+  # indexes at the same time.
   log "Loading game data from $DO_XML..."
   local cachedir="cache/$(basename "$DO_XML")"
   xml-to-cachedir "$cachedir" "$DO_XML"
 
   if ((DO_SHARED)); then
     chmod ug+w cache
-    chmod ug+w eXo/eXoDOS
+    [[ -d eXo/eXoDOS ]] && chmod ug+w eXo/eXoDOS || true
+    [[ -d eXo/eXoWin3x ]] && chmod ug+w eXo/eXoWin3x || true
   fi
 
   if [[ $DO_PLAY ]]; then
@@ -216,9 +213,53 @@ EOF
   echo "/tmp/$$.dialogrc"
 }
 
+function check-exodos {
+  check-installed eXoDOS 'eXo/eXoDOS/!dos' \
+    Content/XODOSMetadata.zip Content/'!DOSmetadata.zip'
+}
+
+function check-exowin3x {
+  check-installed eXoWin3x 'eXo/eXoWin3x/!win3x' \
+    Content/XOWin3xMetadata.zip Content/'!Win3Xmetadata.zip'
+}
+
+# check-installed name dir
+# check if the given eXo library is installed. Returns 0 if it's installed, or
+# if it wasn't installed but the user opted to install it; returns 1 if it's
+# not installed and installation was not possible or was rejected.
+function check-installed {
+  local name="$1"
+  local dir="$2"
+  log "Checking for $name at $dir..."
+  if [[ -d "$dir" ]] && ! ((DO_SETUP)); then
+    # Already installed and the user didn't pass in --setup, so we're good to go.
+    return 0
+  fi
+
+  shift 2
+  while [[ $1 ]]; do
+    if ! [[ -f "$1" ]]; then
+      log "Missing file needed to install $name: $1"
+      return 1
+    fi
+    shift
+  done
+
+  case "$(dialog-ask --menu "It looks like $name is present, but hasn't been unpacked yet. You have a choice of unpacking just the files needed for exodos-ll, which is faster and takes up less disk space, or all the files, which will make it usable on windows as well. Use 'all the files' if this install is on a network mount or portable drive used by both Windows and Linux systems." \
+        0 0 2 \
+        ALL "Unpack all the files for Windows+Linux support" \
+        LIN "Only unpack the files needed to run on Linux")"
+  in
+    ALL) setup-${name} ;;
+    LIN) setup-${name}-linuxonly ;;
+    *)
+      return 1 ;;
+  esac
+}
+
 # This replicates the behaviour of setup.bat and should be run from the same directory
 # The goal is to produce an eXoDOS setup that works in both linux and windows
-function setup-exodos {
+function setup-eXoDOS {
   unzip -o Content/LaunchBox.zip | progressbox "eXoDOS setup: unpacking LaunchBox..."
   unzip -o Content/XODOSMetadata.zip | progressbox "eXoDOS setup: unpacking LaunchBox configuration..."
   unzip -o Content/Magazines.zip -d eXo/ | progressbox "eXoDOS setup: unpacking magazines..."
@@ -228,34 +269,72 @@ function setup-exodos {
     rm -rf DataCache.txt dosbox scummvm Update
     unzip -o -d util/ util/util.zip
     for zip in mt32 SHADERS scummvm dosbox Update; do
-      unzip -o "util/${zip}.zip"
+      if [[ ! -d "$zip" ]]; then unzip -o "util/${zip}.zip"; fi
     done
     [[ -f util/aria.zip ]] && unzip -o -d util/ util/aria.zip
     unzip -o -d util/ util/GBC.zip
   ) | progressbox "eXoDOS setup: unpacking support programs and extras..."
 
-  if dialog-ask --yesno "Include 'adult' (erotic or pornographic) games in the index? Note: this does not filter out violent games." 0 0; then
+  if dialog-ask --yesno "Include 'adult' (erotic or pornographic) games in the index used on windows? Note: this does not filter out violent games." 0 0; then
     cp xml/MS-DOS.xml Data/Platforms/MS-DOS.xml
   else
     cp xml/DOSFAMILY.xml Data/Platforms/MS-DOS.xml
   fi
   cp xml/Playlists/* Data/Playlists/
+
   find . \( -iname '*.exe' -or -iname '*.dll' -or -iname '*.bat' \) \
     \( -print -and -exec chmod a+x '{}' '+' \) \
   | progressbox "Fixing permissions..."
 
-  setup-exodos-defaults
+  DO_CONFIG=1
 }
 
-function setup-exodos-linuxonly {
+function setup-eXoWin3x {
+  unzip -o Content/LaunchBox.zip | progressbox "eXoWin3x setup: unpacking LaunchBox..."
+  unzip -o Content/XOWin3xMetadata.zip | progressbox "eXoWin3x setup: unpacking LaunchBox configuration..."
+  unzip -o Content/'!Win3Xmetadata.zip' | progressbox "eXoWin3x setup: unpacking game configurations..."
+  (
+    cd eXo
+    # exowin config files can't decide if it's "eXoWin3X" or "eXoWin3x"; zip file
+    # uses the lower-case x
+    ln -s eXoWin3x eXoWin3X
+    unzip -o -d util/ util/util3x.zip
+    for zip in mt32 SHADERS dosbox; do
+      if [[ ! -d "$zip" ]]; then unzip -o "util/${zip}.zip"; fi
+    done
+  ) | progressbox "eXoDOS setup: unpacking support programs and extras..."
+
+  if dialog-ask --yesno "Include 'adult' (erotic or pornographic) games in the index used on windows? Note: this does not filter out violent games." 0 0; then
+    cp "xml/Windows 3x.xml" "Data/Platforms/Windows 3x.xml"
+  else
+    cp xml/WinFAMILY.xml "Data/Platforms/Windows 3x.xml"
+  fi
+  cp xml/Playlists/* Data/Playlists/
+
+  find . \( -iname '*.exe' -or -iname '*.dll' -or -iname '*.bat' \) \
+    \( -print -and -exec chmod a+x '{}' '+' \) \
+  | progressbox "Fixing permissions..."
+
+  DO_CONFIG=1
+}
+
+function setup-eXoDOS-linuxonly {
   unzip -o Content/XODOSMetadata.zip 'xml/*' 'Manuals/*' | progressbox 'eXoDOS setup: unpacking game info...'
   unzip -o Content/'!DOSmetadata.zip' | progressbox "eXoDOS setup: unpacking game configurations..."
-  setup-exodos-defaults
+  DO_CONFIG=1
+}
+
+function setup-eXoWin3x-linuxonly {
+  unzip -o Content/XOWin3xMetadata.zip 'xml/*' 'Manuals/*' | progressbox 'eXoWin3x setup: unpacking game info...'
+  unzip -o Content/'!Win3Xmetadata.zip' | progressbox "eXoWin3X setup: unpacking game configurations..."
+  DO_CONFIG=1
 }
 
 # TODO: instead of asking a bunch of yes or no questions, give them a config
 # menu like the game configurator, then apply those settings to the whole
 # game collection
+# TODO: support for eXoWin3x as well; exowin supports more resolutions and we
+# need to handle them appropriately
 function setup-exodos-defaults {
   local sed=''
   case "$(dialog-ask --menu "What do you want your default video mode to be?" 0 -1 3 \
@@ -264,14 +343,15 @@ function setup-exodos-defaults {
     FULL) sed+="s,fullscreen=false,fullscreen=true,;" ;;
     BIG) set+="s,fullscreen=true,fullscreen=false;s,windowresolution=.*,windowresolution=1280x960,;" ;;
     SMALL) set+="s,fullscreen=true,fullscreen=false;s,windowresolution=.*,windowresolution=640x480,;" ;;
-    *) exit 1 ;;
+    *) return ;; # they can skip it if they want and just use the baked-in defaults
   esac
   if dialog-ask --yesno "Enable aspect correction?" 0 0; then
-    sed+="s,aspect=false,aspect=true,;s,output=surface,output=overlay,;"
+    sed+="s,aspect=false,aspect=true,;s,output=surface,output=opengl,;"
   else
-    sed+="s,aspect=true,aspect=false,;s,output=overlay,output=surface,;"
+    sed+="s,aspect=true,aspect=false,;"
   fi
-  find 'eXo/eXoDOS/!dos' -name '*.conf' \( -print -and -exec sed -E -i -s "$sed" '{}' '+' \) \
+  find 'eXo/eXoDOS/!dos' 'eXo/eXoWin3x/!win3x' \
+    -name '*.conf' \( -print -and -exec sed -E -i -s "$sed" '{}' '+' \) \
   | progressbox "Applying default settings, please wait..."
 }
 
@@ -294,7 +374,7 @@ function xml-to-cachedir {
   | xml-stream \
       ApplicationPath ManualPath RootFolder Title ReleaseDate ID Notes Publisher Developer Genre /Game \
       GameID Name /AdditionalApplication \
-  | to-cachedir "$1" "$(fgrep '<Game>' $2 | wc -l)" "$(fgrep '<AdditionalApplication>' $2 | wc -l)"
+  | to-cachedir "$1" "$(fgrep '<Game>' "$2" | wc -l)" "$(fgrep '<AdditionalApplication>' "$2" | wc -l)"
 }
 
 # xml-stream keys
@@ -465,7 +545,7 @@ function full-search {
 function launch-game {
   source "$1"
   local defaultitem="PLAY"
-  local conf="$(dirname "$ApplicationPath")/dosbox.conf"
+  local conf="$RootFolder/dosbox.conf"
   while true; do
     action="$(launch-game-menu "$ApplicationPath")"
     defaultitem="$action"
@@ -589,13 +669,15 @@ function set-conf {
 #   TANDY mode and picks a different config file depending
 # TODO: a bunch of this needs to be changed for eXoWin3x support
 function run-game {
-  source $1
+  source "$1"
   local GameId="$(basename "$RootFolder")"
+  # Directory where the games are installed to; might be eXoDOS or eXoWin3x, depending
+  local dosroot="$(realpath -ms --relative-to=. "$RootFolder/../..")"
   log "Launching game: $GameId ($Title)"
-  if [[ ! -d eXo/eXoDOS/$GameId ]]; then
+  if [[ ! -d $dosroot/$GameId ]]; then
     local ZipName="$(basename "${ApplicationPath%.bat}").zip"
-    if [[ -f eXo/eXoDOS/$ZipName ]]; then
-      unzip -d eXo/eXoDOS "eXo/eXoDOS/$ZipName" | progressbox "Installing $Title from $ZipName..."
+    if [[ -f $dosroot/$ZipName ]]; then
+      unzip -d "$dosroot" "$dosroot/$ZipName" | progressbox "Installing $Title from $ZipName..."
     else
       # TODO: download on demand support
       dialog --keep-tite --msgbox "$Title is not installed, and I couldn't find the zip file ($ZipName) to install it from." 0 0
@@ -604,8 +686,8 @@ function run-game {
   fi
   # if CHOICE.EXE is present, it overrides the dosbox builtin and breaks everything
   # since it's not actually a DOS program! so we move it out of the way until we're done
-  if [[ -f eXo/eXoDOS/$GameId/CHOICE.EXE ]]; then
-    mv "eXo/eXoDOS/$GameId/CHOICE".{EXE,WIN32}
+  if [[ -f $dosroot/$GameId/CHOICE.EXE ]]; then
+    mv "$dosroot/$GameId/CHOICE".{EXE,WIN32}
   fi
   # TODO: optional support for linux-specific config files, so people can drop a
   # dosbox_linux.conf in their game directory and have it do the right thing
@@ -613,14 +695,15 @@ function run-game {
   # completely different dosbox configs rather than in-dosbox launch options
   local conf="$(fix-config "$RootFolder/dosbox.conf")"
   log "Temporary config written to $conf"
-  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -exit -conf "$conf")
+  (cd eXo && "$(find-dosbox-version "../$ApplicationPath")" -conf "$conf")
   rm "$conf"
-  if [[ -f eXo/eXoDOS/$GameId/CHOICE.WIN32 ]]; then
-    mv "eXo/eXoDOS/$GameId/CHOICE".{WIN32,EXE}
+  if [[ -f $dosroot/$GameId/CHOICE.WIN32 ]]; then
+    mv "$dosroot/$GameId/CHOICE".{WIN32,EXE}
   fi
   log "Game exited: $GameId"
   if ((DO_SHARED)); then
-    chmod -R g+w "eXo/eXoDOS/$GameId/"
+    log "Updating permissions: $dosroot/$GameId"
+    chmod -R g+w "$dosroot/$GameId/"
   fi
 }
 
@@ -630,7 +713,10 @@ function run-game {
 #   [mt32] blocks at the end so dosbox-staging can understand them
 function fix-config {
   local conf=/tmp/$$.conf
-  cat "$1" | sed -E 's,\\,/,g' > $conf
+  cat "$1" | sed -E '
+    s,\\,/,g
+    s, runexit , c:/runexit.exe ,
+  ' > $conf
   if egrep -q '^fluid' "$conf"; then
     echo '[fluidsynth]'
     cat "$conf" | egrep '^fluid' | sed -E 's,^fluid\.([^=]+)=,\1=,'
