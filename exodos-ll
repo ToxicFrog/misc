@@ -555,6 +555,7 @@ function launch-game {
       MODE) cycle-screen-mode "$1";;
       ASPC) cycle-aspect-correction "$1";;
       SCLR) cycle-scaler "$1";;
+      MOUS) cycle-mouse "$1" ;;
       EXT*)
         local n="$(( ${action#EXT} * 2 + 1 ))"
         xdg-open "${AdditionalApplications[$n]}" >/dev/null 2>&1
@@ -575,10 +576,12 @@ function launch-game-menu {
   done
   args+=(
     # TODO: support for mouse sensitivity tweaks, since the mouse is way too
-    # twitchy in some games like Island of Doctor Brain
-    MODE "Change screen mode [currently: $(get-screen-mode $conf)]"
-    ASPC "Toggle aspect correction [currently: $(get-aspect-correction $conf)]"
-    SCLR "Change scaler [currently: $(get-scaler $conf)]"
+    # twitchy in some games like Island of Doctor Brain; these are in the
+    # [sdl] sensitivity (0-100) setting
+    MODE "Change screen mode [currently: $(get-screen-mode "$conf")]"
+    ASPC "Toggle aspect correction [currently: $(get-aspect-correction "$conf")]"
+    SCLR "Change scaler [currently: $(get-scaler "$conf")]"
+    MOUS "Change mouse sensitivity [currently: $(get-mouse "$conf")%]"
   )
   dialog-ask --default-item "$defaultitem" --menu "$info" 0 0 "$(( ${#args[@]}/2 ))" "${args[@]}"
 }
@@ -634,6 +637,17 @@ function cycle-scaler {
     shift
   done
   set-conf "$conf" scaler none
+}
+
+function get-mouse {
+  cat "$1" | dos2unix | fgrep sensitivity | cut -d= -f2
+}
+
+function cycle-mouse {
+  local mouse="$(get-mouse "$conf")"
+  mouse=$((mouse-10))
+  if ((mouse<10)); then mouse=100; fi
+  set-conf "$conf" sensitivity $mouse
 }
 
 # set-conf config key val [key val..]
