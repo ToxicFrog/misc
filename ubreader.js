@@ -23,6 +23,9 @@ function filter(xs, f) {
 function map(xs, f) {
   return Array.prototype.map.call(xs, f);
 }
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(result => resolve(result), ms));
+}
 
 // Ubooq isn't always served from /, so this lets us detect what the base URL is.
 // Ubooq URLs look like:
@@ -360,6 +363,21 @@ function setFavicon(_) {
   document.title = getUser() + " - " + document.title;
 }
 
+function htmlToElement(html) {
+  var template = document.createElement('template');
+  template.innerHTML = html;
+  return template.content.firstChild;
+}
+
+function installBookSortOptions() {
+  // TODO: if the BookSettings cookie looks like "...#path#...", make this checked
+  console.log("Installing book sort by path option");
+  let path_sort = htmlToElement(
+    '<label class="radiolabel"><input type="radio" name="sortingCriterion" value="path">Path</label>');
+  let author_sort = document.querySelector('input[value="authors"]').parentNode;
+  author_sort.parentNode.insertBefore(path_sort, author_sort);
+}
+
 // It sometimes takes a few hundred millis after closing a book for the read
 // status to update on the server, so we delay briefly before loading
 // the read status.
@@ -367,3 +385,9 @@ window.addEventListener('load', _ => { setTimeout(updateAllReadStatus, 1000); })
 window.addEventListener('load', installPageSeekBar);
 window.addEventListener('load', _ => { enableResumeSupport('comics'); enableResumeSupport('books'); });
 window.addEventListener('load', setFavicon)
+
+if (isBook) {
+  window.addEventListener('load', installBookSortOptions);
+}
+
+// TODO: add support for "fit largest" in addition to fit height/width/original
