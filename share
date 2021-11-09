@@ -30,6 +30,7 @@
 # TODO: share aliasing (using symlinks) -- removing the share needs to remove the
 # aliases as well!
 # TODO: share renaming (with option to alias the old name)
+# TODO: more options, e.g. keep-exif mode for add-album
 
 set -e
 setopt no_function_argzero
@@ -279,7 +280,8 @@ function cmd/add-album {
     sed -Ei 's,"files/'"$replacement"'","files/'"$(basename $original)"'",' "$SHARE_PATH/$hash/data.json"
   done
   # Remove EXIF data from original JPEG files
-  exiftool -all= -overwrite_original "$SHARE_PATH/$hash/files/"*
+  # Keep the ICC_* metadata, though, since that affects rendering
+  [[ $KEEP_EXIF ]] || exiftool -all= --ICC_Profile:all -overwrite_original "$SHARE_PATH/$hash/files/"*
 
   # We have to do this after calling fgallery, or fgallery will refuse to run
   # because there's already a directory there.
