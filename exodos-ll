@@ -487,6 +487,8 @@ function select-game {
     /:fsearch "=== FULL SEARCH ===" \
     --file "$1/.menudef")"
   case "$selected" in
+    # TODO: when viewing search results, exiting the game details window should
+    # take you back to the search results, not back to the full index
     /:search)
       selected="$(search-results "$(title-search)")"
       [[ $selected ]] && echo "${selected#?:}" || select-game "$1"
@@ -555,7 +557,7 @@ function launch-game {
       MODE) cycle-screen-mode "$1";;
       ASPC) cycle-aspect-correction "$1";;
       SCLR) cycle-scaler "$1";;
-      MOUS) cycle-mouse "$1" ;;
+      MOUS) cycle-mouse "$1" ;; # TODO on some games (e.g. SideLine) this always shows up as ""
       EXT*)
         local n="$(( ${action#EXT} * 2 + 1 ))"
         xdg-open "${AdditionalApplications[$n]}" >/dev/null 2>&1
