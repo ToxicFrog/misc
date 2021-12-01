@@ -116,7 +116,6 @@ function getBubble(cell) {
 // containing the thumbnail for that comic) and server-side ID.
 // Returns a Promise for the fetch->decode->update chain.
 function updateReadStatus(cell, id) {
-  console.log(sleep);
   return sleep((id % 50) * 10)
   .then(_ => fetch(bookmarkURL + id))
   .then(response => {
