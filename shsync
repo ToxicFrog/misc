@@ -140,6 +140,9 @@ function shsync/list-local {
 
 function shsync/list-remote {
   # ssh $REMOTE "cd ${(q)1}; find . -type f" | sed -E 's,^\./,,'
+  # TODO: this has an issue where if you're syncing with a filesystem that doesn't
+  # support second-resolution timestamps, like FAT, it ends up re-sending files
+  # even though they haven't changed.
   ssh $REMOTE "cd ${(q)1}; find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'"
   # | sed -E 's,^regular file:,file:,'
 }
