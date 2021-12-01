@@ -25,7 +25,7 @@ printf '\x1B[0m\n'
 
 printf '%10s ' 'bg'
 printf3 '\x1B[0m \x1B[%d;2m \x1B[0;%dm \x1B[%d;1m ' $(map bg ${codes[@]})
-printf '\x1B[0m\n'
+printf '\x1B[0;1m  +10 for bg\x1B[0m\n'
 
 printf '%10s ' 'fg+bg'
 printf3 '\x1B[0m \x1B[%s;2m#\x1B[0;%sm#\x1B[%s;1m#' $(map fgbg ${codes[@]})
@@ -122,3 +122,48 @@ for g in $(seq 31 32 255); do
   printf '%3d' $g
   printf '\n'
 done
+
+printf '\n%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+  "Non-colour formatting codes" "SGR C m"
+
+function formatcode {
+  local len="$(echo "$2" | wc -c)"
+  if ((len <= 12)); then
+    printf "%2d  ▶\x1B[%dm%s\x1B[0m◀%-$((12-len))s" "$1" "$1" "$2" ""
+  else
+    printf "%2d  ▶\x1B[%dm%s\x1B[0m◀%-$((29-len))s" "$1" "$1" "$2" ""
+  fi
+  if [[ $3 ]]; then
+    shift 2; formatcode "$@"
+  fi
+}
+
+printf '       '
+formatcode 1 bold 2 faint 3 italic 4 underline 5 blink
+printf '\n       '
+formatcode 7 inverse 8 invisible
+printf '\b(invisible)       '
+formatcode 9 strikethrough
+printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
+
+#formatcode \
+#  0 reset 1 bold 2 faint \
+#  3 italic 4 underline 5 blink \
+#  7 inverse 8 $'invisible\x1B[0m (invisible)\n' \
+#  9 strikethrough
+
+#map formatcode \
+#  "2:faint" "22:regular" "1:bold" \
+#  "3:italics" "4:underline" "5:blink" \
+#  "7:inverse" "9:strikethrough" "8:invisible" \
+#  "21:double-underlined" "0:reset"
+
+# for 2-9, adding 20 will disable that attribute, e.g. 24 turns off underline without affecting things otherwise
+
+#printf '%10s ' ''
+#printf '%8s ' bold
+# bold
+# italic
+# faint
+# inverse video
+# 
