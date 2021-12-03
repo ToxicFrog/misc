@@ -133,7 +133,7 @@ uint8_t DHT11_read_byte(GPIO* gpio) {
 	GPIO_wait(gpio, 0);
 	for (int i = 0; i < 8; ++i) {
 		// wait for end of lead-in
-		GPIO_wait(gpio, 1);
+		if (!GPIO_wait(gpio, 1)) return 0;
 		// measure size of payload
 		unsigned int cycles = GPIO_wait(gpio, 0);
 		// 4 cycles is a good cutoff for running on the CHIP compiled with -O0 -g
