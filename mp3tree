@@ -38,6 +38,21 @@ function vgm_to_mp3() {
   echo "DONE"
 }
 
+# This is a bit gross.
+# In theory we should be able to use ffmpeg to do the conversion using its libopenmpt
+# demuxer, but for whatever reason it insists on using libmodplug instead, which
+# (a) is worse and (b) doesn't support as many formats.
+# So instead we use openmpt123 to dump the mod file to wav, then ffmpeg to encode the wav.
+function openmpt_probe {
+  openmpt123 --probe "$1" | egrep -q '^Probe.*Success$'
+}
+
+function openmpt_convert {
+  >/dev/null openmpt123 --render "$1"
+  ffmpeg_convert "$1.wav" "$2"
+  rm "$1.wav"
+}
+
 function ffmpeg_convert() {
   input="$1"
   output="$2"
@@ -104,10 +119,11 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
       spawn ffmpeg_convert "$src" "$dst"
       echo "[PCM] $src"
       ;;
-    *.xm|*.mod|*.s3m)
-      spawn ffmpeg_convert "$src" "$dst"
-      echo "[MOD] $src"
-      ;;
+    #*.ahx|*.mptm)
+    # *.xm|*.mod|*.s3m|*.it|*.mo3|*.umx)
+    #   spawn ffmpeg_convert "$src" "$dst"
+    #   echo "[MOD] $src"
+    #   ;;
     # *.vgm|*.vgz)
       #(vgm_to_mp3 "$src" "$dst")
       # spawn ffmpeg_convert "$src" "$dst"
@@ -122,14 +138,21 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
       echo "[CVR] $src"
       ln -sf "$src" "$dst"
       ;;
-    *.txt|*.m3u|*.png|*.jpg)
+    *.txt|*.m3u|*.png|*.jpg|*.torrent|.*)
       # skip
       continue
       ;;
     *)
-      # File is not recognized.
-      echo "[???] $src"
-      continue
+      # There are a LOT of module formats, so we delegate to openmpt's probe function
+      # rather than trying to list all the extensions.
+      if openmpt_probe "$src"; then
+        spawn openmpt_convert "$src" "$dst"
+        echo "[MOD] $src"
+      else
+        # File is not recognized.
+        echo "[???] $src"
+        continue
+      fi
       ;;
   esac
   echo "$dst" | sed -E 's;/+;/;g' >> /tmp/$$.new
