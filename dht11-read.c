@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/param.h>
 
 // open(2)/close(2)
 #include <fcntl.h>
@@ -14,6 +15,7 @@
 #include <unistd.h>
 
 #define BUFSIZE 256
+#define MAX_EDGES 128
 
 typedef struct GPIO {
 	// We keep that as a char here because everything that needs to interact with
@@ -118,27 +120,12 @@ int GPIO_close(GPIO* gpio) {
 	return !errors;
 }
 
-// Wait for the given GPIO to have the corresponding val.
-// Waits for at most 255 cycles. Returns the number of cycles waited, or 0 if
-// we exceed that limit.
-int GPIO_wait(GPIO* gpio, uint8_t val) {
-	for (uint8_t us = 0; us < 32; ++us) {
-		if (GPIO_read(gpio) == val) return us;
-	}
-	return 0;
-}
 
-uint8_t DHT11_read_byte(GPIO* gpio) {
+uint8_t read_bits(const uint8_t* edges, size_t start_at, int gap) {
 	uint8_t byte = 0;
-	GPIO_wait(gpio, 0);
 	for (int i = 0; i < 8; ++i) {
-		// wait for end of lead-in
-		if (!GPIO_wait(gpio, 1)) return 0;
-		// measure size of payload
-		unsigned int cycles = GPIO_wait(gpio, 0);
-		// 4 cycles is a good cutoff for running on the CHIP compiled with -O0 -g
-		// it's 1-2 for 0 and 5-6 for 1
-		byte = (byte << 1) | (cycles >= 4);
+		byte <<= 1;
+		byte |= (edges[start_at+i*2] < gap?0:1);
 	}
 	return byte;
 }
@@ -163,33 +150,91 @@ int readDHT11Frame(GPIO* gpio, float* temperature, float* humidity) {
 	GPIO_write(gpio, 0);
 	usleep(20*1000);
 	GPIO_write(gpio, 1);
-	usleep(20);
+	// usleep(20);
 	GPIO_direction(gpio, IN);
 
-	// The DHT11 is meant to hold it low for 80us, then high for 80us, before
-	// sending the first bit. In practice if we look for this header we miss the
-	// first bit -- maybe setting the direction to IN takes too long?
-	// if (!GPIO_wait(gpio, 0)) return 0;  // should go to 0 ~immediately
-	// if (!GPIO_wait(gpio, 1)) return 0; // then stay low for 80us
-	// if (!GPIO_wait(gpio, 0)) return 0; // then stay high for 80us
-	// once it goes back to 0 we're into the lead-in
+	uint8_t edges[MAX_EDGES];
+	uint8_t last_seen = 0;
+	uint8_t cycles = 0;
+	uint8_t edge = 0;
+
+	// Read in state changes from the pin.
+	// We start by looking for a rising edge, and record the gaps between successive
+	// edges.
+	// So edges[0] will be how long before we saw the start of the first bit; edges[1]
+	// will be the length of the transmission for that bit; edges[2] will be the gap
+	// between the first two bits, edges[3] the length of the second bit; etc.
+	while(edge < MAX_EDGES && cycles < 255) {
+		cycles = 0;
+		uint8_t this;
+		while ((this = GPIO_read(gpio)) == last_seen && cycles < 255) { ++cycles; }
+		last_seen = this;
+		edges[edge++] = cycles;
+	}
+	--edge;
+
+	// fprintf(stderr, "Edges:");
+	// for (int i = 0; i < edge; ++i) {
+	// 	fprintf(stderr, " %d", edges[i]);
+	// }
+	// fprintf(stderr, "\n");
+
+	// Now we have all the edges. Ideally, we should have recorded 83 edges -- 2
+	// edges for the initial ACK pulse, 2 edges for each bit, and a final edge as
+	// the line returns to high idle.
+	// If we're missing the ack (81 edges) that's fine. We can even be missing the
+	// first bit (79-80) and compensate, because the first bit of the humidity
+	// will always be 0, since humidity can't exceed 100. If we're missing more
+	// than that we have to give up.
+	uint8_t start_at;
+	if (edge < 79) {
+		fprintf(stderr, "Not enough edges from sensor: got %d, needed at least 79\n", edge);
+		return 0;
+	} else if (edge < 81) {
+		fprintf(stderr, "Not enough edges from sensor: got %d, needed at least 79\n", edge);
+		return 0;
+		// insert a synthetic 0 bit at the start
+		memmove(&edges[2], &edges[0], edge*sizeof(uint8_t));
+		edges[0] = edges[2];
+		edges[1] = 1;
+		start_at = 1;
+	} else {
+		start_at = edge - 80;
+	}
+
+	// Figure out how wide the breaks between each bit is. Skip the first break
+	// because it might be super long.
+	int max_gap = 0;
+	int min_gap = 255;
+	for (int i = 1; i < 40; ++i) {
+		max_gap = MAX(max_gap, edges[start_at-1+2*i]);
+		min_gap = MIN(min_gap, edges[start_at-1+2*i]);
+		// fprintf(stderr, "gap: %d [%d - %d]\n", edges[start_at-1+2*i], min_gap, max_gap);
+	}
+	int nominal_gap = (max_gap+min_gap)/2;
+	// fprintf(stderr, "Gap width inferred: %d\n", nominal_gap);
 
 	uint8_t humidity_h, humidity_l, temperature_h, temperature_l, check;
-	humidity_h = DHT11_read_byte(gpio);
-	humidity_l = DHT11_read_byte(gpio);
-	temperature_h = DHT11_read_byte(gpio);
-	temperature_l = DHT11_read_byte(gpio);
-	check = DHT11_read_byte(gpio);
+	humidity_h = read_bits(edges, start_at, nominal_gap);
+	humidity_l = read_bits(edges, start_at+16, nominal_gap);
+	temperature_h = read_bits(edges, start_at+32, nominal_gap);
+	temperature_l = read_bits(edges, start_at+48, nominal_gap);
+	check = read_bits(edges, start_at+64, nominal_gap);
+
+	// fprintf(stderr, "DHT11 read complete: %d %d %d %d %d\n", humidity_h, humidity_l, temperature_h, temperature_l, check);
 
 	if (check != ((humidity_h + humidity_l + temperature_h + temperature_l) & 0xFF)) {
-		// checksum failure
+		fprintf(stderr, "Checksum failure.\n");
 		return 0;
 	}
 
 	*humidity = humidity_h + (humidity_l / 10.0);
 	*temperature = temperature_h + (temperature_l / 10.0);
-	// printf("DHT11 frame read complete: %d %d %d %d %d\n", humidity_h, humidity_l, temperature_h, temperature_l, check);
-	if (humidity_h == 0 && temperature_h == 0) return 0; // if we get all zeroes, the checksum will pass but it was not a good read
+
+	if (humidity_h == 0 && temperature_h == 0) {
+		fprintf(stderr, "Got all zeroes from sensor.\n");
+		return 0;
+	}
 	return 1;
 }
 
@@ -204,7 +249,7 @@ int main(int argc, const char** argv) {
   if (!GPIO_open(&gpio, pin)) return 2;
 
   float temperature, humidity;
-  for (int i = 0; i < 16; ++i) {
+  // for (int i = 0; i < 16; ++i) {
   	// Retry a bunch of times until we successfully read from it.
   	if (readDHT11Frame(&gpio, &temperature, &humidity)) {
 		  printf("temperature\t%f\n", temperature);
@@ -212,9 +257,9 @@ int main(int argc, const char** argv) {
 		  if (!GPIO_close(&gpio)) return 4;
 		  return 0;
 		}
-		usleep(10000);
-  }
-	printf("Error reading from DHT11\n");
+		// usleep(10000);
+  // }
+	// fprintf("Error reading from DHT11.\n");
 
   if (!GPIO_close(&gpio)) return 4;
   return 8;
