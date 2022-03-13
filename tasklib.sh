@@ -50,6 +50,7 @@ function task/-parse-argv {
     local arg="$(task/map-arg "$1")"
     case "$1" in
       year:all)
+        TASK_ARGV+="$(task/year-filter 1970-)"
         TASK_ARGV+="rc.context:"
         ;;
       year:now)
@@ -129,7 +130,7 @@ function task/year-filter {
       end="2099-01-01"
       ;;
     -*)
-      start="1985-01-01"
+      start="1970-01-01"
       end="$((${1#-}+1))-01-01"
       ;;
     *-*)
