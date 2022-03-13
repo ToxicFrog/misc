@@ -258,6 +258,20 @@ function books/add-series {
   main "${uuids[@]}" all
 }
 
+task/register add '^add ' books/add <<EOF
+
+  $NAME add field:value [field:value...] +tag [+tag...] Book Title
+
+Add a book to the list, and display the book's info line.
+EOF
+function extract-book-id {
+  sed -E 's,^Created task (.*)\.$,\1,'
+}
+function books/add {
+  local uuid="$(command task rc.verbose:new-uuid "$@" | extract-book-id)"
+  main "$uuid" next
+}
+
 task/register reread ' reread$' books/reread <<EOF
 
   $NAME [...filters...] reread
@@ -270,9 +284,9 @@ function books/reread {
   shift -p
   local rereads=()
   task/select uuid end+ "$@" \
-  | task/printf 'author:%author%s\tgenre:%genre%s\tgender:%gender%s\ttags:%.tags%s,reread\t%description.desc%s\n' \
+  | task/printf 'author:%author%s\tgenre:%genre%s\tgender:%gender%s\ttags:%.tags%s\t%description.desc%s\n' \
   | while IFS=$'\t' read -A args; do
-    main add "${args[@]}"
+    command task add "${args[@]}" +reread
     rereads+=$(task/select id id+ +LATEST)
   done
   # List the books we just added.
