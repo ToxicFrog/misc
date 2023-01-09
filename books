@@ -67,6 +67,7 @@ command.
 EOF
 function books/new-year {
   \task context define $YEAR "$(task/year-filter $YEAR)"
+  \task context delete ${YEAR}.write
   \task context $YEAR
 }
 
@@ -74,7 +75,7 @@ task/register grep '^grep' books/grep <<EOF
 
   $NAME grep <pattern> [report]
 
-Display books where the author or description match the given pattern (as a
+Display books where the author or title match the given pattern (as a
 case-insensitive regex) in the given report format; if not specified, the report
 defaults to "all". Unlike other commands, searches all years by default.
 EOF
