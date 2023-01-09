@@ -226,10 +226,12 @@ function task/-annocat {
   if [[ ! $* ]]; then
     set -- "$(task/select uuid end+ +COMPLETED | tail -n1)"
   fi
-  echo "## About to annotate the following:"
-  task "$@" uuids | task/printf "  \x1B[4m%description.desc%s\x1B[0m by %author%s\n"
-  echo "## Enter the annotation, ^D when done."
-  \task "$@" annotate "$(cat)"
+  echo "## Annotating the following:" > /tmp/$$.annotation
+  task "$@" uuids | task/printf "##    %description.desc%s by %author%s\n" >> /tmp/$$.annotation
+  echo >> /tmp/$$.annotation
+  nano -tA /tmp/$$.annotation
+  \task "$@" annotate "$(cat /tmp/$$.annotation | egrep -v '^##')"
+  rm /tmp/$$.annotation
 }
 
 task/register star ' star$' task/-star <<EOF
