@@ -40,6 +40,8 @@ if (baseURL) {
 }
 console.log("Detected baseURL as ", baseURL);
 
+// TODO: a lot of this information we can get from the contents of the Scope,
+// take a look at the output of getScope() sometime.
 let isBook = window.location.pathname.match('/books/([0-9]+)');
 if (isBook) {
   var detailsURL = baseURL + '/bookdetails/';
@@ -116,6 +118,7 @@ function getBubble(cell) {
 // containing the thumbnail for that comic) and server-side ID.
 // Returns a Promise for the fetch->decode->update chain.
 function updateReadStatus(cell, id) {
+  console.log(sleep);
   return sleep((id % 50) * 10)
   .then(_ => fetch(bookmarkURL + id))
   .then(response => {
@@ -247,8 +250,11 @@ function seekPage(page) {
 // called, since the code in ubooq that's meant to keep updating it sometimes
 // breaks.
 function updatePageCounter(page) {
-  document.getElementById("pagelabel").innerText =
-    "Page " + page + " of " + getScope().nbPages;
+  document.getElementById('pagelink').innerText = 'Page ' + page;
+  document.getElementById('pagemax').innerText = getScope().nbPages;
+  document.getElementById('pagelink').href = baseURL + '/comicreader/' + getScope().documentId + '?page=' + (page-1);
+  // document.getElementById("pagelabel").innerText =
+  //   "Page " + page + " of " + getScope().nbPages;
 }
 
 function mkExitShortcutHandler($scope, elem_id, handler, predicate) {
@@ -278,6 +284,10 @@ function installPageSeekBar(_) {
   // Adjust the lower margin so that the Chrome status bar doesn't cover actual
   // content.
   // document.getElementById("contentCanvas").style = "padding: 0 0 2em 0;";
+
+  // Install the upgraded page number indicator.
+  document.getElementById("pagelabel").innerHTML =
+    '<a id="pagelink" href="#">Page [loading]</a> of <span id="pagemax">[loading]</span>';
 
   // Install a wrapper around $scope.loadPage() that properly updates the
   // page counter and seek bar. This is called every time a new page is
@@ -311,6 +321,13 @@ function installPageSeekBar(_) {
   document.getElementById('leftbar').removeAttribute('href');
   document.getElementById('centerbar').removeAttribute('href');
   document.getElementById('rightbar').removeAttribute('href');
+}
+
+function installPageLinkButton(_) {
+  let gotobutton = document.getElementById('gotobutton');
+  let pagelinkbutton = htmlToElement(
+    '<button id="pagelinkbutton" class="btn btn-primary" type="button" ng-click="console.log(\'test\');">Direct Image Link</button>');
+  gotobutton.parent.insertAfter
 }
 
 // Add "resume last comic" functionality.
