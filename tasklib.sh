@@ -73,6 +73,7 @@ function task/dispatch {
   local TASK_ARGV=()
   task/-parse-argv "$@"
   set -- "${TASK_ARGV[@]}"
+  #>&2 printf '-- %s\n' TASK_ARGV "${TASK_ARGV[@]}"
 
   for cmd in ${TASK_COMMANDS[@]}; do
     local name=$(echo $cmd | cut -d: -f1)
@@ -145,9 +146,9 @@ function task/year-filter {
   # Items that were completed within the given date range.
   local isfinished="( +COMPLETED and end.after:$start and end.before:$end )"
   # Items that are active, and were active during the given date range.
-  local isactive="( +ACTIVE and start.before:$end )"
+  local isactive="( +ACTIVE and start.before:$end and end.none: )"
   # Items that are not yet started, and existed during the given date range.
-  local ispending="( +PENDING and -ACTIVE and entered.before:$end )"
+  local ispending="( +PENDING and -ACTIVE and end.none: and entered.before:$end )"
   echo -n "( $isfinished or $isactive or $ispending )"
 }
 
