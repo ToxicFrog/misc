@@ -163,6 +163,19 @@ function task/-reset-config {
   rm -v $TASKRC
 }
 
+task/register raw-exec '^raw-exec' task/-raw-exec <<EOF
+
+  $NAME raw-exec <command>
+
+Pass the given command, unmodified, to the Taskwarrior backend. This is useful
+for debugging taskwarrior issues without manually setting up the environment.
+EOF
+function task/-raw-exec {
+  shift
+  echo task "$@"
+  \task "$@"
+}
+
 task/register help '^help' task/-help <<EOF
 
   $NAME help
