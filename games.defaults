@@ -42,8 +42,11 @@ uda.gamestate.type=string
 uda.gamestate.values=unplayed,unfinished,finished,completed,mastered,null
 uda.gamestate.default=unplayed
 
-uda.genres.label=Genres
-uda.genres.type=string
+uda.genre.label=Genre
+uda.genre.type=string
+
+uda.source.label=Source
+uda.source.type=string
 
 # Aliases
 alias.unplayed=modify status:pending start: end: gamestate:unplayed
@@ -57,22 +60,22 @@ alias.platforms=summary
 default.command=next
 
 ## List: concise list of finished and in progress games.
-report.list.columns=id,end,project,gamestate,tags,genres,description.desc
-report.list.labels=ID,Finished,Plt,Status,Tags,Genre,Title
+report.list.columns=id,end,project,source,gamestate,tags,genre,description.desc
+report.list.labels=ID,Finished,Plt,Src,Status,Tags,Genre,Title
 report.list.sort=end+,start+,description+
 report.list.filter=(+COMPLETED or +ACTIVE) and gamestate.not:null
 
 ## Next: games in progress & waiting to be played
-report.next.columns=id,start.age,project,gamestate,tags,genres,description.desc
-report.next.labels=ID,Playing,Plt,Status,Tags,Genre,Title
+report.next.columns=id,start.age,project,source,gamestate,tags,genre,description.desc
+report.next.labels=ID,Playing,Plt,Src,Status,Tags,Genre,Title
 report.next.sort=urgency-,start+
 
 ## Nulled: all games in the null pile
-report.nulled.columns=id,end,project,gamestate,tags,genres,description.desc
+report.nulled.columns=id,end,project,gamestate,tags,genre,description.desc
 report.nulled.labels=ID,Finished,Plt,Status,Tags,Genre,Title
 report.nulled.sort=end+,start+,description+
 report.nulled.filter=gamestate:null
 
-report.all.columns=id,end,project,gamestate,tags,genres,description
+report.all.columns=id,end,project,source,gamestate,tags,genre,description
 report.all.description=All games
-report.all.labels=ID,Finished,Platform,Status,Tags,Genre,Title
+report.all.labels=ID,Finished,Plt,Src,Status,Tags,Genre,Title
