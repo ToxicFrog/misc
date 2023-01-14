@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
 # Fetch/update a recipe index for Cook's Country.
+# needs wring, lua, tac
 
 # Issue: title, cover image, and list of recipes.
 # Recipe: title, blurb, image, "why it works"
@@ -8,7 +9,10 @@
 
 set -e
 
-OUTPUT=/srv/www/archives/cooks-country/
+OUTPUT=${OUTPUT=/srv/www/archives/cooks-country/}
+BASEURL=${BASEURL=https://www.americastestkitchen.com}
+MAGAZINE=${MAGAZINE=cooksillustrated}
+PREFETCH=${PREFETCH=}
 
 # attr html field -> returns contents of field
 function attr {
@@ -27,6 +31,26 @@ function unescape {
   print -r "<div>$*</div>" | wring text - //div
 }
 
+function fetch-desc {
+  local page="$(curl -s "$1")"
+  if ! print -r "$page" | fgrep -q NEXT_DATA; then
+    print -r "$page" > ~/tmp/page
+    echo -n "!"
+    fetch-desc "$1"
+    return
+  fi
+  print -r "$page" \
+  | fgrep NEXT_DATA \
+  | egrep -o '\{.*}' \
+  | jq -r ".props.initialState.content.documents[] | (.description,.whyThisWorks)" \
+  | {
+    read desc || {
+      >&2 echo "Error reading description for $1"; exit 1; }
+    read whythisworks
+    printf "%s\t%s" "$desc" "$(echo "$whythisworks" | sed -E 's,</?p>,,g')"
+  }
+}
+
 mkdir -p "$OUTPUT"
 
 CSS=$(dirname $0)/cooks-country-index.css
@@ -35,12 +59,27 @@ JS=$(dirname $0)/cooks-country-index.js
 cp $CSS $OUTPUT/style.css
 
 echo "Fetching master index..."
-issues="$(curl -s 'https://www.cookscountry.com/magazines/browse' | wring html - .result__image-link)"
-# issues="$(cat /tmp/ck/browse)"
+if [[ $PREFETCH ]]; then
+  # user has already downloaded the index, load from local file
+  issues="$(cat "$PREFETCH" | wring html - .result__image-link)"
+elif [[ $BASEURL ]]; then
+  # default behaviour -- fetch from web
+  issues="$(curl -s "${BASEURL}/${MAGAZINE}/magazines/browse" | wring html - .result__image-link)"
+else
+  # no baseurl -- skip fetching entirely and only regenerate the local html
+  issues=""
+fi
 print -r "$issues" | tac | while read -r issue; do
+  [[ $issue ]] || continue  # no baseurl results in one line of blank input
   title="$(attr "$issue" title)"
   url="$(attr "$issue" href)"
+  if [[ $url != http* ]]; then url="${BASEURL}${url}"; fi
   img="$(attr "$issue" data-src)"
+  >&2 echo "$title" "$url" "$img"
+  if [[ $TITLEFILTER ]]; then
+    >&2 echo skip
+    if ! echo "$title" | eval $TITLEFILTER; then continue; fi
+  fi
 
   out="$OUTPUT/$(sanitize "$title")"
   [[ -f "$out/done" ]] && continue;
@@ -58,7 +97,7 @@ print -r "$issues" | tac | while read -r issue; do
   }
 
   # Fetch recipe images and write issue index file
-  recipes="$(curl -s "https://www.cookscountry.com$url" \
+  recipes="$(curl -s "${url}" \
     | wring html - .recipe \
     | fgrep -v result__online-extra \
     | lua -e 'print((io.read("*a"):gsub("\r",""):gsub("([^>])\n+", "%1 ")))')"
@@ -67,7 +106,8 @@ print -r "$issues" | tac | while read -r issue; do
     title="$(attr "$recipe" title)"
     title="$(unescape "$title")"
     img="$(attr "$recipe" data-src)"
-    desc="$(print -r "$recipe" | wring text - .result__description)"
+    url="$(attr "$recipe" href)"
+    desc="$(fetch-desc "${BASEURL}${url}")"
     splash="$(sanitize "$title").jpeg"
     [[ -f "$out/$splash" ]] || {
       if [[ $img ]] then
@@ -78,6 +118,7 @@ print -r "$issues" | tac | while read -r issue; do
     }
     printf '%s\t%s\t%s\n' "$splash" "$title" "$desc" >> "$out/index"
     echo -n "."
+    sleep 5
   done
 
   if [[ $(cat $out/index | wc -l) -lt 4 ]]; then
@@ -94,7 +135,7 @@ print -r "$issues" | tac | while read -r issue; do
 
   touch "$out/done"
   echo ""
-  # break
+  #break
 done
 
 echo -n "Generating top-level HTML"
@@ -114,7 +155,7 @@ html "
 "
 
 ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue; do
-  # [[ -f "$issue/done" ]] || continue
+  [[ -f "$issue/skip" ]] && continue
   html '
     <div class="header">
       <img src="%s" width=120px>
@@ -124,13 +165,20 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
     </div>
     <table id="%s">
   ' "$issue/cover.jpeg" "$(cat "$OUTPUT/$issue/title")" "$issue"
-  cat "$OUTPUT/$issue/index" | while IFS=$'\t' read -r splash title desc; do
+  cat "$OUTPUT/$issue/index" | sort | while IFS=$'\t' read -r splash title desc whythisworks; do
+    if [[ $desc == $whythisworks ]]; then
+      whythisworks=""
+    fi
     splash="${splash//\"/%22}"
     id="$issue/${splash%.*}"
     html '
       <tr id="%s" class="recipe-row">
         <td><label class="hotlist-button" onclick="toggleStar(this)">☆</label></td>
-        <td class="recipe-name" width=100%%><b>%s</b><br>%s</td>
+        <td class="recipe-name" width=100%%>
+          <b>%s</b><br/>
+          <span class="desc">%s</span>
+          <!-- <span class="whythisworks">%s</span> -->
+        </td>
         <td style="text-align:right;">
           <img src="%s" height="80px" loading="lazy">
         </td>
@@ -151,7 +199,7 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
           </span>
         </td>
       </tr>
-    ' "$id" "$title" "$desc" "$issue/$splash" "$id" "$id" "$id" "$id" "$id" "$id"
+    ' "$id" "$title" "$desc" "$whythisworks" "$issue/$splash" "$id" "$id" "$id" "$id" "$id" "$id"
   done
   html '</table>'
   echo -n "."

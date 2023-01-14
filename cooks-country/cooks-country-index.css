@@ -32,6 +32,13 @@ td {
 .hotlist-button {
   font-weight: bold;
 }
+span.desc {
+  font-style: italic;
+}
+span.desc::after {
+  content: "\a";
+  white-space: pre;
+}
 
 /* Hidden and completed table rows */
 tr.hidden {

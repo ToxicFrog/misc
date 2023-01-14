@@ -86,21 +86,6 @@ function restoreAll(_) {
   setTimeout(_ => { document.getElementById('loading').classList.add('loading-done'); }, n*100);
 }
 
-function restoreAllOld(_) {
-  let rows = document.querySelectorAll('tr.recipe-row');
-  let n=0;
-  for (let row of rows) {
-    let recipe = row.id;
-    setTimeout(_ => {
-      getItem(recipe+'/written').then(v => restoreState(recipe, 'written', v));
-      getItem(recipe+'/cooked').then(v => restoreState(recipe, 'cooked', v));
-      getItem(recipe+'/hidden').then(v => restoreState(recipe, 'hidden', v));
-    }, n*100);
-    ++n;
-  }
-  setTimeout(_ => { document.getElementById('loading').classList.add('loading-done'); }, n*100);
-}
-
 function toggleStar(self) {
   if (self.innerText == "★") {
     self.innerText = "☆";
