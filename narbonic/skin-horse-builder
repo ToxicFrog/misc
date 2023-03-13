@@ -1,0 +1,185 @@
+#!/usr/bin/env zsh
+
+#wget -r -l inf -np -p -x -nv -nc --reject-regex '\?|/feed/' 'http://skin-horse.com/comic/'
+
+set -e
+ENTRYPOINT=comic/12302007/
+
+function status {
+  local fmt="$1"; shift
+  >&2 printf "\r\x1B[0K$fmt" "$@"
+}
+
+function main {
+  cd skin-horse.com
+  mkdir -p img
+  [[ -f img/chapter.jpeg ]] || \
+    curl https://skin-horse.com/wp-content/gallery/wallpapers/lascience_2560x1600_sample.jpg > img/chapter.jpeg
+  [[ -f img/cover.jpeg ]] || \
+    curl https://skin-horse.com/wp-content/uploads/2022/06/goodbye_2500x1600_sample.jpg > img/cover.jpeg
+
+#  build-toc
+#  patch-toc
+
+  # The overall structure should be:
+  # - title page
+  # - prologue page
+  # - foreach chapter until epilogue:
+  #   - generated chapter page
+  #   - chapter contents
+  # - epilogue page
+
+  rm -rf cbz cbz-no-sundays
+  mkdir -p cbz cbz-no-sundays img img-no-sundays
+  local page_number=0
+  add-page '' img/cover.jpeg
+  add-page -no-sundays img/cover.jpeg
+  add-page '' "$(cat toc/00*.toc | cut -f2)"
+  add-page -no-sundays "$(cat toc/00*.toc | cut -f2)"
+  for chapter in toc/{01..42}*.toc; do
+    add-chapter-splash "$(basename ${chapter%.toc})"
+    add-pages-from $chapter
+  done
+  add-page '' "$(cat toc/43*.toc | cut -f2)"
+  add-page -no-sundays "$(cat toc/43*.toc | cut -f2)"
+  cd cbz
+  zip -r -0 ../../"Skin Horse.cbz" .
+  cd ..
+  cd cbz-no-sundays
+  zip -r -0 ../../"Skin Horse [no sunday strips].cbz" .
+  cd ..
+}
+
+# Build the .toc files mapping chapters to (date, image) pairs. Also build the
+# story.txt as a side effect.
+function build-toc {
+  rm -rf toc story.txt
+  mkdir toc/
+
+  local page_url=$ENTRYPOINT
+  local page_img=""
+  local page_date=""
+  local ch_num=0
+  local ch_title="Prologue"
+
+  while read-page; do
+    printf '%s\t%s\n' "$page_date" "$page_img" >> toc/"$(printf '%02d - %s.toc' $ch_num $ch_title)"
+    echo "$(basename $page_img)" | cut -d. -f1 | sed -E 's,^....-..-..,,; s,[-_], ,g; s,^ +,,;' >> story.txt
+  done
+  printf '%s\t%s\n' "$page_date" "$page_img" >> toc/"$(printf '%02d - %s.toc' $ch_num $ch_title)"
+  echo "$(basename $page_img)" | cut -d. -f1 | sed -E 's,^....-..-..,,; s,[-_], ,g; s,^ +,,;' >> story.txt
+}
+
+function read-page {
+  local index="$page_url/index.html"
+  local chapter="$(cat $index | fgrep 'class="comic-chapter"' | egrep -o '[^<>]+</a>' | cut -d'<' -f1)"
+  # sometimes there is no Chapter: line in the page, oops
+  if [[ $chapter && $chapter != $ch_title ]]; then
+    status '%02d - %s: done @ [%s]\n' "$ch_num" "$ch_title" "$page_date"
+    ((++ch_num))
+    ch_title="$chapter"
+  fi
+  page_date="$(cat $index | fgrep '"article:published_time"' | egrep -o '20[012][0-9]-[0-9][0-9]-[0-9][0-9]')"
+  page_img="$(cat $index | fgrep '"og:image"' | head -n1 | egrep -o 'https://skin-horse.com/wp-content/[^"]+' | sed -E 's,https://skin-horse.com/,,')"
+  status '%02d - %s [%s]' "$ch_num" "$ch_title" "$page_date"
+  page_url="$(cat $index | fgrep 'link rel="next"' | head -n1 | egrep -o 'https://skin-horse.com/comic/[^"]+' | sed -E 's,https://skin-horse.com/,,')"
+  if [[ $page_url ]]; then
+    return 0
+  else
+    status '%02d - %s: done @ [%s]\n' "$ch_num" "$ch_title" "$page_date"
+    return 1
+  fi
+}
+
+# Apply necessary patches to the table of contents.
+# We want each chapter to end on a sunday, if possible.
+# - ch01 ends on a saturday. We can just move the sunday from the start of ch02 to it.
+# - ch18 does the same thing with the same solution.
+# - ch30 does the same thing
+# - ch41 ends on a MONDAY. We can fix this by swapping the last two lines.
+function patch-toc {
+  pushd toc/
+  # Chapter 1, 19, and 31 absorb the sunday page that the following chapter
+  # starts on.
+  head -n1 02*.toc >> 01*.toc; sed -Ei '1 d' 02*.toc
+  head -n1 19*.toc >> 18*.toc; sed -Ei '1 d' 19*.toc
+  head -n1 31*.toc >> 30*.toc; sed -Ei '1 d' 31*.toc
+  # Swap the last two pages of chapter 41.
+  local mon="$(tail -n1 41*.toc)"
+  local sun="$(tail -n2 41*.toc | head -n1)"
+  sed -Ei '$ d' 41*.toc; sed -Ei '$ d' 41*.toc
+  printf '%s\n' "$mon" "$sun" >> 41*.toc
+  popd
+}
+
+# Add a single page image to the cbz output.
+function add-page {
+  local dir="cbz$1"; shift
+  local page_file="$(printf '%s/%04d-%s' "$dir" "$page_number" "$(basename $1)")"
+  status 'Page: %s' "${page_file#cbz*/}"
+  ln -f "$1" "$page_file"
+  ((++page_number))
+}
+
+# Add a chapter splash for the given chapter. Single argument is of the form
+# "01 - Cowardly Lion".
+function add-chapter-splash {
+  local number="${${1% - *}#0}"
+  local title="${1#* - }"
+  # take chapter.jpeg and put "Chapter $number" on the top and "$title" on the bottom
+  convert img/chapter.jpeg \
+    -fill black  -pointsize 28 \
+    -gravity north -annotate +0+10 "Chapter $number" \
+    -gravity south -annotate +0+10 "$title" \
+    img/chapter_${number}.jpeg
+  add-page '' img/chapter_${number}.jpeg
+  add-page ''-no-sundays img/chapter_${number}.jpeg
+}
+
+# Add all pages from a given toc file.
+# This works by reading pages until it encounters a sunday page, then concatenating
+# all of the pages into a single vertical image, buffering it, and linking it in.
+# TODO: support for version with no sunday strips
+function add-pages-from {
+  local -a pages=()
+  local start=""
+  cat "$1" | while read date img; do
+    if [[ ! $start ]]; then start=$date; fi
+    if [[ 0 == "$(date -d $date +%w)" ]]; then
+      build-and-add-page -no-sundays $start $date "${pages[@]}"
+      build-and-add-page '' $start $date "${pages[@]}" "$img"
+
+      pages=()
+      start=""
+    else
+      pages+=("$img")
+    fi
+  done
+  if [[ ${pages[1]} ]]; then
+    build-and-add-page -no-sundays "$start" "$date" "${pages[@]}"
+    build-and-add-page '' "$start" "$date" "${pages[@]}"
+  fi
+}
+
+function build-and-add-page {
+  local dirsuffix="$1"
+  local start="$2"
+  local date="$3"
+  shift 3
+
+  # this autodetects PNG if the inputs are all PNG and JPEG otherwise
+  # however, this also makes the output significantly larger given PNG inputs
+  # is it worth it?
+  if echo "$@" | fgrep -q .jpg; then
+    local out="img$dirsuffix/$start~$date.jpeg"
+  else
+    local out="img$dirsuffix/$start~$date.png"
+  fi
+  # TODO: if there is a size mismatch, enlarge the smaller images so that everything
+  # is a consistent width.
+  [[ -f $out ]] || convert -quality 95 -background white -gravity center -append \
+    "$@" "$out"
+  add-page "$dirsuffix" "$out"
+}
+
+main "$@"
