@@ -97,7 +97,7 @@ function shsync/sync {
     elif [[ ${dst_files[$file]} ]]; then
       # check if files are equivalent and sync if not
       if [[ ${dst_files[$file]} != ${src_files[$file]} ]]; then
-        shsync/status '> %s\n' "$file"
+        shsync/status '> %s [%s != %s]\n' "$file" "${src_files[$file]}" "${dst_files[$file]}"
         $sync_file "$src" "$dst" "$file"
       fi
       unset "dst_files[$file]"
@@ -135,7 +135,8 @@ function shsync/status {
 # outputs the list with the following format:
 # SIZE <sp> MODIFICATION_TIME <sp> FILENAME <lf>
 function shsync/list-local {
-  find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'
+  # find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'
+  find . -type f -print0 | xargs -0 md5sum
 }
 
 function shsync/list-remote {
@@ -143,7 +144,8 @@ function shsync/list-remote {
   # TODO: this has an issue where if you're syncing with a filesystem that doesn't
   # support second-resolution timestamps, like FAT, it ends up re-sending files
   # even though they haven't changed.
-  ssh $REMOTE "cd ${(q)1}; find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'"
+  # ssh $REMOTE "cd ${(q)1}; find . '(' -type f -or -type d ')' -print0 | xargs -0 stat -c '%s:%Y %n'"
+  ssh $REMOTE "cd ${(q)1}; find . -type f -print0 | xargs -0 md5sum"
   # | sed -E 's,^regular file:,file:,'
 }
 
