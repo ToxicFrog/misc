@@ -51,6 +51,18 @@ function fetch-desc {
   }
 }
 
+# fixtitle title url -- if the title doesn't have a year on the end, extract
+# the year from the url
+function fixtitle {
+  if echo "$1" | egrep -q '[1-2][0-9][0-9][0-9]$'; then
+    echo -n "$1"
+  else
+    echo -n "$1" | tr -d ' '
+    echo -n " "
+    echo -n "$2" | egrep -o '[1-2][0-9][0-9][0-9]/browse' | cut -d/ -f1
+  fi
+}
+
 mkdir -p "$OUTPUT"
 
 CSS=$(dirname $0)/cooks-country-index.css
@@ -73,12 +85,15 @@ print -r "$issues" | tac | while read -r issue; do
   [[ $issue ]] || continue  # no baseurl results in one line of blank input
   title="$(attr "$issue" title)"
   url="$(attr "$issue" href)"
+  title="$(fixtitle "$title" "$url")"
   if [[ $url != http* ]]; then url="${BASEURL}${url}"; fi
   img="$(attr "$issue" data-src)"
   >&2 echo "$title" "$url" "$img"
   if [[ $TITLEFILTER ]]; then
-    >&2 echo skip
-    if ! echo "$title" | eval $TITLEFILTER; then continue; fi
+    if ! echo "$title" | eval $TITLEFILTER; then
+      >&2 echo "Skipping $title"
+      continue
+    fi
   fi
 
   out="$OUTPUT/$(sanitize "$title")"
@@ -92,8 +107,11 @@ print -r "$issues" | tac | while read -r issue; do
   # Fetch cover if missing
   [[ -f "$out/cover.jpeg" ]] || {
     echo -n " cover"
-    curl -s "$img" > "$out/cover.jpeg"
-    echo -n "."
+    if [[ $img ]]; then
+      curl -s "$img" > "$out/cover.jpeg"
+    else
+      echo -n "!"
+    fi
   }
 
   # Fetch recipe images and write issue index file
