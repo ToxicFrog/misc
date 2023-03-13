@@ -1,0 +1,86 @@
+#!/usr/bin/env zsh
+#
+# timgallery -- a simple gallery wrapper for timg
+#
+# Takes the same arguments as timg. Displays one image at a time; cycle through
+# them with n (next) and p (previous), and quit with q. Images which are HTTP(S)
+# URLs will be automatically downloaded with curl the first time you view them.
+#
+# Uses the alternate terminal buffer so it doesn't stomp on your backscroll, and
+# is compatible with timg's -pk and -pi modes.
+
+declare -a IMGS=()
+declare -a TITLES=()
+declare -a FLAGS=()
+declare IMG=1
+
+function main {
+  parse-args "$@"
+  (( ${#IMGS[@]} == 0 )) && exit 1
+
+  trap cleanup EXIT
+  tput smcup
+  redraw
+  while true; do
+    read -k key
+    case $key in
+      ' '|n) next-img ;;
+      p) prev-img ;;
+      q) exit 0 ;;
+    esac
+    redraw
+  done
+}
+
+function parse-args {
+  local doneflags
+  for arg in "$@"; do
+    case $arg in
+      --) doneflags=1 ;;
+      -*)
+        if (( ! doneflags )); then
+          FLAGS+=($arg)
+          continue
+        fi
+        ;&
+      *)
+        IMGS+=($arg)
+        TITLES+=($arg)
+        ;;
+    esac
+  done
+}
+
+function redraw {
+  tput clear
+  tput cup 999 0
+  printf '[%d/%d] \x1B[1m%s\x1B[0m' \
+    $IMG $#IMGS $TITLES[$IMG]
+  tput cup 0 0
+  if [[ $IMGS[$IMG] == http* ]]; then
+    curl $IMGS[$IMG] > /tmp/$$.$IMG
+    IMGS[$IMG]=/tmp/$$.$IMG
+    printf '\n\x1B[1J' # CSI 1 J: erase above
+    tput cup 0 0
+  fi
+  command timg -gx$((LINES-1)) $FLAGS[@] $IMGS[$IMG]
+  tput cup 0 0
+}
+
+function cleanup {
+  tput rmcup
+  touch /tmp/$$.0
+  rm -f /tmp/$$.*
+}
+
+function prev-img {
+  (( IMG-- ))
+  if (( IMG <= 0 )); then IMG=1; fi
+}
+
+function next-img {
+  (( IMG++ ))
+  if (( IMG > ${#IMGS[@]} )); then IMG=$#IMGS; fi
+}
+
+main "$@"
