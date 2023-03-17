@@ -177,7 +177,8 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
   html '
     <div class="header">
       <img src="%s" width=120px>
-      <span><input type="button" value="✬" onclick="toggleRowFilter('\''star-view'\'')"/></span>
+      <span><input type="button" value="✨" onclick="toggleRowFilter('\''star-view'\'')"/></span>
+      <span><input type="button" value="☀️" onclick="clearAllStars()"/></span>
       <span><input type="button" value="🗒" onclick="toggleRowFilter('\''unwritten-view'\'')"/></span>
       <span class="header-title">%s</span>
     </div>
@@ -191,7 +192,9 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
     id="$issue/${splash%.*}"
     html '
       <tr id="%s" class="recipe-row">
-        <td><label class="hotlist-button" onclick="toggleStar(this)">☆</label></td>
+        <td>
+          <label id="cb:starred:%s" class="hotlist-button" onclick="toggleStar(this)">☆</label>
+        </td>
         <td class="recipe-name" width=100%%>
           <b>%s</b><br/>
           <span class="desc">%s</span>
@@ -217,7 +220,7 @@ ls -t "$OUTPUT" | fgrep -v index.html | fgrep -v style.css | while read -r issue
           </span>
         </td>
       </tr>
-    ' "$id" "$title" "$desc" "$whythisworks" "$issue/$splash" "$id" "$id" "$id" "$id" "$id" "$id"
+    ' "$id" "$id" "$title" "$desc" "$whythisworks" "$issue/$splash" "$id" "$id" "$id" "$id" "$id" "$id"
   done
   html '</table>'
   echo -n "."
