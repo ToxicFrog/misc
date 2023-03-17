@@ -13,10 +13,18 @@ declare -a IMGS=()
 declare -a TITLES=()
 declare -a FLAGS=()
 declare IMG=1
+declare ALLOW_TMUX=1
 
 function main {
+  local escape_tmux=0
   parse-args "$@"
   (( ${#IMGS[@]} == 0 )) && exit 1
+  if [[ $TMUX_PANE ]] && (( escape_tmux )); then
+    # If escape_tmux is set, we were invoked with arguments that are incompatible
+    # with tmux. So we need to relaunch ourself outside tmux.
+    local session="$(tmux display-message -p '#S')"
+    exec tmux detach -E "$0 $@; tmux attach -t '$session'" || exit 2
+  fi
 
   trap cleanup EXIT
   tput smcup
@@ -37,6 +45,9 @@ function parse-args {
   for arg in "$@"; do
     case $arg in
       --) doneflags=1 ;;
+      -pk|-pi)
+        escape_tmux=1
+        ;&
       -*)
         if (( ! doneflags )); then
           FLAGS+=($arg)
