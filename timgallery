@@ -15,7 +15,12 @@ declare -a FLAGS=()
 declare IMG=1
 declare ALLOW_TMUX=1
 
+setopt nomonitor nonotify nofunctionargzero
+
 function main {
+  trap cleanup EXIT
+  mkdir /tmp/$$
+
   local escape_tmux=0
   parse-args "$@"
   (( ${#IMGS[@]} == 0 )) && exit 1
@@ -23,10 +28,11 @@ function main {
     # If escape_tmux is set, we were invoked with arguments that are incompatible
     # with tmux. So we need to relaunch ourself outside tmux.
     local session="$(tmux display-message -p '#S')"
-    exec tmux detach -E "$0 $@; tmux attach -t '$session'" || exit 2
+    printf '%s\0' "$@" > /tmp/$$/argv
+    tmux detach -E "xargs -0 -a /tmp/$$/argv echo; sleep 5; tmux attach -t '$session'"
+    exit $?
   fi
 
-  trap cleanup EXIT
   tput smcup
   redraw
   while true; do
@@ -62,26 +68,39 @@ function parse-args {
   done
 }
 
+TIMG_PID=0
+function kill-timg {
+  (( TIMG_PID )) || return
+  [[ -d /proc/$TIMG_PID ]] || return
+  ppid="$(cat /proc/$TIMG_PID/stat | cut -d' ' -f4)"
+  [[ $ppid == $$ ]] || return
+  kill $TIMG_PID
+  wait $TIMG_PID
+  TIMG_PID=0
+}
+
 function redraw {
+  kill-timg
   tput clear
   tput cup 999 0
-  printf '[%d/%d] \x1B[1m%s\x1B[0m' \
-    $IMG $#IMGS $TITLES[$IMG]
+  printf '[%d/%d] \x1B[1m%s\x1B[0m %s' \
+    $IMG $#IMGS $TITLES[$IMG] "$(date)"
   tput cup 0 0
   if [[ $IMGS[$IMG] == http* ]]; then
-    curl $IMGS[$IMG] > /tmp/$$.$IMG
-    IMGS[$IMG]=/tmp/$$.$IMG
+    curl $IMGS[$IMG] > /tmp/$$/$IMG
+    IMGS[$IMG]=/tmp/$$/$IMG
     printf '\n\x1B[1J' # CSI 1 J: erase above
     tput cup 0 0
   fi
-  command timg -gx$((LINES-1)) $FLAGS[@] $IMGS[$IMG]
-  tput cup 0 0
+  command timg -gx$((LINES-1)) $FLAGS[@] $IMGS[$IMG] &
+  sleep 0.1
+  TIMG_PID=$!
 }
 
 function cleanup {
+  kill-timg
   tput rmcup
-  touch /tmp/$$.0
-  rm -f /tmp/$$.*
+  rm -rf /tmp/$$
 }
 
 function prev-img {
