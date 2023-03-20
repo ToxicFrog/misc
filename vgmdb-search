@@ -3,13 +3,13 @@
 function main {
   if [[ "$1" ]]; then
     while [[ $1 ]]; do
-      wget -q -O- "http://vgmdb.info/search/$1" | show-results
+      wget -q -O- "http://vgmdb.info/search/$1?format=json" | show-results
       shift
     done
     exit 0
   fi
   while read $'query?\nvgmdb> '; do
-    wget -q -O- "http://vgmdb.info/search/$query" | show-results
+    wget -q -O- "http://vgmdb.info/search/$query?format=json" | show-results
     # if [[ $query =~ ^[0-9]+$ ]]; then
     #   curl -s "https://vgmdb.net/album/$query" | show-album
     # fi
