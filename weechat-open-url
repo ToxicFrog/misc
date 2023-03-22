@@ -1,0 +1,57 @@
+#!/usr/bin/env zsh
+#
+# Command to open a URL from weechat in a smart way.
+# For images, assume that we're connected from a terminal that supports
+# kitty rasters, and invoke timgallery to temporarily detach from tmux
+# and view the image.
+# For other URLs, emit a custom OSC sequence that will be interpreted by
+# the client machine as a command to open that URL.
+# Earlier versions of this which I should recover from backups sometime
+# worked by ssh'ing into the client machine to remotely open the browser,
+# and earlier versions still by splitting the tmux display and using elinks/
+# timg -- sadly a lot of the web is now unviewably in elinks.
+
+# Walk up the process tree until we run out of processes or find something
+# with stdout connected to something other than devnull
+function find-tty {
+  local pid=$$
+  while [[ $pid != 1 ]]; do
+    cat /proc/$pid/stat | read pid comm stat ppid _
+    if [[ $(readlink /proc/$pid/fd/1) != /dev/null ]]; then
+      echo -n "$pid"
+      return
+    fi
+    pid=$ppid
+  done
+  echo "Error: couldn't find parent process with valid stdout" >&2
+  echo -n "self"
+}
+
+function osc {
+  local pid=$(find-tty)
+  if [[ $TMUX ]]; then
+    printf '\x1BPtmux;\x1B\x1B]%s\x07\x1B\\' "$*" > /proc/$pid/fd/1
+  else
+    printf '\x1B]%s\x07' "$*" > /proc/$pid/fd/1
+  fi
+}
+
+# TODO: detect if the oscwrapper is connected (somehow?) and open locally if it's not,
+# using split-window and elinks for links or tiv/timg for images.
+function open-image {
+#  osc "451;IMG;$1"
+#  tmux split-window -h -c ~ zsh -c "source .zsh/aliases.zsh; timg '$1'"
+  tmux detach -E "timgallery -pk '$1'; tmux attach"
+}
+
+function open-url {
+  osc "451;URL;$1"
+}
+
+# Probe the URL to figure out what it is
+content_type="$(curl -s -L --head --write-out "%{content_type}" --output /dev/null "$1")"
+if [[ $content_type == image/* ]]; then
+  open-image "$1"
+else
+  open-url "$1"
+fi
