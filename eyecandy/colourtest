@@ -5,6 +5,7 @@ BPP=24
 CUBE_256=1
 CUBE_RGB=0
 ATTRS=1
+FONTS=0
 # SGR field (not command) separator -- the standard is : for the former and
 # ; for the latter, but some terminals use ; for both.
 SGR_FS=:
@@ -28,9 +29,12 @@ while [[ $1 ]]; do
     # Display a rainbow gradient for RGB rather than a colour cube
     --rgb-cube) CUBE_RGB=1 ;;
     --no-rgb-cube) CUBE_RGB=0 ;;
-    # Do not display text attributes at the bottom
+    # Display text attributes at the bottom
     --attrs) ATTRS=1 ;;
     --no-attrs) ATTRS=0 ;;
+    # Display brief test patterns for box drawing, Powerline, and NerdFonts
+    --fonts) FONTS=1 ;;
+    --no-fonts) FONTS=0 ;;
     # Use ; instead of : for 8bpp/24bpp modes
     --legacy-sgr) SGR_FS=';' ;;
     --no-legacy-sgr) SGR_FS=':' ;;
@@ -40,7 +44,7 @@ while [[ $1 ]]; do
     # help!
     -h|--help|*)
       >&2 echo "Usage: colourtest [--(1|4|8|24)bpp] [--feature|--no-feature]..."
-      >&2 echo "Features: 256-cube, rgb-cube, attrs, legacy-sgr, rgb-cs"
+      >&2 echo "Features: 256-cube, rgb-cube, attrs, fonts, legacy-sgr, rgb-cs"
       >&2 echo "If the 8bpp or 24bpp colours come out messed up or confuse your"
       >&2 echo "terminal, experiment with the legacy-sgr and rgb-cs features."
       exit
@@ -223,7 +227,20 @@ function show-attrs {
   formatcode 7 inverse 8 invisible
   printf '\b(invisible)       '
   formatcode 9 strikethrough
-  printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
+  printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n\n'
+}
+
+function show-fonts {
+  heading "Fancy font test"
+  # Box drawing characters are unicode and inserted as-is.
+  # Likewise powerline and NF characters, which use Unicode private areas
+  # and will render, or not, depending on what fonts the user has installed.
+  # The last block tests G0/G1 switching with SHIFT-OUT/SHIFT-IN, aka DEC
+  # graphical mode.
+  printf '%10s %s\n' \
+  '' $'╔═══╗ ┏━━━━━━━┱─────────────╌╌╌┄┄┄┈┈┈┈░▒▓█  \x0Elqqqqqqqqqqqqqqqqk\x0F' \
+  '' $'║Box╟╼┫Drawing┃ Powerline: []  ▞▅▜▟  \x0Ex\x0FDEC G1:\x0Ebcdeifghax\x0F' \
+  '' $'╚═══╝ ┗━━━━━━━┛ Nerd-Font: [⏻󰀁]  \x0Emqqqqqqqqqqqqqqqqj\x0F'
 }
 
 (( BPP >= 4 )) && show-16colours
@@ -245,6 +262,7 @@ if (( BPP >= 24 )); then
 fi
 
 (( ATTRS )) && show-attrs
+(( FONTS )) && show-fonts
 
 #formatcode \
 #  0 reset 1 bold 2 faint \
