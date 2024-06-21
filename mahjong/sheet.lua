@@ -1,287 +1,277 @@
-local fd = io.open('sheet.html', 'wb')
-fd:write [[
-  <html>
-   <head>
-    <link rel="stylesheet" href="./sheet.css">
-   </head>
-   <body>
-]]
-
-local function emit(...)
-  fd:write(string.format(...).."\n")
-end
-
-local function pbreak()
-  emit '<P style="page-break-before: always"/>'
-end
-
-local function open(title)
-  return function(n)
-    emit('<table><tr><th colspan=%d>%s</th></tr>', n, title)
-  end
-end
-
-local function close()
-  emit('</table>')
-end
-
-local function row(content)
-  emit('<tr>')
-  for _,cell in ipairs(content) do
-    emit("%s", cell)
-  end
-  emit('</tr>')
-end
-
-function string:count(pattern)
-  local n = 0
-  for _ in self:gmatch(pattern) do n=n+1 end
-  return n
-end
-
-local function tbl(title)
-  return function(n)
-    open(title)(n)
-    return function(rows)
-      local buf = ""
-      for _,r in ipairs(rows) do
-        buf = buf..r
-        -- print("ROW", buf:count('<td'), r)
-        if buf:count('<td') >= n or buf:match('colspan=') then
-          row{buf}
-          buf = ""
-        end
-      end
-      if #buf > 0 then row{buf} end
-      close()
-    end
-  end
-end
-
-local function txt(text)
-  return '<td class="text">'..(text
-    :gsub("^%s+","")
-    :gsub("%s+$","")
-    :gsub("\n", "<br>")
-    :gsub("_([^*]-)_", "<u>%1</u>")
-    :gsub("%*([^*]-)%*", "<b>%1</b>"))..'</td>'
-end
-
-local function score(score)
-  return function(text)
-    return '<td class="score">'..(score
-      :gsub("^%s+","")
-      :gsub("%s+$","")
-      :gsub("\n", "<br>")
-      :gsub("_([^*]-)_", "<u>%1</u>")
-      :gsub("%*([^*]-)%*", "<b>%1</b>"))..'</td>'
-      .. txt(text)
-  end
-end
-
-local function tiles(text)
-  return '<td class="tiles">'..(text
-    :gsub("^%s+","")
-    :gsub("%s+$","")
-    :gsub(" *(%S+) *",'<img src="%1.gif">')
-    :gsub("\n", "<br>"))..'</td>'
-end
-
-local function cells(c)
-  buf = ""
-  for _,text in ipairs(c) do
-    buf = buf..txt(text)
-  end
-  return buf
-end
+require 'lib'
 
 emit('<div style="text-align: center; width=0%%; margin:0px;">')
 
+open "Overview" (1)
+row {
+  txt [[
+    A game of Mahjong is played in multiple *rounds*, with each round consisting of several *hands*. The overall goal of the game is to score the most points; the goal of each hand is to form a *winning hand* of tiles before anyone else does. Most winning hands will consist of four *melds* (chows, pungs, or kongs) and one matched pair of tiles, but how many points a winning hand is worth depends on what's in it and how it was built.
+
+    These rules are based on one particular version of Hong Kong Old Style Mahjong, but there are innumerable variants of the game, with different tiles, scoring rules, and even rules of play. Feel free to tweak these rules to make it more fun; just make sure everyone in the group agrees what rules you are playing with before you start!
+  ]]
+}
+
 open "Tile Types" (4)
 row {
-  tiles "c2\nb4\nd7",
+  tiles "d7 b4\nc1 c9",
   txt [[
-    *Suits* — Characters, Bamboo, and Circles/Orbs<hr>Used to form chows, pungs, and kongs.
+    *Suits* — Circles, Bamboo, and Hanzi.<hr>The 1 and 9 of each suit are called the "terminals".
   ]],
   tiles "spring flower-summer\nfall flower-winter",
   txt [[
-    *Bonuses* — Seasons and Flowers<hr>When drawn, set aside and draw a replacement.
+    *Bonuses* — Seasons and Flowers<hr>Grants extra points if you collect the right ones.<br>When drawn, play immediately and draw a replacement.
   ]]
 }
 row {
-  tiles "red\ngreen\nwhite",
+  tiles "red green\nwhite",
   txt [[
-    *Dragon Honours* — Red, Green, and White<hr>Can form pungs and kongs, but not chows.
+    *Dragons* — Red, Green, and White<hr>All types of dragons are "honour tiles" and grant extra points.
   ]],
   tiles "E S\nW N",
   txt [[
-    *Wind Honours* — East, South, West, and North<hr>Can form pungs and kongs, but not chows. Bonus if it matches the round wind or your seat wind.
+    *Winds* — East, South, West, and North<hr>All winds are "honour tiles", but only the ones matching the round wind or your seat wind grant extra points.
   ]]
 }
 close()
 
-open "Basic Groups" (2)
+open "Chow (three in a row)" (2)
 row {
   tiles [[
     d1 d2 d3
-    c4 c5 c6
     b7 b8 b9
   ]],
   txt [[
-    *Chow* (three in a row)
-    _Concealed_: form in your hand using tiles from the wall.
-    _Revealed_: take the preceding player's discard, immediately combine with two tiles in your hand, and play face up.
-    Form from suits only; dragons and winds cannot chow.
+    _Closed_: form in your hand using tiles from the wall.
+    _Open_: form face-up by stealing the preceding player's discard and combining with two tiles in your hand.
+    <hr>Formed from suits only, not honour tiles. Usually the lowest-scoring form of meld.
   ]],
 }
+close()
+
+open "Pung (three of a kind)" (2)
 row {
   tiles [[
     b2 b2 b2
-    green green green
     S S S
   ]],
   txt [[
-    *Pung* (three of a kind)
-    _Concealed_: form in your hand using tiles from the wall.
-    _Revealed_: take *any* player's discard, immediately combine with two tiles in your hand, and play face up.
-    If you take another player's discard, play continues to your right even if this skips some players.
+    _Closed_: form in your hand using tiles from the wall.
+    _Open_: form face-up by stealing *any* player's discard and combining with two tiles in your hand.
+    <hr>Play continues to your right even if this skips someone.
   ]]
 }
+close()
+
+open "Kong (four of a kind)" (2)
 row {
   tiles [[
-    d3 d3
-    d3 d3
-    E E
-    E E
+    back E E back
+    d3 d3 d3 d3
   ]];
   txt [[
-    *Kong* (four of a kind)
-    _Concealed_: form in your hand using tiles from the wall. Declare and play face down (now or later).
-    _Revealed (Small)_: take a tile from your hand and add it to a revealed pung.
-    _Revealed (Large)_: take *any* player's discard and immediately add it to a concealed pung; play face up.
-    After playing any kong, draw a _replacement tile_ from the back of the wall and proceed as if you had just drawn from the wall at the start of your turn.
+    _Closed_: form in your hand using tiles from the wall, then play partially face up.
+    _Open (Small)_: form face-up by adding a tile from the wall to a revealed pung.
+    _Open (Large)_: form face-up by stealing *any* player's discard and adding to a concealed pung.
+    <hr>After playing, draw a replacement. Play continues to your right as with pung.
   ]]
 }
+close()
+
+open "Play" (2)
 row {
-  tiles [[
-    d1 d1 d1
-    c4 c4 c4
-    b3 b4 b5
-    red red red
-    red N N
-  ]];
-  txt [[
-    *Mahjong* (winning hand)
-    Any four basic groups + any pair. Ends the game immediately in victory for you.
-    If you need only one tile to form mahjong, you can steal it from any player's discard as if forming a pung, even if it would be used to form a chow or pair. You can also form it by stealing the tile another player plays from their hand to form a small revealed kong.
-  ]]
+  txt "*Your Turn*"; txt "Draw a tile, then choose a tile to discard (or declare victory if you can). You always end your turn by discarding, whether you drew a tile from the wall or stole a tile from someone else.";
+}
+row {
+  txt "*Stealing*"; txt "After someone discards, other players have a few seconds to steal that tile to complete a meld or a winning hand. If multiple players try to steal at once, winning beats kong, which beats pung, which beats chow. Note that you can always steal if that tile would give you a winning hand, even if it wouldn't complete a meld.";
+}
+row {
+  txt "*Replacements*"; txt "After playing a bonus tile or a kong, draw a replacement tile from the back of the dead dead wall rather than the front of the live wall."
+}
+row {
+  txt "*Dead Wall*"; txt "The last 14 tiles of the wall (7 columns) are the \"dead wall\". It's always 14 tiles long no matter how many tiles you've drawn from it."
+}
+row {
+  txt "*Out of Tiles*"; txt "The hand ends in a 4-way tie if there are only 14 tiles (the dead wall) left on the table.";
+}
+row {
+  txt "*Winning*"; txt "When drawing or stealing a tile gives you a winning hand (4 melds + 1 pair), reveal your hand and declare victory. You score points from the other players depending on the contents of the hand."
+}
+row {
+  txt "*Next Hand*"; txt "At the end of a hand (unless it was a tie), the East position moves to the player to the current East's right, and that player goes first."
+}
+row {
+  txt "*Next Round*"; txt "Once every player has been East, the round wind changes to South and the South player goes first. After that comes West, then North."
+}
+row {
+  txt "*Game End*"; txt "A game usually ends after 1-4 rounds (depending on how long a game people want). It also ends immediately if any player runs out of points completely.";
 }
 close()
 
 pbreak()
 
---[=[
-open "Alternate Wins" (3)
+open "Setup" (1)
 row {
-  score "6";
-  tiles [[
-    spring summer fall winter
-    flower-spring flower-summer flower-fall flower-winter]];
   txt [[
-    *Nature's Bounty*
-    All flowers and seasons.
-    If you have seven of the requisite tiles, you can steal the 8th if another player plays it (but not if they already have it);
-  ]];
-}
-row {
-  score "8";
-  tiles [[
-    red green white E S W N
-    b1 b9 c1 c9 d1 d9 back]];
-  txt [[
-    *The Thirteen Orphans*
-    One each of the 1 and 9 of each suit and one of each honour, plus any 14th tile.
-  ]];
-}
-row {
-  score "8"; txt""; txt [[
-    *The Blessing of Heaven*: dealer wins with initial hand
-    *The Blessing of Earth*: any other player wins with initial hand
-  ]];
+    (1) Choose a player to be East. Seat players counterclockwise E-S-W-N (reverse compass order). Decide on scoring rules.
+    (2) Shuffle tiles and build four walls, each one 18 tiles wide and 2 high. Push them together into a square.
+    (3) East rolls 3d6; count that many seats around the table. That player counts that many tiles from the edge of their wall and breaks the wall there. Players will draw tiles from the right side of the break.
+    (4) Players draw two tiles at a time, starting with East, until everyone has 12 tiles; then one more tile each to make 13.
+    (5) The round wind always starts at East, so the East player gets the first turn.
+  ]]
 }
 close()
-]=]
 
-tbl "Alternate Wins" (4) {
-  score "6" [[
-    *Nature's Bounty*: one of each flower and season
-    If you already have seven, you can steal the 8th when someone else draws it.
-  ]];
-  score "8" [[
-    *The Thirteen Orphans*: one of each honour + the 1 and 9 of each suit.
-  ]];
-  [[
-    <td class="score"two>8</td>
-    <td colspan=3>
-      <b>The Blessing of Heaven</b>: dealer wins with initial hand<br>
-      <b>The Blessing of Earth</b>: any other player wins with intial hand
-    </td>]];
-  '<th colspan=4>Victory Bonuses</th>';
-  score "+1" "Win by drawing a tile";
-  --[[
-    Win by drawing from the wall.
-    +1 if it's the last tile.
-    Another +3 if it's the last tile *and* it's 1 Orb.
+open "Between Hands" (1)
+row {
+  txt [[
+    If a hand ends in a tie, just reshuffle the tiles, rebuild the walls, and play another hand.
+    If someone won, but not everyone has been the first player yet this round, the *seat winds* change; the player after the current East becomes the new East (with the players after them being South, West, and North).
+    If everyone has already been first player this round, the *round wind* changes instead, in the same order: East➞South➞West➞North. The player whose seat matches the new round wind goes first.
   ]]
-  score "+2" "Win using the last discard of the game.";
-  score "+1" "Win by stealing the tile another player uses to form a small kong.";
-  score "+2" "Win using the replacement tile you draw after declaring kong.";
-  --[[
-    Win using the replacement tile you draw after declaring kong.
-    +3 if you did more than one kong this turn before winning.
-    +3 if the tile is 5 Orb and you use it to complete a 4-5-6 Orb chow.
-  ]]
-  '<th colspan=4>Hand Bonuses</th>';
--- }
+}
+close()
 
--- tbl "Hand Bonuses" (4) {
-  score "+1" "Whole hand is concealed, some chows";
-  score "+1" "All chows, no honours";
-  score "+3" "All pungs, some revealed";
-  score "+3" "*Half Flush*: one suit + honours";
-  score "+6" "*Full Flush*: one suit, no honours";
-  score "+8" "Honour tiles only";
-  score "+8" "Four concealed pungs";
-  txt ''; txt '';
-
-  '<th colspan=4>Group Bonuses</th>';
-  score "+1" "Pung of round wind";
-  score "+1" "Pung of seat wind";
-  score "+6" "three pungs + pair of winds";
-  score "+8" "*Great Winds*: four pungs of winds";
-  score "+1" "At least one pung of dragons";
-  score "+3" "two pungs + pair of dragons";
-  score "+6" "*Great Dragons*: three pungs of dragons";
-  txt ""; txt "";
-  score "+1" "No flower tiles";
-  score "+1" "Per flower or season tile";
-  score "+1" "Per flower or season of the round";
-  score "+1" "Per flower or season of your seat";
+tbl "Scoring" (1) {
+  row {
+    txt [[
+      Players start with 500 *points*. The overall winner is the one with the most points at the end of the game.
+      Hands are scored in *faan*. Before playing, players should agree on a minimum number of faan to declare victory (usually 1-3) and a maximum faan per hand (usually 7 or 10; sometimes 13).
+      When someone wins a hand, the other players give them points based on the faan-to-points table below. If they won by stealing a tile from someone, the person they stole it from pays double. If they won by drawing a tile, *everyone* pays double.
+    ]];
+  };
+  row {
+    subtable "Faan to Points" (9) {
+      cells { "Faan", '0', '1', '2', '3', '4-6', '7-9', '10-12', '13+' };
+      cells { 'Points', '1', '2', '4', '8', '16', '32', '64', '128' };
+      -- cells { 'Points', '600', '800', '1,000', '2,000', '4,000', '8,000', '12,000', '16,000', };
+    };
+  };
+  -- row {
+  --   subtable "Faan to Points" (9) {
+  --     cells { "Faan", '0', '1', '2', '3', '4-6', '7-9', '10-12', '13+' };
+  --     cells { 'Points', '600', '800', '1,000', '2,000', '4,000', '8,000', '12,000', '16,000', };
+  --   };
+    -- txt [[
+    --   <b>2</b>: points; <b>(2)</b>: points with open hand; <b>(-)</b>: not valid with open hand. Anything that needs a pung also works with a kong.
+    -- ]]
+  -- };
+  -- row {
+  --   txt [[
+  --     The tables below show the various faan bonuses. Ones listed as "max" automatically score the maximum faan possible.
+  --   ]]
+  -- }
 }
 
-tbl "Scoring" (16) {
-  [[
-  <td colspan=16>All bonuses are given in <i>fan</i>. Before playing you should agree on a minimum fan to declare victory (typically 3) and a maximum fan per round (typically 10-13). After tallying bonuses, consult the fan→points table below to determine actual score.<br>
-  Typically, if you win from the wall all other players pay you your score; if you win from discard, the discarding player pays double and the other players pay half or nothing.
-  </td>]];
-  cells { "Fan", "0", "1", "2", "3", "4", "5", '6', '7', '8', '9', '10', '11', '12', '13', '14' };
-  cells { 'Points', '2', '4', '8', '16', '32', '48', '64', '96', '128', '192', '256', '384', '512', '768', '1024' };
-  '<th colspan=16>Two/Three Player Game</th>';
-  [[<td colspan=16>
-  For a <u>three-player game</u>, remove the 2-8 of characters, or disallow chow of characters.<br>
-  For a <u>simple two-player game</u>, disallow chow entirely and otherwise play normally.<br>
-  For <u>more complexity</u>, give each player two hands; you can move tiles between them at will but must go mahjong with both to win, and can't swap tiles once they are revealed. At end of game subtract loser's score (if they have a mahjong out) from winner's.
-  </td>]];
+--[[
+tbl "Faan from Winning Hand" (4) {
+  score "0" "Basic Mahjong (4 melds + 1 pair)";
+  score "4" "Seven Pairs (7 matched pairs of tiles, no melds)";
+  scorespan(3) "max" "Nature's Bounty (all 8 bonus tiles, main hand doesn't matter)";
+  scorespan(3) "max" "Thirteen Orphans (one of each honour and terminal + one duplicate)";
+--}
+
+--tbl "Faan from Winning Move" (4) {
+subheader "Faan from Winning Move";
+  score "2" "Draw last tile from wall";
+  score "1" "Steal from small open kong";
+  score "1" "Draw from wall";
+  score "1" "Steal the last discard of the game";
+  score "1" "Draw from dead wall";
+  score "0" "Steal anything else";
+  scorespan(3) "max" "Blessing of Heaven/Earth (win with your first draw of the hand)";
+
+subheader "Faan from Bonuses";
+  score "2" "All seasons";
+  score "2" "All flowers";
+  score "1" "Season of your seat";
+  score "1" "Flower of your seat";
+  score "1" "No bonus tiles at all";
+  score "max" "All 8 bonus tiles (automatic win)";
+
+subheader "Faan from Melds";
+  score "3" "All pungs/kongs (open hand)";
+  score "1" "All chows (closed hand)";
+  score "6" "All pungs/kongs (closed hand)";
+  score "max" "All kongs";
+
+subheader "Faan from Honours";
+  score "1" "Pung/kong of round wind";
+  score "1" "For each pung/kong of dragons";
+  score "1" "Pung/kong of seat wind";
+  score "1" "*All Simples*: No honours or terminals";
+  score "4" "*Small Dragons*: two pungs/kongs + pair of dragons";
+  score "8" "*Small Winds*: three pungs/kongs + pair of winds";
+  score "6" "*Big Dragons*: three pungs/kongs of dragons";
+  score "max" "*Big Winds*: four pungs/kongs of winds";
+  score "8" "*All Honours*: Entire hand is honour tiles";
+
+subheader "Faan from Suits";
+  score "3" "*Half Flush*: one suit with some honour tiles";
+  score "6" "*Full Flush*: one suit with no honour tiles";
+  scorespan(3) "max" "*Pearl Dragon*: all pungs/kongs, mix of circles and white dragon tiles";
+  scorespan(3) "max" "*Jade Dragon*: all pungs/kongs, mix of bamboo and green dragon tiles";
+  scorespan(3) "max" "*Ruby Dragon*: all pungs/kongs, mix of characters and red dragon tiles";
+  scorespan(3) "max" "*Nine Gates*: 1112345678999 of one suit + one extra of the same suit (closed hand)";
+}
+pbreak()
+]]
+
+tbl "Score Table" (4) {
+  -- score '2' '2 faan';
+  -- score '2 (1)' '2 faan with closed hand, 1 faan with open';
+  -- score '2 (-)' '2 faan with closed hand, 0 faan with open';
+  -- score 'max' 'Automatically score the maximum faan';
+  scorespan(3) 'Notes' "*2 (1)* means that bonus is worth 2 if closed, 1 if open. *2 (-)* means you only get the bonus if the hand is closed. *max* means it automatically scores maximum faan. Anything that needs a pung, you can also use kongs for.";
+
+  subheader 'Alternate Winning Hands';
+    score 'max' 'Thirteen Orphans';
+    score 'max' 'Nine Gates';
+    score 'max' 'Eight Treasures';
+    score '2' 'Seven Pairs';
+
+  subheader 'Faan from Winning Move';
+    score 'max' 'Win with your first draw';
+    score '1' 'Last draw from the wall';
+    score '1' 'Steal the last discard';
+    score '1' 'Any draw from the dead wall';
+    score '1' 'Steal from a small kong';
+    score '1 (-)' 'Normal draw from the wall';
+
+
+  subheader "Faan from Bonuses";
+    score "2" "All seasons";
+    score '1' 'Per season or flower of your seat';
+    score '2' 'All flowers';
+    score "1" "No bonus tiles at all";
+
+  subheader 'Faan from Suits';
+    score '6 (5)' '*Full Flush* All one suit, no honours';
+    score '2 (1)' '*Pure Straight* 1-9 of one suit';
+    score '3 (2)' '*Half Flush* All one suit, some honours';
+    score '2 (1)' 'Three matching chow of different suits';
+    score '3 (-)' 'Two sets of two matching chow of one suit';
+    score '1 (-)' 'Two matching chow of one suit';
+
+  subheader 'Faan from Melds';
+    score 'max' 'Four kongs';
+    score '2' 'Three kongs';
+    score 'max (2)' 'Four pungs';
+    score '2' 'Three closed pungs';
+    score '2' 'Three pungs with the same number';
+    score '2' '2 pungs + 1 pair of dragons';
+
+  subheader 'Faan from Honours/Terminals';
+    scorespan(3) 'max' 'Three wind pungs + wind pair or pung';
+    score 'max' 'Three dragon pungs';
+    score '2' 'Two dragon pungs + dragon pair';
+    score 'max' 'Only honours';
+    score '1' '*All Simples* No honours or terminals';
+    score 'max' 'Only terminals';
+    score '1' 'One dragon pung';
+    score '3 (2)' 'At least one terminal in each meld';
+    score '1' 'Prevalent wind';
+    score '2' 'Only terminals and honours';
+    score '1' 'Seat wind';
 }
 
 emit [[

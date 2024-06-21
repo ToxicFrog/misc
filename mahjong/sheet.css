@@ -1,14 +1,40 @@
-table, th, td {
-  border: 1px solid black;
+body {
+  background-color: white;
+  color: black;
+  width: 8.5in;
+  margin: 0em;
 }
 table {
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  margin: 0;
   border-collapse: collapse;
+  border: solid black;
+  border-width: 2px 1px;
 }
+td.subtable {
+  margin: 0; padding: 0;
+}
+td.subtable table {
+  border: 0;
+}
+tr {
+  border: 0px;
+  border-bottom: 2px solid darkslategray;
+}
+tr:last-child {
+  border-bottom: 0px;
+}
+/* th td {
+  border: solid black;
+  border-width: 3px 1px;
+} */
 th {
   font-weight: bold;
   background: #CCFFCC;
+}
+td {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
 }
 td.tiles {
   white-space: nowrap;
@@ -18,11 +44,12 @@ td.score {
   padding-left: 1em;
   padding-right: 1em;
   font-weight: bold;
+  white-space: nowrap;
 }
 img {
   margin: 0px;
   border: 0.5px solid darkgreen;
 }
 hr {
-  margin: 0px 10% 0px 10%;
+  margin: 0.1em 10% 0.1em 10%;
 }
