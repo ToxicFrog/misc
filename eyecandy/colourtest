@@ -54,7 +54,7 @@ while [[ $1 ]]; do
 done
 
 function heading {
-  printf '%10s \x1B[1m%-60s%s\x1B[0m\n' '' "$@"
+  printf '\n%10s \x1B[1m%-60s%s\x1B[0m\n' '' "$@"
 }
 
 function fixsgr {
@@ -91,7 +91,7 @@ function show-16colours {
 
   printf '%10s ' 'fg+bg'
   printf3 '\x1B[0m \x1B[%s;2m#\x1B[0;%sm#\x1B[%s;1m#' $(map fgbg ${codes[@]})
-  printf '\x1B[0m\n\n'
+  printf '\x1B[0m\n'
 }
 
 # 256-colour palette is usually laid out as:
@@ -115,7 +115,6 @@ function show-256linear {
     printf '\x1B[48:5:%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
     printf '\x1B[0m\n'
   done
-  printf '\n'
 }
 
 # this prints it with a bit more organization that makes it easier to look up
@@ -155,7 +154,6 @@ function show-256cube {
     esac
     printf '\n'
   done
-  printf '\n'
 }
 
 # Display a single-line stripe of RGB to make sure it's working, without
@@ -174,7 +172,7 @@ function show-rgblinear {
   printf ' \x1B[0m]\n'
   printf '           '
   printf '%-11s' K R Y G C B M
-  printf ' W\n\n'
+  printf ' W\n'
 }
 
 # RGB888
@@ -227,7 +225,7 @@ function show-attrs {
   formatcode 7 inverse 8 invisible
   printf '\b(invisible)       '
   formatcode 9 strikethrough
-  printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n\n'
+  printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
 }
 
 function show-fonts {
