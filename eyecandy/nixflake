@@ -82,6 +82,10 @@ while [[ $1 ]]; do
       done
       exit 0;;
     --help) set --; break;;
+    --random)
+      preset="$($0 --presets | shuf | head -n1 | cut -d: -f1 | tr -d ' -')"
+      shift
+      ;;
     --*)
       preset="${1#--}"
       if [[ ! "${presets[$preset]}" ]]; then
@@ -103,7 +107,7 @@ if [[ $6 ]]; then
   printf '\e[0m'
 else
   >&2 echo "Usage: nixflake [--small|--large] R1G1B1 R2G2B2 ... R6G6B6"
-  >&2 echo "       nixflake [--small|--large] --PRESET-NAME"
+  >&2 echo "       nixflake [--small|--large] <--PRESET-NAME|--random>"
   >&2 echo "  or:  nixflake --presets    to list presets"
   exit 1
 fi
