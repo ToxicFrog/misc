@@ -1,8 +1,39 @@
 #!/usr/bin/env bash
 
-# First, do 8-colour palette, in both ANSI (30-37) and AIX (90-97) colours
+# Default settings
+BPP=24
+LINEAR_256=0
+LINEAR_RGB=1
+ATTRS=1
 
-codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
+while [[ $1 ]]; do
+  case "$1" in
+    # Monochrome terminal; show attrs only
+    --1bpp|--mono) BPP=1 ;;
+    # 16-colour terminal
+    --4bpp|--16) BPP=4 ;;
+    # 256-colour terminal
+    --8bpp|--256) BPP=8 ;;
+    # direct (RGB) colour terminal
+    --24bpp|--rgb) BPP=24 ;;
+    # Display 8bpp palette linearly rather than as a colour cube
+    --linear-256) LINEAR_256=1 ;;
+    --no-linear-256) LINEAR_256=0 ;;
+    # Display a rainbow gradient for RGB rather than a colour cube
+    --linear-rgb) LINEAR_RGB=1 ;;
+    --no-linear-rgb) LINEAR_RGB=0 ;;
+    # Do not display text attributes at the bottom
+    --attrs) ATTRS=1 ;;
+    --no-attrs) ATTRS=0 ;;
+    # help!
+    -h|--help|*)
+      >&2 echo "Usage: colourtest [--{1,4,8,24}bpp] [--(no-)linear-{256,rgb}] [--(no-)attrs]"
+      exit
+      ;;
+  esac
+  shift
+done
+
 
 function bg { echo $(( $1+10 )); }
 function fgbg { echo "$1;$(( $1+10 ))"; }
@@ -12,139 +43,181 @@ function printf3 {
   for arg in "$@"; do printf "$fmt" "$arg" "$arg" "$arg"; done
 }
 
-printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
-  "ANSI & AIXTerm 8-colour palettes (dim - plain - bright)" \
-  "SGR C m"
-printf '%10s ' 'colour'
-printf ' %3d' ${codes[@]}
-printf '\n'
+# First, do 8-colour palette, in both ANSI (30-37) and AIX (90-97) colours
+codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
+function show-16colours {
+  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+    "ANSI & AIXTerm 8-colour palettes (dim - plain - bold)" \
+    "SGR C m"
+  printf '%10s ' 'colour'
+  printf ' %3d' ${codes[@]}
+  printf '\n'
 
-printf '%10s ' 'fg'
-printf3 ' \x1B[%d;2m#\x1B[0;%dm#\x1B[%d;1m#' ${codes[@]}
-printf '\x1B[0m\n'
+  printf '%10s ' 'fg'
+  printf3 ' \x1B[0;%d;2m#\x1B[0;%dm#\x1B[%d;1m#' ${codes[@]}
+  printf '\x1B[0m\n'
 
-printf '%10s ' 'bg'
-printf3 '\x1B[0m \x1B[%d;2m \x1B[0;%dm \x1B[%d;1m ' $(map bg ${codes[@]})
-printf '\x1B[0;1m  +10 for bg\x1B[0m\n'
+  printf '%10s ' 'bg'
+  printf3 '\x1B[0m \x1B[%d;2m \x1B[0;%dm \x1B[%d;1m ' $(map bg ${codes[@]})
+  printf '\x1B[0;1m  +10 for bg\x1B[0m\n'
 
-printf '%10s ' 'fg+bg'
-printf3 '\x1B[0m \x1B[%s;2m#\x1B[0;%sm#\x1B[%s;1m#' $(map fgbg ${codes[@]})
-printf '\x1B[0m\n\n'
+  printf '%10s ' 'fg+bg'
+  printf3 '\x1B[0m \x1B[%s;2m#\x1B[0;%sm#\x1B[%s;1m#' $(map fgbg ${codes[@]})
+  printf '\x1B[0m\n\n'
+}
 
 # 256-colour palette is usually laid out as:
 # [00-0f] 16-colour palette at the start
 # [10-e7] 6x6x6 (=216) colours
 # [e8-ff] greyscale
 # this just prints it out raw
-printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
-  "256-colour indexed" \
-  "SGR 38;5;I m"
-printf '%10s     \x1B[4mraw palette\x1B[0m\n'
-printf '%6s' ''
-printf '%4s 0123456789ABCDEF' '' '' '' ''
-printf '\n'
-for i in {0..3}; do
-  printf '%10x ' $i
-  printf '\x1B[48;5;%dm ' $(seq $((16*i)) $((16*i+15)))
-  printf '\x1B[0m%4x ' $((i+4))
-  printf '\x1B[48;5;%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
-  printf '\x1B[0m%4x ' $((i+8))
-  printf '\x1B[48;5;%dm ' $(seq $((16*(i+8))) $((16*(i+8)+15)))
-  printf '\x1B[0m%4x ' $((i+12))
-  printf '\x1B[48;5;%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
-  printf '\x1B[0m\n'
-done
-printf '\n'
+function show-256linear {
+  printf '%10s     \x1B[4mraw palette\x1B[0m\n'
+  printf '%6s' ''
+  printf '%4s 0123456789ABCDEF' '' '' '' ''
+  printf '\n'
+  for i in {0..3}; do
+    printf '%10x ' $i
+    printf '\x1B[48;5;%dm ' $(seq $((16*i)) $((16*i+15)))
+    printf '\x1B[0m%4x ' $((i+4))
+    printf '\x1B[48;5;%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
+    printf '\x1B[0m%4x ' $((i+8))
+    printf '\x1B[48;5;%dm ' $(seq $((16*(i+8))) $((16*(i+8)+15)))
+    printf '\x1B[0m%4x ' $((i+12))
+    printf '\x1B[48;5;%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
+    printf '\x1B[0m\n'
+  done
+  printf '\n'
+}
 
 # this prints it with a bit more organization that makes it easier to look up
 # by colour, but harder to look up by number
-printf '%10s     \x1B[4m%s\x1B[0m\n' '' "216-colour cube (16-231)"
-printf '%10s '
-printf '%-8s' $(seq 16 36 220)
-printf '\n'
-
-# each row is a different G
-for g in {0..5}; do
-  printf '%10s ' "+$((g*6))"
-  # each box is a different R
-  for r in {0..5}; do
-    # and then within each row of each box, B increases to the left
-    base=$(( 0x10 + r*36 + g*6 ))
-    printf '\x1B[48;5;%dm ' $(seq $base $((base+5)))
-    printf '\x1B[0m  '
-  done
-  case $g in
-    0)
-      printf '  \x1B[4m16-colour (0-15)\x1B[0m'
-      ;;
-    1)
-      printf ' ['
-      printf '\x1B[48;5;%dm ' $(seq 0 15)
-      printf '\x1B[0m]'
-      ;;
-    3)
-      printf '  \x1B[4mgreyscale (232-255)\x1B[0m'
-      ;;
-    4)
-      printf ' ['
-      printf '\x1B[48;5;%dm ' $(seq 232 255)
-      printf '\x1B[0m]'
-  esac
+function show-256cube {
+  printf '%10s     \x1B[4m%s\x1B[0m\n' '' "216-colour cube (16-231)"
+  printf '%10s '
+  printf '%-8s' $(seq 16 36 220)
   printf '\n'
-done
 
+  # each row is a different G
+  for g in {0..5}; do
+    printf '%10s ' "+$((g*6))"
+    # each box is a different R
+    for r in {0..5}; do
+      # and then within each row of each box, B increases to the left
+      base=$(( 0x10 + r*36 + g*6 ))
+      printf '\x1B[48;5;%dm ' $(seq $base $((base+5)))
+      printf '\x1B[0m  '
+    done
+    case $g in
+      0)
+        printf '  \x1B[4m16-colour (0-15)\x1B[0m'
+        ;;
+      1)
+        printf ' ['
+        printf '\x1B[48;5;%dm ' $(seq 0 15)
+        printf '\x1B[0m]'
+        ;;
+      3)
+        printf '  \x1B[4mgreyscale (232-255)\x1B[0m'
+        ;;
+      4)
+        printf ' ['
+        printf '\x1B[48;5;%dm ' $(seq 232 255)
+        printf '\x1B[0m]'
+    esac
+    printf '\n'
+  done
+  printf '\n'
+}
+
+# Display a single-line stripe of RGB to make sure it's working, without
+# trying to display the whole colour cube.
+function show-rgblinear {
+  printf '%10s     \x1B[4mLinear gradient (8 colours, 10 steps between colours)\x1B[0m\n'
+  printf '          ['
+  printf '\x1B[48;2;0;0;0m '                       # black
+  printf '\x1B[48;2;%d;0;0m '     $(seq 5 25 255)  # black to red
+  printf '\x1B[48;2;255;%d;0m '   $(seq 5 25 255)  # red to yellow
+  printf '\x1B[48;2;%d;255;0m '   $(seq 255 -25 5) # yellow to green
+  printf '\x1B[48;2;0;255;%dm '   $(seq 5 25 255)  # green to cyan
+  printf '\x1B[48;2;0;%d;255m '   $(seq 255 -25 5) # cyan to blue
+  printf '\x1B[48;2;%d;0;255m '   $(seq 5 25 255)  # blue to magenta
+  printf '\x1B[48;2;255;%d;255m ' $(seq 5 25 255)  # magenta to white
+  printf ' \x1B[0m]\n\n'
+}
 
 # RGB888
 # if we sample every 32nd colour, i.e. stride each one from 0 to 255 in steps of 32,
 # we can probably fit them all on screen, and this gives a higher colour resolution
 # than the 6x6x6 cube above still
-
-printf '\n%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
-  "RGB-888 colour cube (sampled at RGB333 resolution)" \
-  "SGR 38;2;R;G;B m"
-# as above, each row is G, each box is R, and B varies across cells
-printf '%10s R='
-printf ' %-3d      ' $(seq 31 32 256)
-printf '\n'
-printf '         B='
-printf ' 31-255%s   ' '' '' '' '' '' '' '' ''
-printf '\n'
-for g in $(seq 31 32 255); do
-  if (( g==31 )); then
-    printf '   G= %3d  ' $g
-  else
-    printf '%9d  ' $g
-  fi
-  for r in $(seq 31 32 255); do
-    printf "\x1B[48;2;$r;$g;%dm " $(seq 31 32 255)
-    printf '\x1B[0m  '
-  done
-  printf '%3d' $g
+function show-rgbcube {
+  printf '%10s     \x1B[4mColour cube (8 samples per axis)\x1B[0m\n'
+  # as with the 256 cube, each row is G, each box is R, and B varies across cells
+  printf '%10s R='
+  printf ' %-3d      ' $(seq 31 32 256)
   printf '\n'
-done
-
-printf '\n%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
-  "Non-colour formatting codes" "SGR C m"
-
-function formatcode {
-  local len="$(echo "$2" | wc -c)"
-  if ((len <= 12)); then
-    printf "%2d  ▶\x1B[%dm%s\x1B[0m◀%-$((12-len))s" "$1" "$1" "$2" ""
-  else
-    printf "%2d  ▶\x1B[%dm%s\x1B[0m◀%-$((29-len))s" "$1" "$1" "$2" ""
-  fi
-  if [[ $3 ]]; then
-    shift 2; formatcode "$@"
-  fi
+  printf '         B='
+  printf ' 31-255%s   ' '' '' '' '' '' '' '' ''
+  printf '\n'
+  for g in $(seq 31 32 255); do
+    if (( g==31 )); then
+      printf '   G= %3d  ' $g
+    else
+      printf '%9d  ' $g
+    fi
+    for r in $(seq 31 32 255); do
+      printf "\x1B[48;2;$r;$g;%dm " $(seq 31 32 255)
+      printf '\x1B[0m  '
+    done
+    printf '%3d' $g
+    printf '\n'
+  done
 }
 
-printf '       '
-formatcode 1 bold 2 faint 3 italic 4 underline 5 blink
-printf '\n       '
-formatcode 7 inverse 8 invisible
-printf '\b(invisible)       '
-formatcode 9 strikethrough
-printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
+function show-attrs {
+  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+    "Non-colour formatting codes" "SGR C m"
+
+  function formatcode {
+    local len="$(echo "$2" | wc -c)"
+    if ((len <= 12)); then
+      printf "%2d  ▶\x1B[%dm%s\x1B[0m◀%-$((12-len))s" "$1" "$1" "$2" ""
+    else
+      printf "%2d  ▶\x1B[%dm%s\x1B[0m◀%-$((29-len))s" "$1" "$1" "$2" ""
+    fi
+    if [[ $3 ]]; then
+      shift 2; formatcode "$@"
+    fi
+  }
+
+  printf '       '
+  formatcode 1 bold 2 faint 3 italic 4 underline 5 blink
+  printf '\n       '
+  formatcode 7 inverse 8 invisible
+  printf '\b(invisible)       '
+  formatcode 9 strikethrough
+  printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
+}
+
+(( BPP >= 4 )) && show-16colours
+
+if (( BPP >= 8 )); then
+  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+    "256-colour indexed" \
+    "SGR 38;5;I m"
+  (( LINEAR_256 )) && show-256linear
+  (( LINEAR_256 )) || show-256cube
+fi
+
+if (( BPP >= 24 )); then
+  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+    "RGB direct colour (24bpp, 8 bits/channel)" \
+    "SGR 38;2;R;G;B m"
+  (( LINEAR_RGB )) && show-rgblinear
+  (( LINEAR_RGB )) || show-rgbcube
+fi
+
+(( ATTRS )) && show-attrs
 
 #formatcode \
 #  0 reset 1 bold 2 faint \
@@ -166,4 +239,4 @@ printf '\n        0  reset all formatting          22  disable bold/faint       
 # italic
 # faint
 # inverse video
-# 
+#
