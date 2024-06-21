@@ -100,6 +100,7 @@ fi
 
 if [[ $6 ]]; then
   nixflake-$size "$@"
+  printf '\e[0m'
 else
   >&2 echo "Usage: nixflake [--small|--large] R1G1B1 R2G2B2 ... R6G6B6"
   >&2 echo "       nixflake [--small|--large] --PRESET-NAME"
