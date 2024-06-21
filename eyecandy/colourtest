@@ -2,9 +2,15 @@
 
 # Default settings
 BPP=24
-LINEAR_256=0
-LINEAR_RGB=1
+CUBE_256=1
+CUBE_RGB=0
 ATTRS=1
+# SGR field (not command) separator -- the standard is : for the former and
+# ; for the latter, but some terminals use ; for both.
+SGR_FS=:
+# Whether to include a dummy colourspace ID in RGB colour codes.
+# Some terminals require it, some reject it, some don't care.
+RGB_CS=1
 
 while [[ $1 ]]; do
   case "$1" in
@@ -17,23 +23,41 @@ while [[ $1 ]]; do
     # direct (RGB) colour terminal
     --24bpp|--rgb) BPP=24 ;;
     # Display 8bpp palette linearly rather than as a colour cube
-    --linear-256) LINEAR_256=1 ;;
-    --no-linear-256) LINEAR_256=0 ;;
+    --256-cube) CUBE_256=1 ;;
+    --no-256-cube) CUBE_256=0 ;;
     # Display a rainbow gradient for RGB rather than a colour cube
-    --linear-rgb) LINEAR_RGB=1 ;;
-    --no-linear-rgb) LINEAR_RGB=0 ;;
+    --rgb-cube) CUBE_RGB=1 ;;
+    --no-rgb-cube) CUBE_RGB=0 ;;
     # Do not display text attributes at the bottom
     --attrs) ATTRS=1 ;;
     --no-attrs) ATTRS=0 ;;
+    # Use ; instead of : for 8bpp/24bpp modes
+    --legacy-sgr) SGR_FS=';' ;;
+    --no-legacy-sgr) SGR_FS=':' ;;
+    # Include colourspace ID in 24bpp mode
+    --rgb-cs) RGB_CS=1 ;;
+    --no-rgb-cs) RGB_CS=0 ;;
     # help!
     -h|--help|*)
-      >&2 echo "Usage: colourtest [--{1,4,8,24}bpp] [--(no-)linear-{256,rgb}] [--(no-)attrs]"
+      >&2 echo "Usage: colourtest [--(1|4|8|24)bpp] [--feature|--no-feature]..."
+      >&2 echo "Features: 256-cube, rgb-cube, attrs, legacy-sgr, rgb-cs"
+      >&2 echo "If the 8bpp or 24bpp colours come out messed up or confuse your"
+      >&2 echo "terminal, experiment with the legacy-sgr and rgb-cs features."
       exit
       ;;
   esac
   shift
 done
 
+function heading {
+  printf '%10s \x1B[1m%-60s%s\x1B[0m\n' '' "$@"
+}
+
+function fixsgr {
+  local fmt="$1"; shift
+  (( RGB_CS )) && fmt="${fmt/8:2:/8:2:0:}"
+  printf "${fmt//:/${SGR_FS}}" "$@"
+}
 
 function bg { echo $(( $1+10 )); }
 function fgbg { echo "$1;$(( $1+10 ))"; }
@@ -46,7 +70,7 @@ function printf3 {
 # First, do 8-colour palette, in both ANSI (30-37) and AIX (90-97) colours
 codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
 function show-16colours {
-  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+  heading \
     "ANSI & AIXTerm 8-colour palettes (dim - plain - bold)" \
     "SGR C m"
   printf '%10s ' 'colour'
@@ -78,13 +102,13 @@ function show-256linear {
   printf '\n'
   for i in {0..3}; do
     printf '%10x ' $i
-    printf '\x1B[48;5;%dm ' $(seq $((16*i)) $((16*i+15)))
+    printf '\x1B[48:5:%dm ' $(seq $((16*i)) $((16*i+15)))
     printf '\x1B[0m%4x ' $((i+4))
-    printf '\x1B[48;5;%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
+    printf '\x1B[48:5:%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
     printf '\x1B[0m%4x ' $((i+8))
-    printf '\x1B[48;5;%dm ' $(seq $((16*(i+8))) $((16*(i+8)+15)))
+    printf '\x1B[48:5:%dm ' $(seq $((16*(i+8))) $((16*(i+8)+15)))
     printf '\x1B[0m%4x ' $((i+12))
-    printf '\x1B[48;5;%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
+    printf '\x1B[48:5:%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
     printf '\x1B[0m\n'
   done
   printf '\n'
@@ -105,7 +129,7 @@ function show-256cube {
     for r in {0..5}; do
       # and then within each row of each box, B increases to the left
       base=$(( 0x10 + r*36 + g*6 ))
-      printf '\x1B[48;5;%dm ' $(seq $base $((base+5)))
+      fixsgr '\x1B[48:5:%dm ' $(seq $base $((base+5)))
       printf '\x1B[0m  '
     done
     case $g in
@@ -114,7 +138,7 @@ function show-256cube {
         ;;
       1)
         printf ' ['
-        printf '\x1B[48;5;%dm ' $(seq 0 15)
+        fixsgr '\x1B[48:5:%dm ' $(seq 0 15)
         printf '\x1B[0m]'
         ;;
       3)
@@ -122,7 +146,7 @@ function show-256cube {
         ;;
       4)
         printf ' ['
-        printf '\x1B[48;5;%dm ' $(seq 232 255)
+        fixsgr '\x1B[48:5:%dm ' $(seq 232 255)
         printf '\x1B[0m]'
     esac
     printf '\n'
@@ -135,15 +159,18 @@ function show-256cube {
 function show-rgblinear {
   printf '%10s     \x1B[4mLinear gradient (8 colours, 10 steps between colours)\x1B[0m\n'
   printf '          ['
-  printf '\x1B[48;2;0;0;0m '                       # black
-  printf '\x1B[48;2;%d;0;0m '     $(seq 5 25 255)  # black to red
-  printf '\x1B[48;2;255;%d;0m '   $(seq 5 25 255)  # red to yellow
-  printf '\x1B[48;2;%d;255;0m '   $(seq 255 -25 5) # yellow to green
-  printf '\x1B[48;2;0;255;%dm '   $(seq 5 25 255)  # green to cyan
-  printf '\x1B[48;2;0;%d;255m '   $(seq 255 -25 5) # cyan to blue
-  printf '\x1B[48;2;%d;0;255m '   $(seq 5 25 255)  # blue to magenta
-  printf '\x1B[48;2;255;%d;255m ' $(seq 5 25 255)  # magenta to white
-  printf ' \x1B[0m]\n\n'
+  fixsgr '\x1B[48:2:0:0:0m '                       # black
+  fixsgr '\x1B[48:2:%d:0:0m '     $(seq 5 25 255)  # black to red
+  fixsgr '\x1B[48:2:255:%d:0m '   $(seq 5 25 255)  # red to yellow
+  fixsgr '\x1B[48:2:%d:255:0m '   $(seq 255 -25 5) # yellow to green
+  fixsgr '\x1B[48:2:0:255:%dm '   $(seq 5 25 255)  # green to cyan
+  fixsgr '\x1B[48:2:0:%d:255m '   $(seq 255 -25 5) # cyan to blue
+  fixsgr '\x1B[48:2:%d:0:255m '   $(seq 5 25 255)  # blue to magenta
+  fixsgr '\x1B[48:2:255:%d:255m ' $(seq 5 25 255)  # magenta to white
+  printf ' \x1B[0m]\n'
+  printf '           '
+  printf '%-11s' K R Y G C B M
+  printf ' W\n\n'
 }
 
 # RGB888
@@ -175,8 +202,8 @@ function show-rgbcube {
 }
 
 function show-attrs {
-  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
-    "Non-colour formatting codes" "SGR C m"
+  heading \
+    "Non-colour text attributes" "SGR C m"
 
   function formatcode {
     local len="$(echo "$2" | wc -c)"
@@ -202,19 +229,19 @@ function show-attrs {
 (( BPP >= 4 )) && show-16colours
 
 if (( BPP >= 8 )); then
-  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+  heading \
     "256-colour indexed" \
-    "SGR 38;5;I m"
-  (( LINEAR_256 )) && show-256linear
-  (( LINEAR_256 )) || show-256cube
+    "$(fixsgr "SGR 38:5:I m")"
+  (( CUBE_256 )) || show-256linear
+  (( CUBE_256 )) && show-256cube
 fi
 
 if (( BPP >= 24 )); then
-  printf '%10s \x1B[1m%-64s%s\x1B[0m\n' '' \
+  heading \
     "RGB direct colour (24bpp, 8 bits/channel)" \
-    "SGR 38;2;R;G;B m"
-  (( LINEAR_RGB )) && show-rgblinear
-  (( LINEAR_RGB )) || show-rgbcube
+    "$(fixsgr "SGR 38:2:R:G:B m")"
+  (( CUBE_RGB )) || show-rgblinear
+  (( CUBE_RGB )) && show-rgbcube
 fi
 
 (( ATTRS )) && show-attrs
