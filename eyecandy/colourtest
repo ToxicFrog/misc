@@ -79,7 +79,7 @@ codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
 function show-16colours {
   heading \
     "ANSI & AIXTerm 8-colour palettes (dim - plain - bold)" \
-    "SGR C m"
+    "CSI C m"
   printf '%10s ' 'colour'
   printf ' %3d' ${codes[@]}
   printf '\n'
@@ -212,7 +212,7 @@ function show-rgbcube {
 
 function show-attrs {
   heading \
-    "Non-colour text attributes" "SGR C m"
+    "Non-colour text attributes" "CSI A m"
 
   function formatcode {
     local len="$(echo "$2" | wc -c)"
@@ -261,7 +261,7 @@ fi
 if (( BPP >= 8 )); then
   heading \
     "256-colour indexed" \
-    "$(fixsgr "SGR 38:5:I m")"
+    "$(fixsgr "CSI 38:5:I m")"
   (( CUBE_256 )) || show-256linear
   (( CUBE_256 )) && show-256cube
 fi
@@ -269,7 +269,7 @@ fi
 if (( BPP >= 24 )); then
   heading \
     "RGB direct colour (24bpp, 8 bits/channel)" \
-    "$(fixsgr "SGR 38:2:R:G:B m")"
+    "$(fixsgr "CSI 38:2:R:G:B m")"
   (( CUBE_RGB )) || show-rgblinear
   (( CUBE_RGB )) && show-rgbcube
 fi
