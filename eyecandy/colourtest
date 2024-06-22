@@ -6,6 +6,7 @@ CUBE_256=1
 CUBE_RGB=0
 ATTRS=1
 FONTS=0
+RGB_TEST=0
 # SGR field (not command) separator -- the standard is : for the former and
 # ; for the latter, but some terminals use ; for both.
 SGR_FS=:
@@ -41,6 +42,8 @@ while [[ $1 ]]; do
     # Include colourspace ID in 24bpp mode
     --rgb-cs) RGB_CS=1 ;;
     --no-rgb-cs) RGB_CS=0 ;;
+    # Special RGB test mode
+    --rgb-test) RGB_TEST=1 ;;
     # help!
     -h|--help|*)
       >&2 echo "Usage: colourtest [--(1|4|8|24)bpp] [--feature|--no-feature]..."
@@ -159,7 +162,9 @@ function show-256cube {
 # Display a single-line stripe of RGB to make sure it's working, without
 # trying to display the whole colour cube.
 function show-rgblinear {
-  printf '%10s     \x1B[4mLinear gradient (8 colours, 10 steps between colours)\x1B[0m\n'
+  local title="Linear gradient (8 colours, 10 steps between colours)"
+  if [[ $1 ]]; then title="$1"; fi
+  printf '%10s     \x1B[4m%s\x1B[0m\n' '' "$title"
   printf '          ['
   fixsgr '\x1B[48:2:0:0:0m '                       # black
   fixsgr '\x1B[48:2:%d:0:0m '     $(seq 5 25 255)  # black to red
@@ -170,9 +175,11 @@ function show-rgblinear {
   fixsgr '\x1B[48:2:%d:0:255m '   $(seq 5 25 255)  # blue to magenta
   fixsgr '\x1B[48:2:255:%d:255m ' $(seq 5 25 255)  # magenta to white
   printf ' \x1B[0m]\n'
-  printf '           '
-  printf '%-11s' K R Y G C B M
-  printf ' W\n'
+  if [[ ! $1 ]]; then
+    printf '           '
+    printf '%-11s' K R Y G C B M
+    printf ' W\n'
+  fi
 }
 
 # RGB888
@@ -241,6 +248,14 @@ function show-fonts {
   '' $'╚═══╝ ┗━━━━━━━┛ Nerd-Font: [⏻󰀁]  \x0Emqqqqqqqqqqqqqqqqj\x0F'
 }
 
+if (( RGB_TEST )); then
+  SGR_FS=':' RGB_CS=1 show-rgblinear "ITU   format, with colourspace"
+  SGR_FS=':' RGB_CS=0 show-rgblinear "ITU   format,   no colourspace"
+  SGR_FS=';' RGB_CS=1 show-rgblinear "XTerm format, with colourspace"
+  SGR_FS=';' RGB_CS=0 show-rgblinear "XTerm format,   no colourspace"
+  exit 0
+fi
+
 (( BPP >= 4 )) && show-16colours
 
 if (( BPP >= 8 )); then
@@ -261,6 +276,8 @@ fi
 
 (( ATTRS )) && show-attrs
 (( FONTS )) && show-fonts
+
+exit 0
 
 #formatcode \
 #  0 reset 1 bold 2 faint \
