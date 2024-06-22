@@ -162,9 +162,11 @@ function show-256cube {
 # Display a single-line stripe of RGB to make sure it's working, without
 # trying to display the whole colour cube.
 function show-rgblinear {
-  local title="Linear gradient (8 colours, 10 steps between colours)"
-  if [[ $1 ]]; then title="$1"; fi
-  printf '%10s     \x1B[4m%s\x1B[0m\n' '' "$title"
+  if [[ $1 ]]; then
+    heading "$@"
+  else
+    printf '%10s     \x1B[4m%s\x1B[0m\n' '' "Linear gradient (8 colours, 10 steps between colours)"
+  fi
   printf '          ['
   fixsgr '\x1B[48:2:0:0:0m '                       # black
   fixsgr '\x1B[48:2:%d:0:0m '     $(seq 5 25 255)  # black to red
@@ -249,10 +251,10 @@ function show-fonts {
 }
 
 if (( RGB_TEST )); then
-  SGR_FS=':' RGB_CS=1 show-rgblinear "ITU   format, with colourspace"
-  SGR_FS=':' RGB_CS=0 show-rgblinear "ITU   format,   no colourspace"
-  SGR_FS=';' RGB_CS=1 show-rgblinear "XTerm format, with colourspace"
-  SGR_FS=';' RGB_CS=0 show-rgblinear "XTerm format,   no colourspace"
+  SGR_FS=':' RGB_CS=1 show-rgblinear "  ITU format, with colourspace" "CSI 38:2:0:R:G:B m"
+  SGR_FS=':' RGB_CS=0 show-rgblinear "  ITU format,   no colourspace" "CSI   38:2:R:G:B m"
+  SGR_FS=';' RGB_CS=1 show-rgblinear "XTerm format, with colourspace" "CSI 38;2;0;R;G;B m"
+  SGR_FS=';' RGB_CS=0 show-rgblinear "XTerm format,   no colourspace" "CSI   38;2;R;G;B m"
   exit 0
 fi
 
