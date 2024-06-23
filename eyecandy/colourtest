@@ -57,7 +57,7 @@ while [[ $1 ]]; do
 done
 
 function heading {
-  printf '\n%10s \x1B[1m%-60s%s\x1B[0m\n' '' "$@"
+  printf '\n%6s \x1B[1m%-60s%s\x1B[0m\n' '' "$@"
 }
 
 function fixsgr {
@@ -80,19 +80,19 @@ function show-16colours {
   heading \
     "ANSI & AIXTerm 8-colour palettes (dim - plain - bold)" \
     "CSI C m"
-  printf '%10s ' 'colour'
+  printf '%6s ' 'colour'
   printf ' %3d' ${codes[@]}
   printf '\n'
 
-  printf '%10s ' 'fg'
+  printf '%6s ' 'fg'
   printf3 ' \x1B[0;%d;2m#\x1B[0;%dm#\x1B[%d;1m#' ${codes[@]}
   printf '\x1B[0m\n'
 
-  printf '%10s ' 'bg'
+  printf '%6s ' 'bg'
   printf3 '\x1B[0m \x1B[%d;2m \x1B[0;%dm \x1B[%d;1m ' $(map bg ${codes[@]})
   printf '\x1B[0;1m  +10 for bg\x1B[0m\n'
 
-  printf '%10s ' 'fg+bg'
+  printf '%6s ' 'fg+bg'
   printf3 '\x1B[0m \x1B[%s;2m#\x1B[0;%sm#\x1B[%s;1m#' $(map fgbg ${codes[@]})
   printf '\x1B[0m\n'
 }
@@ -103,12 +103,12 @@ function show-16colours {
 # [e8-ff] greyscale
 # this just prints it out raw
 function show-256linear {
-  printf '%10s     \x1B[4mraw palette\x1B[0m\n'
-  printf '%6s' ''
+  printf '%6s     \x1B[4mraw palette\x1B[0m\n'
+  printf '  '
   printf '%4s 0123456789ABCDEF' '' '' '' ''
   printf '\n'
   for i in {0..3}; do
-    printf '%10x ' $i
+    printf '%6x ' $i
     printf '\x1B[48:5:%dm ' $(seq $((16*i)) $((16*i+15)))
     printf '\x1B[0m%4x ' $((i+4))
     printf '\x1B[48:5:%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
@@ -123,14 +123,14 @@ function show-256linear {
 # this prints it with a bit more organization that makes it easier to look up
 # by colour, but harder to look up by number
 function show-256cube {
-  printf '%10s     \x1B[4m%s\x1B[0m\n' '' "216-colour cube (16-231)"
-  printf '%10s '
+  printf '%6s     \x1B[4m%s\x1B[0m\n' '' "216-colour cube (16-231)"
+  printf '%6s '
   printf '%-8s' $(seq 16 36 220)
   printf '\n'
 
   # each row is a different G
   for g in {0..5}; do
-    printf '%10s ' "+$((g*6))"
+    printf '%6s ' "+$((g*6))"
     # each box is a different R
     for r in {0..5}; do
       # and then within each row of each box, B increases to the left
@@ -165,9 +165,9 @@ function show-rgblinear {
   if [[ $1 ]]; then
     heading "$@"
   else
-    printf '%10s     \x1B[4m%s\x1B[0m\n' '' "Linear gradient (8 colours, 10 steps between colours)"
+    printf '%6s     \x1B[4m%s\x1B[0m\n' '' "Linear gradient (8 colours, 10 steps between colours)"
   fi
-  printf '          ['
+  printf '      ['
   fixsgr '\x1B[48:2:0:0:0m '                       # black
   fixsgr '\x1B[48:2:%d:0:0m '     $(seq 5 25 255)  # black to red
   fixsgr '\x1B[48:2:255:%d:0m '   $(seq 5 25 255)  # red to yellow
@@ -175,12 +175,12 @@ function show-rgblinear {
   fixsgr '\x1B[48:2:0:255:%dm '   $(seq 5 25 255)  # green to cyan
   fixsgr '\x1B[48:2:0:%d:255m '   $(seq 255 -25 5) # cyan to blue
   fixsgr '\x1B[48:2:%d:0:255m '   $(seq 5 25 255)  # blue to magenta
-  fixsgr '\x1B[48:2:255:%d:255m ' $(seq 5 25 255)  # magenta to white
+  fixsgr '\x1B[48:2:255:%d:255m ' $(seq 5 25 255) 255  # magenta to white
   printf ' \x1B[0m]\n'
   if [[ ! $1 ]]; then
-    printf '           '
+    printf '       '
     printf '%-11s' K R Y G C B M
-    printf ' W\n'
+    printf '  W\n'
   fi
 }
 
@@ -189,19 +189,19 @@ function show-rgblinear {
 # we can probably fit them all on screen, and this gives a higher colour resolution
 # than the 6x6x6 cube above still
 function show-rgbcube {
-  printf '%10s     \x1B[4mColour cube (8 samples per axis)\x1B[0m\n'
+  printf '%6s     \x1B[4mColour cube (8 samples per axis)\x1B[0m\n'
   # as with the 256 cube, each row is G, each box is R, and B varies across cells
-  printf '%10s R='
+  printf '%6sR  '
   printf ' %-3d      ' $(seq 31 32 256)
   printf '\n'
-  printf '         B='
+  printf '    G B'
   printf ' 31-255%s   ' '' '' '' '' '' '' '' ''
   printf '\n'
   for g in $(seq 31 32 255); do
     if (( g==31 )); then
-      printf '   G= %3d  ' $g
+      printf '  %3d  ' $g
     else
-      printf '%9d  ' $g
+      printf '%5d  ' $g
     fi
     for r in $(seq 31 32 255); do
       printf "\x1B[48;2;$r;$g;%dm " $(seq 31 32 255)
@@ -228,13 +228,13 @@ function show-attrs {
     fi
   }
 
-  printf '       '
+  printf '   '
   formatcode 1 bold 2 faint 3 italic 4 underline 5 blink
-  printf '\n       '
+  printf '\n   '
   formatcode 7 inverse 8 invisible
   printf '\b(invisible)       '
   formatcode 9 strikethrough
-  printf '\n        0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
+  printf '\n    0  reset all formatting          22  disable bold/faint         23-29  disable 3-9\n'
 }
 
 function show-fonts {
@@ -246,16 +246,16 @@ function show-fonts {
   local SO=$'\x0E'
   local SI=$'\x0F'
   local B=$'\e[1m'
+  local U=$'\e[4m'
   local O=$'\e[0m'
   echo
   cat <<EOF
-           ┏━┫${B}Font Test${O}╞═════════════════════════════════════════════════════════════════╗
-           ┃  ASCII \`abcdefghijklmnopqrstuvwxyz{|}~+,-.0123456789!"#$%&'()*/:;<=>?@[\]^_ ║
-           ┃    DEC ${SO}\`abcdefghijklmnopqrstuvwxyz{|}~+,-.0      ABCDEFGHIJKLMNOPQRSTUVWXYZ${SI} ║
-           ┃  Powerline: []  Nerd-Font: [⏻󰀁]  Blocks: ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏  ║
-           ┗━━╍╍┅┅┉┉                                       ┈┈┄┄╌╌──┤Unicode Box Drawing╞═╝
+       ┏━┫${B}Font Test${O}╞══════════════════════════════════════════════════════════════════╗
+       ┃  ${U}ASCII${O} \`abcdefghijklmnopqrstuvwxyz{|}~+,-.0123456789!"#$%&'()*/:;<=>?@[\]^_  ║
+       ┃    ${U}DEC${O} ${SO}\`abcdefghijklmnopqrstuvwxyz{|}~+,-.0      ABCDEFGHIJKLMNOPQRSTUVWXYZ${SI}  ║
+       ┃  ${U}Powerline${O} []   ${U}Nerd-Font${O} [⏻󰀁]   ${U}Blocks${O} [▁▂▃▄▅▆▇█▉▊▋▌▍▎▏]  ║
+       ┗━━╍╍╍╍╍╍╍╍┅┅┅┅┅┅┅┅┉┉┉┉┉┉┉┉ ᪥ ┈┈┈┈┈┈┈┈┄┄┄┄┄┄┄┄╌╌╌╌╌╌╌╌──┤Unicode Box Drawing╞══╝
 EOF
-# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 }
 
 if (( RGB_TEST )); then
@@ -303,7 +303,7 @@ exit 0
 
 # for 2-9, adding 20 will disable that attribute, e.g. 24 turns off underline without affecting things otherwise
 
-#printf '%10s ' ''
+#printf '%6s ' ''
 #printf '%8s ' bold
 # bold
 # italic
