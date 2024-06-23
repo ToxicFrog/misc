@@ -238,16 +238,24 @@ function show-attrs {
 }
 
 function show-fonts {
-  heading "Fancy font test"
   # Box drawing characters are unicode and inserted as-is.
   # Likewise powerline and NF characters, which use Unicode private areas
   # and will render, or not, depending on what fonts the user has installed.
-  # The last block tests G0/G1 switching with SHIFT-OUT/SHIFT-IN, aka DEC
-  # graphical mode.
-  printf '%10s %s\n' \
-  '' $'╔═══╗ ┏━━━━━━━┱─────────────╌╌╌┄┄┄┈┈┈┈░▒▓█  \x0Elqqqqqqqqqqqqqqqqk\x0F' \
-  '' $'║Box╟╼┫Drawing┃ Powerline: []  ▞▅▜▟  \x0Ex\x0FDEC G1:\x0Ebcdeifghax\x0F' \
-  '' $'╚═══╝ ┗━━━━━━━┛ Nerd-Font: [⏻󰀁]  \x0Emqqqqqqqqqqqqqqqqj\x0F'
+  # The DEC line includes shift-in/shift-out characters, which will render it
+  # as various drawing characters on ttys that support those.
+  local SO=$'\x0E'
+  local SI=$'\x0F'
+  local B=$'\e[1m'
+  local O=$'\e[0m'
+  echo
+  cat <<EOF
+           ┏━┫${B}Font Test${O}╞═════════════════════════════════════════════════════════════════╗
+           ┃  ASCII \`abcdefghijklmnopqrstuvwxyz{|}~+,-.0123456789!"#$%&'()*/:;<=>?@[\]^_ ║
+           ┃    DEC ${SO}\`abcdefghijklmnopqrstuvwxyz{|}~+,-.0      ABCDEFGHIJKLMNOPQRSTUVWXYZ${SI} ║
+           ┃  Powerline: []  Nerd-Font: [⏻󰀁]  Blocks: ▁▂▃▄▅▆▇█▉▊▋▌▍▎▏  ║
+           ┗━━╍╍┅┅┉┉                                       ┈┈┄┄╌╌──┤Unicode Box Drawing╞═╝
+EOF
+# ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 }
 
 if (( RGB_TEST )); then
