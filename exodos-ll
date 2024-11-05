@@ -487,8 +487,6 @@ function select-game {
     /:fsearch "=== FULL SEARCH ===" \
     --file "$1/.menudef")"
   case "$selected" in
-    # TODO: when viewing search results, exiting the game details window should
-    # take you back to the search results, not back to the full index
     /:search)
       selected="$(search-results "$(title-search)")"
       [[ $selected ]] && echo "${selected#?:}" || select-game "$1"
@@ -557,7 +555,8 @@ function launch-game {
       MODE) cycle-screen-mode "$1";;
       ASPC) cycle-aspect-correction "$1";;
       SCLR) cycle-scaler "$1";;
-      MOUS) cycle-mouse "$1" ;; # TODO on some games (e.g. SideLine) this always shows up as ""
+      MOUS) cycle-mouse "$1" ;;
+      EDIT) edit-config "$1" ;;
       EXT*)
         local n="$(( ${action#EXT} * 2 + 1 ))"
         xdg-open "${AdditionalApplications[$n]}" >/dev/null 2>&1
@@ -584,6 +583,7 @@ function launch-game-menu {
     ASPC "Toggle aspect correction [currently: $(get-aspect-correction "$conf")]"
     SCLR "Change scaler [currently: $(get-scaler "$conf")]"
     MOUS "Change mouse sensitivity [currently: $(get-mouse "$conf")%]"
+    EDIT "Edit configuration file directly [$conf]"
   )
   dialog-ask --default-item "$defaultitem" --menu "$info" 0 0 "$(( ${#args[@]}/2 ))" "${args[@]}"
 }
@@ -650,6 +650,10 @@ function cycle-mouse {
   mouse=$((mouse-10))
   if ((mouse<10)); then mouse=100; fi
   set-conf "$conf" sensitivity $mouse
+}
+
+function edit-config {
+  ${EDITOR:=nano} "$conf"
 }
 
 # set-conf config key val [key val..]
