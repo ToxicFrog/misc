@@ -201,27 +201,13 @@ function task/-help {
   fi
 }
 
-task/register annote '^annote' task/-annote <<EOF
+task/register annote 'annote$' task/-annote <<EOF
 
-  $NAME annote <text>
+  $NAME [filter] annote
 
-Annotate the most recently finished entry with the given text and the current
-timestamp.
+Open the editor to annotate the given entry.
 EOF
 function task/-annote {
-  LAST=$(task/select uuid end+ +COMPLETED | tail -n1)
-  shift
-  \task $LAST annotate "$@"
-}
-
-task/register annocat 'annocat$' task/-annocat <<EOF
-
-  $NAME [filter] annocat
-
-Annotate the selected entries with text entered on stdin. If no filter is specified,
-annotates the most recently completed entry.
-EOF
-function task/-annocat {
   shift -p
   if [[ ! $* ]]; then
     set -- "$(task/select uuid end+ +COMPLETED | tail -n1)"
@@ -229,7 +215,7 @@ function task/-annocat {
   echo "## Annotating the following:" > /tmp/$$.annotation
   task "$@" uuids | task/printf "##    %description.desc%s by %author%s\n" >> /tmp/$$.annotation
   echo >> /tmp/$$.annotation
-  nano -tA /tmp/$$.annotation
+  ${=EDITOR} /tmp/$$.annotation
   \task "$@" annotate "$(cat /tmp/$$.annotation | egrep -v '^##')"
   rm /tmp/$$.annotation
 }
