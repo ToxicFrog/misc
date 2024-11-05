@@ -1,92 +1,53 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 
 set -e
+setopt nomonitor nonotify
 
 MUSIC_DIR="${1:-/ancilla/media/music/Library}"
-MP3_DIR="${2:-/ancilla/media/music/MP3}"
-VGMPLAY_INI=/ancilla/media/music/vgmplay.ini
+MP3_DIR="${2:-/ancilla/media/music/.srv}"
 
-function safe_path() {
-  tr '<>:"/\|?*' '[_*]'
-}
-
-# Helper function for converting VGM/VGZ files.
-function vgm_to_mp3() {
-  mkdir /tmp/$$.vgm
-  pushd /tmp/$$.vgm
-
-  vgm="$1"
-  wav="${1%.vg?}.wav"
-  mp3="$2"
-
-  # set up vgmplay.ini
-  # vgmplay will prefer the one it finds in ./ to the user/system ones.
-  sed 's/^LogSound.*/LogSound = 1/' < "$VGMPLAY_INI" > vgmplay.ini
-
-  # invoke vgmplay to convert vgm -> wav
-  </dev/null >/dev/null vgmplay "$vgm"
-
-  # now the wav is next to the original vgm/vgz file
-  # invoke ffmpeg to encode it
-  [[ -f "$wav" ]] || { echo "ERROR"; return 1; }
-  </dev/null ffmpeg -y -i "$wav" -v error -stats -map 0:0 -q:a 0 -codec:a libmp3lame "$mp3"
-
-  # cleanup
-  popd
-  rm "$wav"
-  rm -rf /tmp/$$.vgm
-  echo "DONE"
-}
-
-# This is a bit gross.
-# In theory we should be able to use ffmpeg to do the conversion using its libopenmpt
-# demuxer, but for whatever reason it insists on using libmodplug instead, which
-# (a) is worse and (b) doesn't support as many formats.
-# So instead we use openmpt123 to dump the mod file to wav, then ffmpeg to encode the wav.
-function openmpt_probe {
-  openmpt123 --probe "$1" | egrep -q '^Probe.*Success$'
-}
-
-function openmpt_convert {
-  >/dev/null openmpt123 --render "$1"
-  ffmpeg_convert "$1.wav" "$2"
-  rm "$1.wav"
+function probe-music {
+  ffprobe &>/dev/null "$@"
 }
 
 function ffmpeg_convert() {
   input="$1"
   output="$2"
   shift 2
-  </dev/null ffmpeg -y -i "$input" -v error -nostats -map 0:0 "$@" -q:a 0 -codec:a libmp3lame "$output" || echo "[ERR] $input"
+  </dev/null ffmpeg -y -i "$input" -v error -nostats -map_metadata 0 -map 0:0 "$@" -q:a 0 -codec:a libmp3lame "$output" || printf '\x1B[1;91m[FAIL] %s\x1B[0m\n' $input
 }
 
-NTHREADS=4
+NTHREADS=8
 # Spawn a background job iff the number of background jobs is <= NTHREADS.
 function spawn() {
-  while [[ $(jobs | wc -l) -ge $NTHREADS ]]; do
+  while [[ $#jobstates -ge $NTHREADS ]]; do
     sleep 1
+    jobs &>/dev/null # reap finished children
   done
   "$@" &
 }
 
 # Keep a list of converted files here so we can find ones that are stale later.
-> /tmp/$$.new
+printf '' > /tmp/$$.new
 
 echo "Creating mp3s..."
+mkdir -p $MP3_DIR
 find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
   # Strip non-FAT characters from filenames so we can e.g. rsync this onto USB
   # keys without everything being terrible.
   relpath="${src#$MUSIC_DIR/}"
-  dst="${MP3_DIR}/$(echo "$relpath" | tr '<>:"|?*' '[-*]')"
- # echo "$src"
- # echo "  == $relpath"
- # echo "  -> $dst"
+  dst="${MP3_DIR}/$(echo "$relpath" | tr '<>:\"|?*' '[-*]' | sed -E 's;/+;/;g')"
+  #echo "$src"
+  #echo "  == $relpath"
+  #echo "  -> $dst"
 
   # Handle directories. Create mirrors of non-empty directories, skip empty ones.
   if [[ -d $src ]]; then
     if [[ $(ls -A "$src") && ! -e "$dst" ]]; then
-      echo "[DIR] $dst"
+      echo "[DIR ] $dst"
       mkdir -p "$dst"
+    else
+      printf '\x1B[2K[SCAN] %s\r' $src
     fi
     continue
   fi
@@ -94,73 +55,76 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
   # Handle files.
   # Cover files don't have their extensions changed, everything else becomes
   # an MP3.
-  if ! [[ "$dst" =~ .*/cover\..* ]]; then
-    dst="${dst%.*}.mp3"
-  fi
+  ext="${dst##*.}"
+  dst_mp3="${dst%.*}.mp3"
 
-  # Skip things that don't need to be updated
+  # Skip existing links.
   if [[ -e $dst && ! $src -nt $dst ]]; then
-    echo "$dst" | sed -E 's;/+;/;g' >> /tmp/$$.new
+    echo "$dst" >> /tmp/$$.new
+    continue
+  fi
+  # Skip existing converted files that are no older than the source.
+  if [[ -e $dst_mp3 && ! $src -nt $dst_mp3 ]]; then
+    echo "$dst_mp3" >> /tmp/$$.new
     continue
   fi
 
+  # Now we process files that exist in the source but not the destination.
   case "$(echo "$src" | tr '[:upper:]' '[:lower:]')" in
+    # All formats supported by both mstream and gonic (taglib).
+    # Turns out some of these aren't supported by the phone?
+    # *.mp3|*.mp4|*.flac|*.m4a|*.ogg|*.opus|*.aac)
+    # *.mp3|*.flac|*.ogg|*.opus|*.aac)
     *.mp3)
       ln -sf "$src" "$dst"
-      echo "[MP3] $src"
+      echo "$dst" >> /tmp/$$.new
+      printf "\x1B[92m[LINK]\x1B[0m %s\n" $src
       ;;
-    *.opus|*.ogg)
-      # Use map_metadata to map metadata from stream0 to the whole file, since
-      # OGG OPUS files have per-stream metadata and MP3s don't.
-      spawn ffmpeg_convert "$src" "$dst" -map_metadata 0:s:0
-      echo "[PCM] $src"
-      ;;
-    *.flac|*.m4a|*.mpc|*.wav|*.aif|*.aiff|*.wma)
-      spawn ffmpeg_convert "$src" "$dst"
-      echo "[PCM] $src"
-      ;;
-    #*.ahx|*.mptm)
-    # *.xm|*.mod|*.s3m|*.it|*.mo3|*.umx)
-    #   spawn ffmpeg_convert "$src" "$dst"
-    #   echo "[MOD] $src"
-    #   ;;
-    # *.vgm|*.vgz)
-      #(vgm_to_mp3 "$src" "$dst")
-      # spawn ffmpeg_convert "$src" "$dst"
-      # echo "[VGM] $src"
-      # ;;
-    *.vgm|*.vgz|*.mid|*.midi)
-      # File is recognized but we don't have a converter for it.
-      echo "[!!!] $src"
-      continue
-      ;;
-    */cover.*)
-      echo "[CVR] $src"
+    # Non-audio metadata like covers
+    */cover.*|*.jpg|*.jpeg|*.png|*.bmp|*.gif|*.m3u)
       ln -sf "$src" "$dst"
+      echo "$dst" >> /tmp/$$.new
+      printf "\x1B[96m[META]\x1B[0m %s\n" $src
       ;;
-    *.txt|*.m3u|*.png|*.jpg|*.torrent|.*)
-      # skip
-      continue
+    # Recognized formats we don't have converters for
+    *.ahx)
+      ;&
+    # Things we always want to skip
+    *.torrent|*.download*|*.backup)
       ;;
+    # Recognized formats that we need to convert
+    *.dbm|*.gdm|*.hvl|*.imf|*.it|*.mo3|*.mod|*.mptm|*.mtm|*.s3m|*.umx|*.vgm|*.vgz|*.xm)
+      ;&
+    *.mpc|*.aif|*.aiff|*.wma|*.wav|*.mid|*.midi|*.opus|*.m4a|*.ogg)
+      spawn ffmpeg_convert "$src" "$dst_mp3"
+      echo "$dst_mp3" >> /tmp/$$.new
+      printf "\x1B[93m[CONV]\x1B[0m %s\n" $src
+      ;;
+    # Unrecognized format. See if ffprobe understands it.
     *)
+      printf "\x1B[91m[????]\x1B[0m %s\n" $src
       # There are a LOT of module formats, so we delegate to openmpt's probe function
       # rather than trying to list all the extensions.
-      if openmpt_probe "$src"; then
-        spawn openmpt_convert "$src" "$dst"
-        echo "[MOD] $src"
+      if probe-music "$src"; then
+        spawn ffmpeg_convert "$src" "$dst_mp3"
+        echo "$dst_mp3" >> /tmp/$$.new
+        printf "\x1B[93m[CONV]\x1B[0m %s\n" $src
       else
         # File is not recognized.
-        echo "[???] $src"
         continue
       fi
       ;;
   esac
-  echo "$dst" | sed -E 's;/+;/;g' >> /tmp/$$.new
 done
 
-# Clean up all broken symlinks
+while [[ $#jobstates -ge 1 ]]; do
+  sleep 1
+  jobs &>/dev/null # reap finished children
+done
+
+# Clean up all broken symlinks.
 echo "Cleaning up broken symlinks..."
-find "$MP3_DIR" -depth \( \( -type l -xtype l \) -or \( -type d -empty \) \) -print -delete
+find "$MP3_DIR" -depth \( -type l -xtype l \) -print -delete
 
 # Clean up all non-symlink files that no longer correspond to files in MUSIC_DIR.
 echo "Cleaning up stale converted files..."
@@ -168,5 +132,10 @@ find "$MP3_DIR" -type f -or -type l > /tmp/$$.all
 cat /tmp/$$.new /tmp/$$.all | sort | uniq -u \
   | xargs -r -d\\n rm -fv
 
+# Clean up directories that have been emptied as a result of the above.
+echo "Cleaning up empty directories..."
+find "$MP3_DIR" -depth \( -type d -empty \) -print -delete
+
 rm /tmp/$$.new /tmp/$$.all
+touch $MP3_DIR/.NOBACKUP
 echo "Done!"
