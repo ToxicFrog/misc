@@ -50,15 +50,15 @@ report.next.filter=status:pending -BLOCKED
 
 ## List: concise list of finished and in progress books.
 report.list.description=Finished and in progress books
-report.list.columns=id,end,genre,gender,author,description.desc,tags
-report.list.labels=ID,Finished,Genre,⚥,Author,Title,Tags
+report.list.columns=id,uuid.short,end,genre,gender,author,description.desc,tags
+report.list.labels=ID,UUID,Finished,Genre,⚥,Author,Title,Tags
 report.list.sort=end+,author+,description+
 report.list.filter=status:completed or (status:pending and +ACTIVE)
 
 # "All" -- combination of list and next
 report.all.description=All Books
-report.all.columns=id,end,genre,gender,author,description.desc,tags,start.age
-report.all.labels=ID,Finished,Genre,⚥,Author,Title,Tags,Reading
+report.all.columns=id,uuid.short,end,genre,gender,author,description.desc,tags,start.age
+report.all.labels=ID,UUID,Finished,Genre,⚥,Author,Title,Tags,Reading
 report.all.sort=end+,urgency-,start+,author+,description+
 
 report.series.description=Series Preview Mode

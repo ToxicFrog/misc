@@ -17,6 +17,7 @@ urgency.active.coefficient=1024
 urgency.age.coefficient=-1
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
+urgency.blocking.coefficient=0
 
 context.default=-DELETED
 context=default
@@ -26,6 +27,7 @@ color.uda.gamestate.completed=rgb551
 color.uda.gamestate.mastered=rgb025
 color.uda.gamestate.null=rgb211
 color.tagged=
+color.blocking=
 
 # Ok, so, this is kind of gross
 # color.active is used if the task is started but not yet finished.
@@ -35,6 +37,7 @@ color.tagged=
 #color.active=on rgb200
 #color.tag.ACTIVE=on rgb100
 #color.completed=on rgb404
+color.tag.DNF=rgb500
 
 # UDAs
 uda.gamestate.label=Play Status
@@ -59,11 +62,11 @@ alias.percent=summary
 alias.platforms=summary
 default.command=next
 
-## List: concise list of finished and in progress games.
+## List: concise list of finished, in progress, and DNF games.
 report.list.columns=id,end,project,source,gamestate,tags,genre,description.desc
 report.list.labels=ID,Finished,Plt,Src,Status,Tags,Genre,Title
 report.list.sort=end+,start+,description+
-report.list.filter=(+COMPLETED or +ACTIVE) and gamestate.not:null
+report.list.filter=(+COMPLETED or +ACTIVE) # and (gamestate.not:null or +DNF)
 
 ## Next: games in progress & waiting to be played
 report.next.columns=id,start.age,project,source,gamestate,tags,genre,description.desc
