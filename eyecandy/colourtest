@@ -109,13 +109,13 @@ function show-256linear {
   printf '\n'
   for i in {0..3}; do
     printf '%6x ' $i
-    printf '\x1B[48:5:%dm ' $(seq $((16*i)) $((16*i+15)))
+    fixsgr '\x1B[48:5:%dm ' $(seq $((16*i)) $((16*i+15)))
     printf '\x1B[0m%4x ' $((i+4))
-    printf '\x1B[48:5:%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
+    fixsgr '\x1B[48:5:%dm ' $(seq $((16*(i+4))) $((16*(i+4)+15)))
     printf '\x1B[0m%4x ' $((i+8))
-    printf '\x1B[48:5:%dm ' $(seq $((16*(i+8))) $((16*(i+8)+15)))
+    fixsgr '\x1B[48:5:%dm ' $(seq $((16*(i+8))) $((16*(i+8)+15)))
     printf '\x1B[0m%4x ' $((i+12))
-    printf '\x1B[48:5:%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
+    fixsgr '\x1B[48:5:%dm ' $(seq $((16*(i+12))) $((16*(i+12)+15)))
     printf '\x1B[0m\n'
   done
 }
