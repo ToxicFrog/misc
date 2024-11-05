@@ -79,7 +79,7 @@ codes=(30 31 32 33 34 35 36 37 90 91 92 93 94 95 96 97)
 function show-16colours {
   heading \
     "ANSI & AIXTerm 8-colour palettes (dim - plain - bold)" \
-    "CSI C m"
+    $'CSI \e[3mC\e[23m m'
   printf '%6s ' 'colour'
   printf ' %3d' ${codes[@]}
   printf '\n'
@@ -214,7 +214,7 @@ function show-rgbcube {
 
 function show-attrs {
   heading \
-    "Non-colour text attributes" "CSI A m"
+    "Non-colour text attributes" $'CSI \e[3mA\e[23m m'
 
   function formatcode {
     local len="$(echo "$2" | wc -c)"
@@ -254,7 +254,7 @@ function show-fonts {
        ┃  ${U}ASCII${O} \`abcdefghijklmnopqrstuvwxyz{|}~+,-.0123456789!"#$%&'()*/:;<=>?@[\]^_  ║
        ┃    ${U}DEC${O} ${SO}\`abcdefghijklmnopqrstuvwxyz{|}~+,-.0      ABCDEFGHIJKLMNOPQRSTUVWXYZ${SI}  ║
        ┃  ${U}Powerline${O} []   ${U}Nerd-Font${O} [⏻󰀁]   ${U}Blocks${O} [▁▂▃▄▅▆▇█▉▊▋▌▍▎▏]  ║
-       ┗━━╍╍╍╍╍╍╍╍┅┅┅┅┅┅┅┅┉┉┉┉┉┉┉┉ ᪥ ┈┈┈┈┈┈┈┈┄┄┄┄┄┄┄┄╌╌╌╌╌╌╌╌──┤Unicode Box Drawing╞══╝
+       ┗━━╍╍╍╍╍╍╍╍┅┅┅┅┅┅┅┅┉┉┉┉┉┉┉┉ ᪥ ┈┈┈┈┈┈┈┈┄┄┄┄┄┄┄┄╌╌╌╌╌╌╌╌───┤Unicode Box Drawing╞═╝
 EOF
 }
 
