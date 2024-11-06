@@ -14,7 +14,13 @@ function ffmpeg_convert() {
   input="$1"
   output="$2"
   shift 2
-  </dev/null ffmpeg -y -i "$input" -v error -nostats -map_metadata 0 -map 0:0 "$@" -q:a 0 -codec:a libmp3lame "$output" || printf '\x1B[1;91m[FAIL] %s\x1B[0m\n' $input
+  </dev/null ffmpeg -y -i "$input" \
+    -v error -nostats \
+    -map_metadata 0:s:a:0 -map 0:0 \
+    "$@" \
+    -q:a 0 -codec:a libmp3lame \
+    "$output" \
+  || printf '\x1B[1;91m[FAIL] %s\x1B[0m\n' $input
 }
 
 NTHREADS=8
@@ -90,12 +96,12 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
     *.ahx)
       ;&
     # Things we always want to skip
-    *.torrent|*.download*|*.backup)
+    *.torrent|*.download*|*.backup|*.txt)
       ;;
     # Recognized formats that we need to convert
     *.dbm|*.gdm|*.hvl|*.imf|*.it|*.mo3|*.mod|*.mptm|*.mtm|*.s3m|*.umx|*.vgm|*.vgz|*.xm)
       ;&
-    *.mpc|*.aif|*.aiff|*.wma|*.wav|*.mid|*.midi|*.opus|*.m4a|*.ogg)
+    *.mpc|*.aif|*.aiff|*.wma|*.wav|*.mid|*.midi|*.opus|*.m4a|*.ogg|*.flac)
       spawn ffmpeg_convert "$src" "$dst_mp3"
       echo "$dst_mp3" >> /tmp/$$.new
       printf "\x1B[93m[CONV]\x1B[0m %s\n" $src
