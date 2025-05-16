@@ -32,7 +32,7 @@ EOF
 function games/start { shift -p; \task "$@" unfinished; }
 
 task/register done 'done$' games/done </dev/null
-function games/done { echo "Use \`$NAME <filter> (finished|completed|mastered|null)\` instead."; }
+function games/done { echo "Use \`$NAME <filter> (finished|completed|mastered|null|dnf|skip)\` instead."; }
 
 task/register grep '^grep' games/grep <<EOF
 

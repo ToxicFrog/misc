@@ -18,6 +18,7 @@ urgency.age.coefficient=-1
 urgency.project.coefficient=0
 urgency.tags.coefficient=0
 urgency.blocking.coefficient=0
+urgency.annotations.coefficient=0
 
 context.default=-DELETED
 context=default
@@ -37,7 +38,11 @@ color.blocking=
 #color.active=on rgb200
 #color.tag.ACTIVE=on rgb100
 #color.completed=on rgb404
+
+# DNF is for games I started playing and abandoned.
+# SKIPPED is for games I have in my library but decided not to play at all.
 color.tag.DNF=rgb500
+color.tag.SKIPPED=rgb300
 
 # UDAs
 uda.gamestate.label=Play Status
@@ -58,27 +63,35 @@ alias.finished=modify status:completed end:now gamestate:finished
 alias.completed=modify status:completed end:now gamestate:completed
 alias.mastered=modify status:completed end:now gamestate:mastered
 alias.null=modify status:completed end:now gamestate:null
+alias.dnf=modify status:completed end:now gamestate:null +DNF
+alias.skip=modify status:completed end:now gamestate:null +SKIPPED
 alias.percent=summary
 alias.platforms=summary
 default.command=next
 
 ## List: concise list of finished, in progress, and DNF games.
-report.list.columns=id,end,project,source,gamestate,tags,genre,description.desc
-report.list.labels=ID,Finished,Plt,Src,Status,Tags,Genre,Title
+report.list.columns=id,uuid.short,end,project,source,gamestate,tags,genre,description.desc
+report.list.labels=ID,UUID,Finished,Plt,Src,Status,Tags,Genre,Title
 report.list.sort=end+,start+,description+
-report.list.filter=(+COMPLETED or +ACTIVE) # and (gamestate.not:null or +DNF)
+report.list.filter=(+COMPLETED or +ACTIVE) and gamestate.not:null and -DNF and -SKIPPED
+
+## Listall: includes null and dnf games
+report.listall.columns=id,uuid.short,end,project,source,gamestate,tags,genre,description.desc
+report.listall.labels=ID,UUID,Finished,Plt,Src,Status,Tags,Genre,Title
+report.listall.sort=end+,start+,description+
+report.listall.filter=(+COMPLETED or +ACTIVE)
 
 ## Next: games in progress & waiting to be played
-report.next.columns=id,start.age,project,source,gamestate,tags,genre,description.desc
-report.next.labels=ID,Playing,Plt,Src,Status,Tags,Genre,Title
+report.next.columns=id,uuid.short,start.age,project,source,gamestate,tags,genre,description.desc
+report.next.labels=ID,UUID,Playing,Plt,Src,Status,Tags,Genre,Title
 report.next.sort=urgency-,start+
 
 ## Nulled: all games in the null pile
-report.nulled.columns=id,end,project,gamestate,tags,genre,description.desc
-report.nulled.labels=ID,Finished,Plt,Status,Tags,Genre,Title
+report.nulled.columns=uuid.short,end,project,gamestate,tags,genre,description.desc
+report.nulled.labels=UUID,Finished,Plt,Status,Tags,Genre,Title
 report.nulled.sort=end+,start+,description+
 report.nulled.filter=gamestate:null
 
-report.all.columns=id,end,project,source,gamestate,tags,genre,description
+report.all.columns=uuid.short,end,project,source,gamestate,tags,genre,description
 report.all.description=All games
-report.all.labels=ID,Finished,Plt,Src,Status,Tags,Genre,Title
+report.all.labels=UUID,Finished,Plt,Src,Status,Tags,Genre,Title
