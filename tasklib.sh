@@ -242,7 +242,7 @@ function task/-unstar {
   \task "$@" modify -★
 }
 
-task/register stars ' stars$' task/-stars <<EOF
+task/register stars '(^| )stars$' task/-stars <<EOF
 
   $NAME [filter] stars
 
