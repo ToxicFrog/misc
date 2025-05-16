@@ -302,6 +302,29 @@ function cmd/add-zip {
   share/publish "$hash"
 }
 
+function cmd/add-tar {
+  local name=$1; shift
+  local hash=$(share/hash $name)
+  if [[ $name =~ / ]] || [[ $name != *.tar.xz ]]; then
+    die "The first argument to add-zip must be a .tar.xz file name with no slashes."
+  fi
+
+  share/create "$hash" \
+    hash "$hash" \
+    name "$name" \
+    type "tar.xz" \
+    pwd "$PWD" \
+    -- "$@"
+
+  tar -c --xz "$@" | pv > "$SHARE_PATH/$hash/$name"
+  printf 'Name: %s\n' $name
+  printf ' URL: %s/%s/%s\n' "$SHARE_URL" "$hash" "${name// /%20}"
+
+  share/publish "$hash"
+}
+
+
+
 # share config manipulation functions
 # the config is stored as a multimap, one line per entry, k-v tab separated
 
