@@ -14,9 +14,15 @@ function ffmpeg_convert() {
   input="$1"
   output="$2"
   shift 2
+  # We need two calls to map_metadata here. The first one tells it to set
+  # global metadata in the output from the metadata in the first stream of the
+  # input. The second one tells it to also copy global metadata input->output.
+  # This is necessary because some input formats, like opus, attach the metadata
+  # to the audio stream, and some, like FLAC, attach it to the container, and
+  # we need to handle both cases.
   </dev/null ffmpeg -y -i "$input" \
     -v error -nostats \
-    -map_metadata 0:s:a:0 -map 0:0 \
+    -map_metadata 0:s:a:0 -map_metadata 0:g -map 0:0 \
     "$@" \
     -q:a 0 -codec:a libmp3lame \
     "$output" \
@@ -82,6 +88,8 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
     # *.mp3|*.mp4|*.flac|*.m4a|*.ogg|*.opus|*.aac)
     # *.mp3|*.flac|*.ogg|*.opus|*.aac)
     *.mp3)
+      # TODO: can we convert *everything*, and burn in the replaygain information
+      # as we do so?
       ln -sf "$src" "$dst"
       echo "$dst" >> /tmp/$$.new
       printf "\x1B[92m[LINK]\x1B[0m %s\n" $src
