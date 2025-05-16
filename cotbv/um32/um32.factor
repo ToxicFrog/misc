@@ -1,4 +1,5 @@
-USING: accessors alien.endian arrays combinators effects.parser formatting io io.mmap kernel math math.bits memoize namespaces pair-rocket sequences strings vectors ;
+USING: accessors alien.endian arrays combinators command-line effects.parser formatting io io.mmap kernel math math.bits
+math.bitwise memoize namespaces pair-rocket prettyprint sequences specialized-arrays strings vectors ;
 IN: um32
 
 USE: specialized-arrays
@@ -14,10 +15,13 @@ TUPLE: UM32
   ! Memory banks; vector of vectors of machine words. $0 is initialized with the
   ! program. Others must be allocated at runtime with the ALLOC instruction.
   { mem vector }
+  ! Freelist. Dequeue of bank IDs that were allocated but have now been freed
+  ! and are available for reuse.
+  { freelist dlist }
   ;
 
 : <UM32> ( program -- um32 )
-  [ "" 0 { 0 0 0 0 0 0 0 0 0 } ] dip 1vector UM32 boa ;
+  [ "" 0 { 0 0 0 0 0 0 0 0 0 } ] dip 1vector <dlist> UM32 boa ;
 
 TUPLE: RegisterOp
   { opcode fixnum }
@@ -94,7 +98,11 @@ MEMO: decode ( instr -- quot )
 : op-halt ( op -- ) drop "halted" halt-vm ;
 
 : (find-free-bank) ( -- bankid )
-  f *vm* get mem>> [ index ] [ length ] bi or ;
+  *vm* get
+  dup freelist>> deque-empty?
+  [ mem>> length ]
+  [ freelist>> pop-back ]
+  if ;
 
 : op-alloc ( op -- ) ! B <- calloc(C)
   [ (find-free-bank) ] dip
@@ -103,7 +111,10 @@ MEMO: decode ( instr -- quot )
   2bi ;
 
 : op-free ( op -- )  ! free(C)
-  [ f ] dip c>> get-reg set-bank ;
+  [ f ] dip c>> get-reg
+  [ set-bank ]
+  [ *vm* get freelist>> push-front ]
+  bi ;
 
 : op-out ( op -- )  ! putc(C)
   c>> get-reg write1 flush ;
