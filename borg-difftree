@@ -1,0 +1,189 @@
+#!/usr/bin/env lua
+--[[
+Tool to display output of `borg diff --content-only` in a more readable limited-
+depth tree format.
+]]
+
+local HELPTEXT = [[
+Usage:
+$ borg diff --content-only ... | borg-difftree [flags]
+
+Flags:
+  --maxdepth=N
+    Display at most N levels of filesystem heirarchy. 0 displays only the root
+    of the archive. "all" displays all levels and may be memory-hungry.
+  --minsize=N
+    Display only nodes where the "after" size is at least this large. You can
+    suffix the size with 'kB', 'MB', 'GB', or 'TB'.
+  --mindelta=N
+    Display only nodes where the difference between "before" and "after" is at
+    least this large. Supports the same suffixes as --minsize.
+  --mindepth=N
+    Display at least this many levels of the heirarchy even if --minsize
+    or --mindelta are not satisfied. Must be ≤ --maxdepth.
+  --sort=name | --sort=size | --sort=delta
+    Sort heirarchy by file/directory name, absolute size, or delta
+]]
+
+-- "borg diff" output parsing bits --
+
+--[[
+Format of lines from "borg diff" is:
+For modified files:
+  +[new size] -[old size] [path]
+For added/removed files:
+  (added|removed) [size] [path]
+For directories:
+  (added|removed) directory [path]
+A size is expressed as a number (up to three whole digits + 2 after the decimal)
+followed by a space, followed by B, kB, MB, GB, or TB.
+]]
+
+-- Used for both sizes from borg (with a space before the units) and sizes from
+-- the command line (without a space)
+local sizes = { B = 1; kB = 2^10; MB = 2^20; GB = 2^30; TB = 2^40; }
+local function parse_size(size)
+  local sign,magnitude,exponent = size:match('([-+]?)([0-9.]+) ?([kMGT]?B)')
+  magnitude = tonumber(magnitude)
+  if sign == '-' then magnitude = -magnitude end
+  return magnitude * sizes[exponent]
+end
+
+-- parse a line and return old_size,new_size,path
+-- if it's a remove, new_size will be 0
+-- if it's an add, old_size will be 0
+-- if it's a directory, returns nil
+local function parse_line(line)
+  if line:match('^%S+ directory') then
+    return nil
+  elseif line:match('^%S+ link') then
+    return nil
+  elseif line:match('^added') then
+    local size,path = line:match('^added%s+([^B]+B) (.*)')
+    return 0,parse_size(size),path
+  elseif line:match('^removed') then
+    local size,path = line:match('^removed%s+([^B]+B) (.*)')
+    return parse_size(size),0,path
+  else
+    -- print(line)
+    local new_size,old_size,path = line:match('^%s*([-+][^B]+B)%s+([-+ ][^B]+B) (.*)')
+    return parse_size(old_size),parse_size(new_size),path
+  end
+end
+
+-- Tree-building and tree-displaying parts --
+
+local function add_child(tree, name)
+  if not tree.children[name] then
+    tree.children[name] = { old_size = 0; new_size = 0; children = {}; keys = {}; }
+    table.insert(tree.keys, name)
+  end
+  return tree.children[name]
+end
+
+local function record_diff(tree, max_depth, old_size, new_size, path)
+  if old_size == nil then return end -- no size change
+  tree.old_size = tree.old_size + math.abs(old_size)
+  tree.new_size = tree.new_size + new_size
+  tree.delta = tree.new_size - tree.old_size
+  if max_depth > 0 then
+    local head,tail = path:match('([^/]+/)(.+)')
+    if not head then return end
+    return record_diff(add_child(tree, head), max_depth-1, old_size, new_size, tail)
+  end
+end
+
+local function pprint_size(size)
+  size = math.abs(size)
+  for suffix,magnitude in pairs(sizes) do
+    if size >= magnitude and size < magnitude*1024 then
+      return string.format('%.1f%-2s', size/magnitude, suffix)
+    end
+  end
+  return size..'B'
+end
+
+local function mksorter(tree, field)
+  -- hack hack hack
+  if field == 'delta' then
+    return function(x1, x2)
+      return tree.children[x1][field] > tree.children[x2][field]
+    end
+  else
+    return function(x1, x2)
+      return tree.children[x1][field] < tree.children[x2][field]
+    end
+  end
+end
+local valid_sorters = { name = 'name'; size = 'new_size'; delta = 'delta'; }
+
+local function report_diff(opts, tree, path, depth)
+  local delta = tree.new_size - tree.old_size
+
+  if depth > opts.mindepth then
+    if delta < opts.mindelta or tree.new_size < opts.minsize then return end
+  end
+
+  print(string.format(
+    '%8s %9s -> %8s | %s%s',
+      pprint_size(tree.old_size),
+      tree.delta == 0 and ' ' or (tree.delta > 0 and '+' or '-')..pprint_size(tree.delta),
+      pprint_size(tree.new_size),
+      string.rep('  ', depth), path))
+
+  table.sort(tree.keys, mksorter(tree, opts.sort))
+  for _,name in ipairs(tree.keys) do
+    report_diff(opts, tree.children[name], name, depth+1)
+  end
+end
+
+-- command line flag parsing --
+
+local function parseopts(...)
+  local opts = { maxdepth = 3; minsize = 1; mindelta = 1; mindepth = 1; sort = 'name' }
+  for _,arg in ipairs {...} do
+    if arg:match('^--maxdepth=') then
+      opts.maxdepth = assert(tonumber(arg:match('=(.*)')))
+    elseif arg:match('^--mindepth=') then
+      opts.mindepth = assert(tonumber(arg:match('=(.*)')))
+    elseif arg:match('^--minsize=') then
+      opts.minsize = assert(parse_size(arg:match('=(.*)')))
+    elseif arg:match('^--mindelta=') then
+      opts.mindelta = assert(parse_size(arg:match('=(.*)')))
+    elseif arg:match('^--sort=') then
+      opts.sort = assert(valid_sorters[arg:match('=(.*)')])
+    else
+      error()
+    end
+  end
+  return opts
+end
+
+local function main(...)
+  local result,opts = pcall(parseopts, ...)
+  if not result then
+    print(HELPTEXT)
+    os.exit(1)
+  end
+
+  local tree = {
+    old_size = 0;
+    new_size = 0;
+    children = {};
+    keys = {};
+  }
+
+  for line in io.lines() do
+    local ok,old_size,new_size,path = pcall(parse_line, line)
+    if not ok then
+      print("Error parsing line: "..line)
+      print(old_size) -- actually error
+    else
+      record_diff(tree, opts.maxdepth, old_size, new_size, path)
+    end
+  end
+
+  report_diff(opts, tree, '/', 0)
+end
+
+return main(...)
