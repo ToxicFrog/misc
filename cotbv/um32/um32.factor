@@ -151,21 +151,31 @@ MEMO: decode ( instr -- quot )
 ! VM entry point
 
 USE: prettyprint
-: show-vm' ( -- )
+: (show-vm) ( -- )
   8 get-reg 0 get-mem
   dup decode unparse
   *vm* get
-  [ r>> unparse ] [ mem>> [ { } or length ] map unparse ] bi
-  "\t0x%08X %s %s %s\n" printf ;
+  [ r>> unparse ]
+  [ mem>> length ]
+  [ mem>> 8 index-or-length head [ { } or length ] map unparse ]
+  tri "\t0x%08X %s %s %d %s\n" printf ;
 
-: show-vm ( -- ) ;
+: show-vm ( -- )
+  *vm* get clk>> 50,000,000 rem 0 =
+  [ (show-vm) flush ] when
+! Uncomment these to halt the VM about halfway through sandmark, before the
+! profiler crashes.
+!  *vm* get clk>> 50,000,000 50 * >
+!  [ "timeout" halt-vm ] when
+  ;
 
 : with-um32 ( um32 quot -- ... )
   *vm* swap with-variable ; inline
 
 : run-um32 ( program -- vm )
   <UM32> [
-    [ show-vm fetch decode dispatch check-ip
+    [ show-vm
+      fetch decode dispatch check-ip
       *vm* get
       [ [ 1 + ] change-clk drop ]
       [ error>> empty? ] bi ]
@@ -178,5 +188,8 @@ USE: prettyprint
 : run-um32-file ( filename -- vm )
   ube32 [ { } like run-um32 ] with-mapped-array-reader ;
 
-command-line get first ! binary file-contents
-run-um32-file
+! Invoke as: factor um32.factor sandmark.umz
+command-line get first
+[ run-um32-file ] profile top-down flat [ profile. ] bi@
+! run-um32-file
+
