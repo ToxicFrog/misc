@@ -13,6 +13,9 @@
 
 # Walk up the process tree until we run out of processes or find something
 # with stdout connected to something other than devnull
+# tmux list-clients -F '#{client_activity} #{client_tty}' | sort -g | tail -n1 | cut -d' ' -f2
+# If we're inside tmux, this will return the pty associated with the connected client
+# that was most recently active, i.e. the one the user is sitting in front of
 function find-tty {
   local pid=$$
   while [[ $pid != 1 ]]; do
@@ -41,7 +44,14 @@ function osc {
 function open-image {
 #  osc "451;IMG;$1"
 #  tmux split-window -h -c ~ zsh -c "source .zsh/aliases.zsh; timg '$1'"
-  tmux detach -E "timgallery -pk '$1'; tmux attach"
+  # this needs to be -ps if we're connected from yaft,
+  # but -pk for konsole or kitty
+  # todo: use split-window instead now that tmux supports sixel
+  tmux detach -E "trap 'tmux attach' EXIT; timgallery -pa '$1'"
+}
+
+function open-video {
+  osc "451;VID;$1"
 }
 
 function open-url {
@@ -49,9 +59,16 @@ function open-url {
 }
 
 # Probe the URL to figure out what it is
-content_type="$(curl -s -L --head --write-out "%{content_type}" --output /dev/null "$1")"
-if [[ $content_type == image/* ]]; then
+# Ideally we'd use HEAD but a bunch of servers just 405 that???
+content_type="$(curl -s -L --write-out "%{http_code}:%{content_type}" --output /dev/null "$1")"
+if [[ $content_type != 200:* ]]; then
+  # We used to do nothing here, but cloudflare bullshit means a lot of sites will
+  # return 403 or whatnot to curl specifically :<
+  open-url "$1"
+elif [[ $content_type == 200:image/* ]]; then
   open-image "$1"
+elif [[ $content_type == 200:video/* ]]; then
+  open-video "$1"
 else
   open-url "$1"
 fi
