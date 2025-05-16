@@ -5,8 +5,10 @@ USE: specialized-arrays
 SPECIALIZED-ARRAY: ube32
 
 TUPLE: UM32
-  ! Error state, or f if operating normally.
-  error
+  ! Error state, or "" if operating normally.
+  { error string }
+  ! How many cycles have we executed?
+  { clk fixnum }
   ! Register file. Contains 9 registers. r0 through r7 are general purpose; r8 is the instruction pointer.
   { r array }
   ! Memory banks; vector of vectors of machine words. $0 is initialized with the
@@ -15,7 +17,7 @@ TUPLE: UM32
   ;
 
 : <UM32> ( program -- um32 )
-  [ "" { 0 0 0 0 0 0 0 0 0 } ] dip 1vector UM32 boa ;
+  [ "" 0 { 0 0 0 0 0 0 0 0 0 } ] dip 1vector UM32 boa ;
 
 TUPLE: RegisterOp
   { opcode fixnum }
@@ -151,7 +153,13 @@ USE: prettyprint
   *vm* swap with-variable ; inline
 
 : run-um32 ( program -- vm )
-  <UM32> [ [ show-vm fetch decode dispatch check-ip *vm* get error>> empty? ] loop *vm* get ] with-um32 ;
+  <UM32> [
+    [ show-vm fetch decode dispatch check-ip
+      *vm* get
+      [ [ 1 + ] change-clk drop ]
+      [ error>> empty? ] bi ]
+    loop *vm* get
+  ] with-um32 ;
 
 : dbg ( rom -- )
   [ 0 1430 ] dip subseq [ swap [ 4 * ] dip "%08x: %08x\n" printf ] each-index ;
@@ -159,4 +167,5 @@ USE: prettyprint
 : run-um32-file ( filename -- vm )
   ube32 [ { } like run-um32 ] with-mapped-array-reader ;
 
-"sandmark.umz" run-um32-file
+command-line get first ! binary file-contents
+run-um32-file
