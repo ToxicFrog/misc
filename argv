@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Simple script to show what would command would be executed and what would
+# end up in its argv. It does not actually run the command, just shows you
+# what WOULD run if you entered it as a normal command.
+#
+# Put it in front of the command, e.g.
+#   $ argv foo --bar --baz $HOME/waffles
+
+cmd="$1"
+type="$(type -t "$cmd")"
+
+# First, say what we would execute and what kind of thing it is.
+case "$type" in
+  file)
+    # It's a program on disk somewhere.
+    printf 'Would execute program: \e[1m%s\e[0m\n' "$(type -p "$cmd")"
+    ;;
+  function|builtin)
+    # It's a builtin command or a shell function.
+    printf 'Would execute shell %s: \e[1m%s\e[0m\n' "$type" "$cmd"
+    ;;
+  alias|keyword)
+    # Figuring out what arguments actually go to the alias is complicated.
+    # Keywords aren't commands at all, they're part of the bash language itself.
+    # In either case I don't want to open that can of worms.
+    printf "%s is a %s and I don't support those.\n" "$cmd" "$type"
+    exit 1
+    ;;
+  *)
+    printf "Something went wrong and I can't figure out what would get executed, sorry :(\n"
+    exit 2
+    ;;
+esac
+
+# Now show what that program would get in argv[].
+printf 'const char* argv[] = {\n'
+for arg in "$@"; do
+  printf '  "%q",\n' "$arg"
+done
+printf '};\n'
