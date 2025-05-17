@@ -38,17 +38,15 @@ SYMBOL: *vm*
 
 ! Register and memory access words
 
-: >word ( n -- n' ) 0x100000000 rem integer>fixnum ;
-
 : get-reg ( r -- i ) *vm* get r>> nth ;
-: set-reg ( i r -- ) [ >word ] dip *vm* get r>> set-nth ;
+: set-reg ( i r -- ) *vm* get r>> set-nth ;
 : get-ip ( -- ip ) 8 get-reg ;
 : set-ip ( ip -- ) 8 set-reg ;
 
 : get-bank ( bank -- mem ) *vm* get mem>> nth ;
 : set-bank ( mem bank -- ) *vm* get mem>> set-nth ;
 : get-mem ( addr bank -- i ) get-bank nth ;
-: set-mem ( i addr bank -- ) [ >word ] 2dip get-bank set-nth ;
+: set-mem ( i addr bank -- ) get-bank set-nth ;
 
 : halt-vm ( reason -- ) *vm* get error<< ;
 : check-ip ( -- ) 8 get-reg 0 get-bank length < [ "IP out of bounds" halt-vm ] unless ;
@@ -90,10 +88,10 @@ MEMO: decode ( instr -- quot )
 : op-store ( op -- )  ! $A:B <- C
   [ c>> get-reg ] [ b>> get-reg ] [ a>> get-reg ] tri set-mem ;
 
-: op-add ( op -- ) [ + ] (op-math) ;
-: op-mul ( op -- ) [ * ] (op-math) ;
+: op-add ( op -- ) [ math.bitwise:w+ ] (op-math) ;
+: op-mul ( op -- ) [ math.bitwise:w* ] (op-math) ;
 : op-div ( op -- ) [ /i ] (op-math) ;
-: op-nand ( op -- ) [ bitand bitnot ] (op-math) ;
+: op-nand ( op -- ) [ bitand bitnot 32 math.bitwise:bits ] (op-math) ;
 
 : op-halt ( op -- ) drop "halted" halt-vm ;
 
@@ -156,9 +154,9 @@ USE: prettyprint
   dup decode unparse
   *vm* get
   [ r>> unparse ]
-  [ mem>> length ]
+  ! [ mem>> length ]
   [ mem>> 8 index-or-length head [ { } or length ] map unparse ]
-  tri "\t0x%08X %s %s %d %s\n" printf ;
+  bi "\t0x%08X %s %s %s\n" printf ;
 
 : show-vm ( -- )
   *vm* get clk>> 50,000,000 rem 0 =
