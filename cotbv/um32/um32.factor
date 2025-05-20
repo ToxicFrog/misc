@@ -38,22 +38,24 @@ SYMBOL: *vm*
 
 ! Register and memory access words
 
-: get-reg ( r -- i ) *vm* get r>> nth ;
-: set-reg ( i r -- ) *vm* get r>> set-nth ;
-: get-ip ( -- ip ) 8 get-reg ;
-: set-ip ( ip -- ) 8 set-reg ;
+: get-reg ( vm r -- i ) swap r>> nth ;
+: set-reg ( vm i r -- ) rot r>> set-nth ;
+: get-ip ( vm -- ip ) 8 get-reg ;
+: set-ip ( vm ip -- ) 8 set-reg ;
 
-: get-bank ( bank -- mem ) *vm* get mem>> nth ;
-: set-bank ( mem bank -- ) *vm* get mem>> set-nth ;
-: get-mem ( addr bank -- i ) get-bank nth ;
-: set-mem ( i addr bank -- ) get-bank set-nth ;
+: get-bank ( vm bank -- mem ) swap mem>> nth ;
+: set-bank ( vm mem bank -- ) rot mem>> set-nth ;
+:: get-mem ( vm addr bank -- i ) addr vm bank get-bank nth ;
+:: set-mem ( vm i addr bank -- ) i addr vm bank get-bank set-nth ;
 
-: halt-vm ( reason -- ) *vm* get error<< ;
-: check-ip ( -- ) 8 get-reg 0 get-bank length < [ "IP out of bounds" halt-vm ] unless ;
+: halt-vm ( vm reason -- ) >>error drop ;
+:: check-ip ( vm -- )
+  vm [ 8 get-reg ] [ 0 get-bank length ] bi
+  < [ vm "IP out of bounds" halt-vm ] unless ;
 
 ! Instruction decoding
 
-: fetch ( -- instr ) get-ip [ 0 get-mem ] [ 1 + set-ip ] bi ;
+:: fetch ( vm -- instr ) vm get-ip [ vm swap 0 get-mem ] [ 1 + vm swap set-ip ] bi ;
 
 : decode-opcode ( instr -- opcode ) 32 <bits> 4 tail* bits>number ;
 
@@ -74,61 +76,68 @@ MEMO: decode ( instr -- quot )
 ! Instruction dispatch
 
 ! Implements all math of the form: A <- B op C
-: (op-math) ( op quot -- )
-  [ [ a>> ] [ b>> get-reg ] [ c>> get-reg ] tri ] dip
-  call swap set-reg ; inline
+: (op-math) ( vm op quot -- )
+  [ [ a>> ] [ b>> get-reg ] [ c>> get-reg ] 2tri ] dip
+  call swap set-reg
+  ; inline
 
-: op-cmov ( op -- )  ! A <- B iff C!=0
-  [ c>> get-reg 0 = ] [ b>> ] [ a>> ] tri
-  '[ _ get-reg _ set-reg ] unless ;
+:: op-cmov ( vm op -- )  ! A <- B iff C!=0
+  op [ c>> vm swap get-reg 0 = ] [ b>> ] [ a>> ] tri
+  '[ vm _ get-reg vm swap _ set-reg ] unless ;
 
-: op-load ( op -- )  ! A <- $B:C
-  [ a>> ] [ c>> get-reg ] [ b>> get-reg ] tri get-mem swap set-reg ;
+:: op-load ( vm op -- )  ! A <- $B:C
+  vm
+  vm op c>> get-reg
+  vm op b>> get-reg
+  get-mem
+  [ vm ] dip op a>> set-reg ;
 
-: op-store ( op -- )  ! $A:B <- C
-  [ c>> get-reg ] [ b>> get-reg ] [ a>> get-reg ] tri set-mem ;
+:: op-store ( vm op -- )  ! $A:B <- C
+  vm dup
+  op [ c>> get-reg ] [ b>> get-reg ] [ a>> get-reg ] 2tri
+  set-mem ;
 
-: op-add ( op -- ) [ math.bitwise:w+ ] (op-math) ;
-: op-mul ( op -- ) [ math.bitwise:w* ] (op-math) ;
-: op-div ( op -- ) [ /i ] (op-math) ;
-: op-nand ( op -- ) [ bitand bitnot 32 math.bitwise:bits ] (op-math) ;
+: op-add ( vm op -- ) [ math.bitwise:w+ ] (op-math) ;
+: op-mul ( vm op -- ) [ math.bitwise:w* ] (op-math) ;
+: op-div ( vm op -- ) [ /i ] (op-math) ;
+: op-nand ( vm op -- ) [ bitand bitnot 32 math.bitwise:bits ] (op-math) ;
 
-: op-halt ( op -- ) drop "halted" halt-vm ;
+: op-halt ( vm op -- ) drop "halted" halt-vm ;
 
-: (find-free-bank) ( -- bankid )
-  *vm* get
+: (find-free-bank) ( vm -- bankid )
   dup freelist>> deque-empty?
   [ mem>> length ]
   [ freelist>> pop-back ]
   if ;
 
-: op-alloc ( op -- ) ! B <- calloc(C)
-  [ (find-free-bank) ] dip
-  [ c>> get-reg 0 <array> swap set-bank ]
-  [ b>> set-reg ]
-  2bi ;
+:: op-alloc ( vm op -- ) ! B <- calloc(C)
+  vm op c>> get-reg 0 <array>
+  vm (find-free-bank)
+  ! mem bank
+  [ vm swap op b>> set-reg drop ] [ vm -rot set-bank ] 2bi ;
 
-: op-free ( op -- )  ! free(C)
-  [ f ] dip c>> get-reg
-  [ set-bank ]
-  [ *vm* get freelist>> push-front ]
+:: op-free ( vm op -- )  ! free(C)
+  vm op c>> get-reg
+  [ vm f rot set-bank ]
+  [ vm freelist>> push-front ]
   bi ;
 
-: op-out ( op -- )  ! putc(C)
+: op-out ( vm op -- )  ! putc(C)
   c>> get-reg write1 flush ;
 
-: op-in ( op -- )  ! C <- getc()
+: op-in ( vm op -- )  ! C <- getc()
   c>> read1 swap set-reg ;
 
-: op-exec ( op -- )  ! $0 <- $B; IP <- C
-  [ b>> get-reg dup zero? [ drop ] [ get-bank clone 0 set-bank ] if ]
-  [ c>> get-reg 8 set-reg ]
-  bi ;
+:: op-exec ( vm op -- )  ! $0 <- $B; IP <- C
+  vm op b>> get-reg dup zero?
+  [ drop ] [ [ vm dup ] dip get-bank clone 0 set-bank ] if
+  vm dup op c>> get-reg 8 set-reg
+  ;
 
-: op-literal ( op -- )  ! A <- val
-  [ val>> ] [ a>> ] bi set-reg ;
+:: op-literal ( vm op -- )  ! A <- val
+  vm op val>> op a>> set-reg ;
 
-: dispatch ( op -- )
+: dispatch ( vm op -- )
   dup opcode>> {
     0x0 => [ op-cmov ]
     0x1 => [ op-load ]
@@ -149,36 +158,35 @@ MEMO: decode ( instr -- quot )
 ! VM entry point
 
 USE: prettyprint
-: (show-vm) ( -- )
-  8 get-reg 0 get-mem
+:: (show-vm) ( vm -- )
+  vm dup 8 get-reg 0 get-mem
   dup decode unparse
-  *vm* get
+  vm
   [ r>> unparse ]
   ! [ mem>> length ]
   [ mem>> 8 index-or-length head [ { } or length ] map unparse ]
   bi "\t0x%08X %s %s %s\n" printf ;
 
-: show-vm ( -- )
-  *vm* get clk>> 50,000,000 rem 0 =
-  [ (show-vm) flush ] when
+: show-vm ( vm -- )
+  drop
+!  *vm* get clk>> 50,000,000 rem 0 =
+!  (show-vm) flush
 ! Uncomment these to halt the VM about halfway through sandmark, before the
 ! profiler crashes.
 !  *vm* get clk>> 50,000,000 50 * >
 !  [ "timeout" halt-vm ] when
   ;
 
-: with-um32 ( um32 quot -- ... )
-  *vm* swap with-variable ; inline
-
 : run-um32 ( program -- vm )
   <UM32> [
-    [ show-vm
-      fetch decode dispatch check-ip
-      *vm* get
+    dup {
+      [ show-vm ]
+      [ dup fetch decode dispatch ]
+      [ check-ip ]
       [ [ 1 + ] change-clk drop ]
-      [ error>> empty? ] bi ]
-    loop *vm* get
-  ] with-um32 ;
+      [ error>> empty? ]
+    } cleave
+  ] loop ;
 
 : dbg ( rom -- )
   [ 0 1430 ] dip subseq [ swap [ 4 * ] dip "%08x: %08x\n" printf ] each-index ;
