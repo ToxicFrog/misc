@@ -27,12 +27,13 @@ region "Wine Cellar" {
   ]];
   room "Entrance to Darkness" {
     "Starting room.";
-    exit "Worker's Breakroom";
+    x = 0; y = 0;
+    exitn "Worker's Breakroom";
   };
   room "Worker's Breakroom" {
     "First save point and chest.";
-    exit "Entrance to Darkness";
-    exit "Hall of Struggle";
+    exits "Entrance to Darkness";
+    exitn "Hall of Struggle";
     save_point = true;
     chest {
       "Tovarisch:Hand Axe.B/Wooden Grip",
@@ -42,21 +43,21 @@ region "Wine Cellar" {
   };
   room "Hall of Struggle" {
     "First enemy.";
-    exit "Worker's Breakroom";
-    exit "Smokebarrel Stair";
+    exits "Worker's Breakroom";
+    exitn "Smokebarrel Stair";
     enemy "Bat";
   };
   room "Smokebarrel Stair" {
     "Cutscene with Crimson Blades talking about the sigil-locked door.";
-    exit "Hall of Struggle";
-    exit "Wine Guild Hall";
-    exit "Room of Cheap Red Wine" "Chamomile Sigil";
+    exitsw "Hall of Struggle";
+    exitse "Wine Guild Hall";
+    exitn "Room of Cheap Red Wine" "Chamomile Sigil";
     trap "Heal Panel";
   };
   room "Wine Guild Hall" {
     "Cutscene with Crimson Blades talking about cloudstones.";
-    exit "Smokebarrel Stair";
-    exit "Wine Magnate's Chambers";
+    exitn "Smokebarrel Stair";
+    exits "Wine Magnate's Chambers";
     save_point = true;
     container = true;
     enemy "Sackheim";
@@ -64,29 +65,30 @@ region "Wine Cellar" {
   };
   room "Wine Magnate's Chambers" {
     "Tremor cutscene.";
-    exit "Wine Guild Hall";
-    exit "Fine Vintage Vault";
+    x = 3; y = 1;
+    exitnw "Wine Guild Hall";
+    exitne "Fine Vintage Vault";
     enemy "Bat";
     enemy "Silver Wolf";
     trap "Gust";
   };
   room "Fine Vintage Vault" {
     "Cutscene with Sydney deceiving two CBs.";
-    exit "Wine Magnate's Chambers";
-    exit "Chamber of Fear";
+    exits "Wine Magnate's Chambers";
+    exitn "Chamber of Fear";
     enemy "Crimson Blade";
   };
   room "Chamber of Fear" {
     "Cutscene with earthquake raising the terrain.";
-    exit "Fine Vintage Vault";
-    exit "The Reckoning Room";
-    exit "A Laborer's Thirst";
+    exits "Fine Vintage Vault";
+    exitw "The Reckoning Room";
+    exitn "A Laborer's Thirst";
     enemy "Bat";
     enemy "Silver Wolf";
   };
   room "The Reckoning Room" {
     "Cage match with a bat and two wolves.";
-    exit "Chamber of Fear";
+    exite "Chamber of Fear";
     enemy "Bat";
     enemy "Silver Wolf";
     chest {
@@ -97,30 +99,30 @@ region "Wine Cellar" {
     };
   };
   room "A Laborer's Thirst" {
-    exit "Chamber of Fear";
-    exit "The Rich Drown in Wine";
+    exits "Chamber of Fear";
+    exitn "The Rich Drown in Wine";
     enemy "Bat";
     enemy "Silver Wolf";
   };
   room "The Rich Drown in Wine" {
     "Lever-controlled timed door.";
-    exit "A Laborer's Thirst";
-    exit "Room of Rotten Grapes";
+    exits "A Laborer's Thirst";
+    exitn "Room of Rotten Grapes";
     enemy "Bat";
     enemy "Silver Wolf";
   };
   room "Room of Rotten Grapes" {
     "First flashback to Ashley's family.";
-    exit "The Rich Drown in Wine";
-    exit "Blackmarket of Wines";
+    exits "The Rich Drown in Wine";
+    exitn "Blackmarket of Wines";
     enemy "Bat";
     trap "Heal Panel"; -- before Lich
     trap "Curse Panel"; -- after Lich
   };
   room "Blackmarket of Wines" {
     "Small room with save point and chest. Combat dummy appears once you've defeated Minotaur.";
-    exit "Room of Rotten Grapes";
-    exit "The Gallows";
+    exits "Room of Rotten Grapes";
+    exitn "The Gallows";
     save_point = true;
     chest {
       "Cure Potion",
@@ -129,8 +131,9 @@ region "Wine Cellar" {
     dummy "Human" { after = "The Gallows"; };
   };
   room "The Gallows" {
+    x = 3; y = 7;
     "Minotaur boss room. 'Show me your soul' cutscene, unlocking of battle abilities.";
-    exit "Blackmarket of Wines";
+    exits "Blackmarket of Wines";
     enemy "Minotaur" {
       boss = true;
       "Chamomile Sigil",
@@ -152,28 +155,29 @@ region "Wine Cellar" {
   };
   room "Room of Cheap Red Wine" {
     "Crimson Blade zombie cutscene.";
-    exit "Smokebarrel Stair";
-    exit "Room of Cheap White Wine";
-    enemy "Mandel" { "Rapier:Rapier.B/Short Hilt" };
+    exits "Smokebarrel Stair";
+    exitn "Room of Cheap White Wine";
+    enemy "Mandel" { miniboss = true; "Rapier:Rapier.B/Short Hilt" };
     trap "Heal Panel";
   };
   room "Room of Cheap White Wine" {
     "Cutscene with many zombies rising.";
-    exit "Room of Cheap Red Wine";
-    exit "The Greedy One's Den";
-    enemy "Zombie Fighter" { "Cure Bulb" };
-    enemy "Zombie" { "Cure Root x2" };
-    enemy "Ghoul" { "Cure Root x2" };
+    exits "Room of Cheap Red Wine";
+    exitn "The Greedy One's Den";
+    enemy "Zombie Fighter" { miniboss = true; "Cure Bulb" };
+    enemy "Zombie" { miniboss = true; "Cure Root x2" };
+    enemy "Ghoul" { miniboss = true; "Cure Root x2" };
   };
   room "The Greedy One's Den" {
     "Uninteresting room with wolves and sometimes bats.";
-    exit "Room of Cheap White Wine";
-    exit "The Hero's Winehall";
+    exits "Room of Cheap White Wine";
+    exitn "The Hero's Winehall";
     enemy "Silver Wolf";
   };
   room "The Hero's Winehall" {
-    exit "The Greedy One's Den";
-    exit "Hall of Sworn Revenge"; -- to Catacombs
+    x = 1; y = 7;
+    exits "The Greedy One's Den";
+    exitn "Hall of Sworn Revenge"; -- to Catacombs
     enemy "Dullahan" {
       boss = true;
       "Elixir of Queens", "Elixir of Mages", "Grimoire Lux",

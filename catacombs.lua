@@ -5,8 +5,8 @@ region "Catacombs" {
   ]];
   room "Hall of Sworn Revenge" {
     "Catacombs entrance room with save point and container.";
-    exit "The Hero's Winehall"; -- to Wine Cellar
-    exit "The Last Blessing";
+    exits "The Hero's Winehall"; -- to Wine Cellar
+    exitn "The Last Blessing";
     trap "Heal Panel";
     trap "Cure Panel";
     dummy "Undead" { after = "Sanctum"; };
@@ -15,16 +15,16 @@ region "Catacombs" {
   };
   room "The Last Blessing" {
     "Bat and Slime are HP-dependent.";
-    exit "Hall of Sworn Revenge";
-    exit "The Weeping Corridor";
+    exits "Hall of Sworn Revenge";
+    exitn "The Weeping Corridor";
     enemy "Hellhound";
     enemy "Bat";
     enemy "Slime";
   };
   room "The Weeping Corridor" {
     "Hellhound and Slime are HP-dependent.";
-    exit "The Last Blessing";
-    exit "Persecution Hall";
+    exits "The Last Blessing";
+    exitn "Persecution Hall";
     trap "Freeze";
     enemy "Skeleton";
     enemy "Hellhound";
@@ -32,16 +32,16 @@ region "Catacombs" {
   };
   room "Persecution Hall" {
     "Bat and Slime are HP-dependent. Exit to Rodent-Ridden Chamber by moving crates around.";
-    exit "The Weeping Corridor";
-    exit "Rodent-Ridden Chamber";
-    exit "Shrine to the Martyrs";
+    exits "The Weeping Corridor";
+    exitw "Rodent-Ridden Chamber";
+    exitn "Shrine to the Martyrs";
     enemy "Skeleton";
     enemy "Slime";
     enemy "Bat";
   };
   room "Rodent-Ridden Chamber" {
     "Small dead end room with a chest.";
-    exit "Persecution Hall";
+    exite "Persecution Hall";
     enemy "Skeleton";
     enemy "Ghost" { after = "The Lamenting Mother (West)"; };
     chest {
@@ -51,17 +51,17 @@ region "Catacombs" {
     };
   };
   room "Shrine to the Martyrs" {
-    exit "Persecution Hall";
-    exit "The Lamenting Mother (West)";
-    exit "Hall of Dying Hope";
+    exits "Persecution Hall";
+    exite "The Lamenting Mother (West)";
+    exitn "Hall of Dying Hope";
     enemy "Hellhound";
     enemy "Skeleton";
     enemy "Bat";
   };
   room "The Lamenting Mother (West)" {
     "On first visit this is connected to Lamenting Mother East, so you can grab the chest there. However, after defeating the ghost and leaving, the two are no longer collected and the chest can only be reached from the other side of the room.";
-    exit "Shrine to the Martyrs";
-    enemy "Ghost" { "Cure Bulb x3", "Elixir of Kings", };
+    exitw "Shrine to the Martyrs";
+    enemy "Ghost" { miniboss = true; "Cure Bulb x3", "Elixir of Kings", };
   };
   room "The Lamenting Mother (East)" {
     "On first visit to Lamenting Mother West, you can reach this area, but after defeating the ghost it is disconnected and reachable only via The Last Stab of Hope. The chest is thus associated with this area to avoid softlocks if you miss it on your first visit.";
@@ -74,16 +74,16 @@ region "Catacombs" {
     };
   };
   room "Hall of Dying Hope" {
-    exit "Shrine to the Martyrs";
-    exit "Bandits' Hideout";
-    exit "The Bloody Hallway";
+    exits "Shrine to the Martyrs";
+    exitw "Bandits' Hideout";
+    exite "The Bloody Hallway";
     enemy "Zombie Knight";
     enemy "Slime";
     enemy "Skeleton";
   };
   room "Bandits' Hideout" {
     "Dead-end treasure room. Ghost has a high chance of dropping a Fireball grimoire.";
-    exit "Hall of Dying Hope";
+    exite "Hall of Dying Hope";
     enemy "Hellhound";
     enemy "Bat";
     enemy "Ghost";
@@ -94,62 +94,62 @@ region "Catacombs" {
   };
   room "The Bloody Hallway" {
     "Room with simple block-pushing puzzle.";
-    exit "Hall of Dying Hope";
-    exit "Faith Overcame Fear";
+    exitw "Hall of Dying Hope";
+    exite "Faith Overcame Fear";
   };
   room "Faith Overcame Fear" {
-    exit "The Bloody Hallway";
-    exit "The Withered Spring";
+    exitw "The Bloody Hallway";
+    exite "The Withered Spring";
     enemy "Skeleton";
     enemy "Zombie Knight";
     enemy "Slime";
   };
   room "The Withered Spring" {
-    exit "Faith Overcame Fear";
-    exit "Prisoners' Niche" "Lily Sigil"; -- to Sanctum
-    exit 'Workshop "Work of Art"';
-    exit "Repent, O ye Sinners";
+    exitw "Faith Overcame Fear";
+    exite "Prisoners' Niche" "Lily Sigil"; -- to Sanctum
+    exitn 'Workshop "Work of Art"';
+    exits "Repent, O ye Sinners";
     enemy "Zombie Knight";
     enemy "Ghoul";
     save_point = true;
   };
   room 'Workshop "Work of Art"' {
     "First workshop!";
-    exit "The Withered Spring";
+    exits "The Withered Spring";
     save_point = true;
     container = true;
     workshop = { "W", "L", "B" };
   };
   room "Repent, O ye Sinners" {
-    exit "The Withered Spring";
-    exit "The Reaper's Victims";
-    exit "The Last Stab of Hope";
+    exitn "The Withered Spring";
+    exitw "The Reaper's Victims";
+    exits "The Last Stab of Hope";
     enemy "Bat";
     enemy "Mummy";
     enemy "Slime";
   };
   room "The Reaper's Victims" {
-    exit "Repent, O ye Sinners";
+    exite "Repent, O ye Sinners";
     enemy "Zombie Knight";
     enemy "Bat";
   };
   room "The Last Stab of Hope" {
     "Vertical cliff to the north can be traversed by breaking the heavy crate, then carrying the light ones. This is the room connected to the west half of Lamenting Mother.";
-    exit "Repent, O ye Sinners";
-    exit "The Lamenting Mother (East)";
-    exit "Hallway of Heroes";
+    exitn "Repent, O ye Sinners";
+    exitw "The Lamenting Mother (East)";
+    exits "Hallway of Heroes";
     trap "Cure Panel";
     enemy "Skeleton";
     enemy "Slime";
   };
   room "Hallway of Heroes" {
-    exit "The Last Stab of Hope";
-    exit "The Beast's Domain";
+    exitn "The Last Stab of Hope";
+    exits "The Beast's Domain";
     enemy "Zombie Knight";
   };
   room "The Beast's Domain" {
     "Miniboss fight against two Lizardmen for the Lily Sigil.";
-    exit "Hallway of Heroes";
+    exitn "Hallway of Heroes";
     enemy "Lizardman" {
       miniboss = true;
       "Knuckles.I", "Glaive:Glaive.B/Wooden Pole", "Grimoire Antidote", "Elixir of Queens",
