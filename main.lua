@@ -70,6 +70,17 @@ function gv_pos(region, room)
   end
 end
 
+function gv_arrow(room, to)
+  if not ROOMS[to] or not ROOMS[to].exit then
+    return ""
+  end
+  if ROOMS[to].exit[room.name] then
+    return ""
+  else
+    return ",dir=forward"
+  end
+end
+
 for r,region in ipairs(REGIONS) do
   printf('  \n//// region: %s ////\n', r)
 
@@ -78,13 +89,20 @@ for r,region in ipairs(REGIONS) do
     for _,exit in ipairs(room.exit or {}) do
       local to = exit.name
       local dir = ''
+      local gv_to = gv_name(to)
+      local gv_room = gv_name(room.name)
+      local arrow = gv_arrow(room, to)
       if exit.dir then dir = ':'..exit.dir end
+
       if exit.key then
-        printf('    %s%s -- %s [color=red,label="%s"];\n', gv_name(room.name), dir, gv_name(to), exit.key)
+        printf('    %s%s -- %s [color=red,label="%s"%s];\n',
+          gv_room, dir, gv_to, exit.key, arrow)
       elseif not region.rooms[to] then
-        printf('    %s%s -- %s [color=blue];\n', gv_name(room.name), dir, gv_name(to))
+        printf('    %s%s -- %s [color=blue%s];\n',
+          gv_room, dir, gv_to, arrow)
       else
-        printf('    %s%s -- %s;\n', gv_name(room.name), dir, gv_name(to))
+        printf('    %s%s -- %s [color=black%s];\n',
+          gv_room, dir, gv_to, arrow)
       end
     end
   end
