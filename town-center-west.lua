@@ -2,7 +2,7 @@ region "Town Center West" {
   "The first Town Center area you gain access to, but most of it is inaccessible until you activate the cloudstone at Tircolas Flow.";
   room "Rue Vermillion" {
     "East takes you to the workshop, south to a boss.";
-    sw "Stairway to the Light"; -- to Sanctum
+    sw "Stairway to the Light"; dx=3.5; dy=0.5; -- to Sanctum
     s "Tircolas Flow (North)";
     e "The Rene Coastroad";
     w "Students of Death" "Crimson Key"; -- to City Walls West
@@ -73,7 +73,7 @@ region "Town Center West" {
     w "Villeport Way";
   };
   room "Villeport Way" {
-    e "Dinas Walk";
+    e "Dinas Walk"; dx=-1;
     se "Rue Sant D'alsa";
     -- exit "In Wait of the Foe"; -- One-way from City Walls South
     n "The Bread Peddler's Way"; -- to Undercity West
