@@ -42,10 +42,40 @@ region "Town Center West" {
       "Guisarm.B/Czekan Type", "Cure Root x3"
     };
   };
-  room "Tircolas Flow (South)" {};
-  room "Rue Bouquet" {};
-  room "Glacialdra Kirk Ruins" {};
-  room "Rue Sant D'alsa" {};
-  room "Dinas Walk" {};
-  room "Villeport Way" {};
+  room "Tircolas Flow (South)" {
+    exit "Tircolas Flow (North)";
+    exit "Rue Bouquet";
+    exit "Glacialdra Kirk Ruins";
+    enemy "Crimson Blade";
+  };
+  room "Rue Bouquet" {
+    exit "Escapeway"; -- to room in Abandoned Mines B1, not the area of the same name.
+    exit "Tircolas Flow (South)";
+    exit "Glacialdra Kirk Ruins";
+  };
+  room "Glacialdra Kirk Ruins" {
+    "Notable primarily for containing the first 'Sealed with the Rood Inverse' door; in normal play you can't traverse this until NG+.";
+    exit "Tircolas Flow (South)";
+    exit "Rue Bouquet";
+    exit "Rue Sant D'alsa";
+    exit "Path to the Greengrocer" "Rood Inverse"; -- to Undercity West; NG+ only
+  };
+  room "Rue Sant D'alsa" {
+    "Cutscene in Villeport Way featuring Sydney, Guildenstern, and Samantha talking about the Gran Grimoire.";
+    exit "Glacialdra Kirk Ruins";
+    exit "Dinas Walk";
+    exit "Villeport Way";
+    enemy "Crimson Blade";
+  };
+  room "Dinas Walk" {
+    "Second floor area connecting St. D'alsa to Villeport.";
+    exit "Rue Sant D'alsa";
+    exit "Villeport Way";
+  };
+  room "Villeport Way" {
+    exit "Dinas Walk";
+    exit "Rue Sant D'alsa";
+    -- exit "In Wait of the Foe"; -- One-way from City Walls South
+    exit "The Bread Peddler's Way"; -- to Undercity West
+  };
 }
