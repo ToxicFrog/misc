@@ -1,3 +1,5 @@
+-- Regenerate map with:
+-- luajit main.lua | tee vs.dot | fdp -Tpng > vs.png
 require 'util'
 require 'nodes'
 
@@ -48,6 +50,8 @@ for r,region in all_regions() do
       if child.tag == 'exit' then
         if child.key then
           printf('    %s -- %s [color=red,label="%s"];\n', gv_name(room.name), gv_name(child.to), child.key)
+        elseif not region.rooms[child.to] then
+          printf('    %s -- %s [color=blue];\n', gv_name(room.name), gv_name(child.to))
         else
           printf('    %s -- %s;\n', gv_name(room.name), gv_name(child.to))
         end

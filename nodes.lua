@@ -36,6 +36,8 @@ function region(name)
   return function(info)
     local node = node_builder('region', name, true)(info)
     REGIONS[node.name] = node
+    node.rooms = {}
+    for _,room in ipairs(node.children) do node.rooms[room.name] = room end
     return node
   end
 end
