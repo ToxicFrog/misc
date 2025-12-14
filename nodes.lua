@@ -73,7 +73,7 @@ function exit(to)
 end
 
 for _,dir in ipairs { 'n', 'nw', 'w', 'sw', 's', 'se', 'e', 'ne' } do
-  _G['exit'..dir] = function(to)
+  _G[dir] = function(to)
     return function(key)
       return { tag = 'exit'; name = to; key = key; dir = dir; }
     end
