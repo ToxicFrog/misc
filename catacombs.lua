@@ -65,6 +65,7 @@ region "Catacombs" {
   };
   room "The Lamenting Mother (East)" {
     "On first visit to Lamenting Mother West, you can reach this area, but after defeating the ghost it is disconnected and reachable only via The Last Stab of Hope. The chest is thus associated with this area to avoid softlocks if you miss it on your first visit.";
+    x = 3; y = 11;
     -- You can only actually use this door after triggering the quake, which means
     -- it is effectively a one-way latch from Last Stab.
     -- exit "The Last Stab of Hope";

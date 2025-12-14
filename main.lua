@@ -38,7 +38,7 @@ end
 print [[
 strict graph {
   node [shape=box];
-  edge [len=2];
+  edge [len=1];
 ]]
 
 local directions = {
@@ -49,13 +49,14 @@ local directions = {
 
 function gv_pos(region, room)
   local scale = 3;
-  if not room.x then
-    for to,exit in pairs(room.exit or {}) do
-      other = ROOMS[to]
+  if not room.x or not room.y then
+    for _,exit in ipairs(room.exit or {}) do
+      local to = exit.name
+      local other = ROOMS[to]
       if other and other.x and exit.dir then
         local dx,dy = table.unpack(directions[exit.dir])
-        room.x = other.x - dx
-        room.y = other.y - dy
+        room.x = room.x or (other.x - dx + (room.dx or 0))
+        room.y = room.y or (other.y - dy + (room.dy or 0))
         eprintf('set %s to (%d,%d) b/c %s (%d,%d) to %s\n',
           room.name, room.x, room.y, to, other.x, other.y, exit.dir)
         break
@@ -69,12 +70,13 @@ function gv_pos(region, room)
   end
 end
 
-for r,region in all_regions() do
+for r,region in ipairs(REGIONS) do
   printf('  \n//// region: %s ////\n', r)
 
   for _,room in ipairs(region.children) do
     printf('  %s [label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
-    for to,exit in pairs(room.exit or {}) do
+    for _,exit in ipairs(room.exit or {}) do
+      local to = exit.name
       local dir = ''
       if exit.dir then dir = ':'..exit.dir end
       if exit.key then

@@ -20,9 +20,8 @@ local function node_builder(tag, name, has_desc)
           node[v.tag] = node[v.tag] or {}
           if v.name then
             node[v.tag][v.name] = v
-          else
-            table.insert(node[v.tag], v)
           end
+          table.insert(node[v.tag], v)
         end
       end
       info[i] = nil
@@ -45,6 +44,7 @@ function region(name)
   return function(info)
     local node = node_builder('region', name, true)(info)
     REGIONS[node.name] = node
+    table.insert(REGIONS, node)
     node.rooms = {}
     for _,room in ipairs(node.children) do
       node.rooms[room.name] = room

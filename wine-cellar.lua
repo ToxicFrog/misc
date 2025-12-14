@@ -65,7 +65,6 @@ region "Wine Cellar" {
   };
   room "Wine Magnate's Chambers" {
     "Tremor cutscene.";
-    x = 3; y = 1;
     exitnw "Wine Guild Hall";
     exitne "Fine Vintage Vault";
     enemy "Bat";
@@ -74,6 +73,7 @@ region "Wine Cellar" {
   };
   room "Fine Vintage Vault" {
     "Cutscene with Sydney deceiving two CBs.";
+    x = 3; y = 2;
     exits "Wine Magnate's Chambers";
     exitn "Chamber of Fear";
     enemy "Crimson Blade";
@@ -131,7 +131,6 @@ region "Wine Cellar" {
     dummy "Human" { after = "The Gallows"; };
   };
   room "The Gallows" {
-    x = 3; y = 7;
     "Minotaur boss room. 'Show me your soul' cutscene, unlocking of battle abilities.";
     exits "Blackmarket of Wines";
     enemy "Minotaur" {
@@ -175,7 +174,6 @@ region "Wine Cellar" {
     enemy "Silver Wolf";
   };
   room "The Hero's Winehall" {
-    x = 1; y = 7;
     exits "The Greedy One's Den";
     exitn "Hall of Sworn Revenge"; -- to Catacombs
     enemy "Dullahan" {

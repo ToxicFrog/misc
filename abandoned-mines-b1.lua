@@ -1,21 +1,21 @@
 region "Abandoned Mines B1" {
   room "Dreamers' Entrance" {
     "First encounter with Stirges, bloodsucking bats";
-    exit "Where the Master Fell"; -- to City Walls West
-    exit "The Crossing";
+    exitn "Where the Master Fell"; dy = -7; -- to City Walls West
+    exits "The Crossing";
     enemy "Stirge";
   };
   room "The Crossing" {
-    exit "Dreamers' Entrance";
-    exit "Miners' Resting Hall";
-    exit "Conflict and Accord";
-    exit "The Suicide King";
+    exitn "Dreamers' Entrance";
+    exitw "Miners' Resting Hall";
+    exite "Conflict and Accord";
+    exits "The Suicide King";
     save_point = true;
     enemy "Hellhound";
   };
   room "Miners' Resting Hall" {
     "First mimic. Extremely annoying and doesn't even drop anything! Also first locked chest; requires the Unlock spell from Grimoire Clef.";
-    exit "The Crossing";
+    exite "The Crossing";
     enemy "Goblin";
     enemy "Mimic";
     chest {
@@ -26,31 +26,31 @@ region "Abandoned Mines B1" {
     };
   };
   room "Conflict and Accord" {
-    exit "The Crossing";
-    exit "The End of the Line";
+    exitw "The Crossing";
+    exits "The End of the Line";
     enemy "Hellhound";
     enemy "Goblin";
   };
   room "The End of the Line" {
     "Locked-door battle against goblins.";
-    exit "Conflict and Accord";
-    exit "The Earthquake's Mark";
+    exitn "Conflict and Accord"; dy = -2;
+    exits "The Earthquake's Mark";
     enemy "Stirge" { "Vera Root" };
     enemy "Goblin" { "Yggdrasil's Tears" };
     enemy "Goblin" { "Yggdrasil's Tears" };
   };
   room "The Earthquake's Mark" {
     "Extremely vertical room full of stirges. Upper level (N/E) doors are unlocked. Lower level W door is latched from the other side and must be reached by going S from The Crossing; S door is sigil-locked";
-    exit "The End of the Line";
-    exit "Coal Mine Storage";
-    exit "The Passion of Lovers" "Hyacinth Sigil";
+    exitn "The End of the Line";
+    exite "Coal Mine Storage";
+    exits "The Passion of Lovers" "Hyacinth Sigil";
     -- exit "The Fruits of Friendship"; -- one-way
     enemy "Stirge";
     trap "Eruption";
   };
   room "Coal Mine Storage" {
     "Dead-end room notable for Fern Sigil and a goblin leader.";
-    exit "The Earthquake's Mark";
+    exitw "The Earthquake's Mark";
     enemy "Goblin";
     enemy "Goblin Leader";
     trap "Poison Panel";
@@ -60,70 +60,70 @@ region "Abandoned Mines B1" {
     };
   };
   room "The Suicide King" {
-    exit "The Crossing";
-    exit "The Battle's Beginning";
+    exitn "The Crossing";
+    exits "The Battle's Beginning";
     enemy "Stirge" { "Vera Root" };
     enemy "Goblin" { "Yggdrasil's Tears" };
     enemy "Goblin" { "Yggdrasil's Tears" };
   };
   room "The Battle's Beginning" {
     "Boss fight against the Wyvern.";
-    exit "The Suicide King";
-    exit "What Lies Ahead";
+    exitn "The Suicide King";
+    exits "What Lies Ahead";
     enemy "Wyvern" {
       boss = true;
       "Hyacinth Sigil", "Cure Tonic", "Grimoire Ignifuge"
     };
   };
   room "What Lies Ahead?" {
-    exit "The Battle's Beginning";
-    exit "The Fruits of Friendship";
+    exitn "The Battle's Beginning";
+    exits "The Fruits of Friendship";
     enemy "Goblin";
     enemy "Goblin Leader";
     trap "Heal Panel";
   };
   room "The Fruits of Friendship" {
-    exit "What Lies Ahead";
-    exit "The Earthquake's Mark";
+    exitn "What Lies Ahead";
+    exite "The Earthquake's Mark";
   };
   room "The Passion of Lovers" {
     "Entering here starts a timer to get through this and Hall of Hope to Dark Tunnel.";
-    exit "The Earthquake's Mark";
-    exit "The Hall of Hope";
+    exitn "The Earthquake's Mark";
+    exite "The Hall of Hope";
   };
   room "The Hall of Hope" {
-    exit "The Passion of Lovers";
-    exit "The Dark Tunnel";
+    exitw "The Passion of Lovers";
+    exite "The Dark Tunnel";
     enemy "Hellhound";
   };
   room "The Dark Tunnel" {
     "Four-way room with save point.";
     save_point = true;
-    exit "The Hall of Hope";
-    exit "Everwant Passage";
-    exit "Rust in Peace";
-    exit "The Smeltry";
+    exitw "The Hall of Hope";
+    exitn "Everwant Passage";
+    exite "Rust in Peace";
+    exits "The Smeltry";
     enemy "Goblin";
     enemy "Goblin Leader";
     dummy "Beast" { after = "Hewn from Nature" };
   };
   room "Everwant Passage" {
     "Another mimic room, and you can't even get through it until NG+.";
-    exit "The Dark Tunnel";
-    exit "Mining Regrets" "Silver Key";
+    exits "The Dark Tunnel"; dy = 1;
+    exitw "Mining Regrets" "Silver Key";
     enemy "Goblin";
     enemy "Mimic";
   };
   room "Mining Regrets" {
     "Dead-end room with some nice NG+ gear.";
-    exit "Everwant Passage";
+    exite "Everwant Passage";
     trap "Death Vapor";
     chest {
       "White Cargo:Voulge.D/Winged Pole", "Polaris", "Mana Potion x3"
     };
   };
   room "Rust in Peace" {
-    exit "The Dark Tunnel";
+    exitw "The Dark Tunnel";
     enemy "Mimic";
     enemy "Goblin";
     enemy "Goblin Leader";
@@ -133,43 +133,43 @@ region "Abandoned Mines B1" {
     };
   };
   room "The Smeltry" {
-    exit "The Dark Tunnel";
-    exit "Clash of Hyaenas";
+    exitn "The Dark Tunnel";
+    exits "Clash of Hyaenas";
     enemy "Fire Elemental" {
       boss = true;
       "Grimoire Flamme", "Elixir of Queens", "Mana Tonic"
     };
   };
   room "Clash of Hyaenas" {
-    exit "The Smeltry";
-    exit "Greed Knows No Bounds";
+    exitn "The Smeltry";
+    exite "Greed Knows No Bounds";
   };
   room "Greed Knows No Bounds" {
-    exit "Clash of Hyaenas";
-    exit "Live Long and Prosper";
+    exitw "Clash of Hyaenas";
+    exite "Live Long and Prosper";
     enemy "Goblin";
     enemy "Goblin Leader";
   };
   room "Live Long and Prosper" {
-    exit "Greed Knows No Bounds";
-    exit "Pray to the Mineral Gods" "Fern Sigil";
+    exitw "Greed Knows No Bounds";
+    exitn "Pray to the Mineral Gods" "Fern Sigil";
   };
   room "Pray to the Mineral Gods" {
-    exit "Live Long and Prosper";
-    exit "Traitor's Parting";
+    exits "Live Long and Prosper";
+    exitn "Traitor's Parting";
     enemy "Stirge";
   };
   room "Traitor's Parting" {
     "Boss fight against Ogre, and cutscene of Sydney, Hardin, and Merlose in Dinas Walk.";
-    exit "Pray to the Mineral Gods";
-    exit "Escapeway";
+    exits "Pray to the Mineral Gods";
+    exitn "Escapeway";
     enemy "Ogre" {
       boss = true;
       "Cure Bulb x3", "Elixir of Kings", "Grimoire Rempart"
     };
   };
   room "Escapeway" {
-    exit "Traitor's Parting";
-    exit "Rue Bouquet"; -- to Town Centre West
+    exits "Traitor's Parting";
+    exitn "Rue Bouquet"; -- to Town Centre West
   };
 }
