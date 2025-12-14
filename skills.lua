@@ -70,6 +70,28 @@ local skilltypes = {
   [14] = 'trap'; -- used by trap panels
 }
 
+--[[
+  targeting parameters field
+
+  ---1 ? set for buffs/debuffs, heals, items, non-AOE attacks (but not chains), fixate/eureka, analyze
+  --2- default target is self rather than nearest enemy
+  -4-- set if this ability can hit individual body parts
+  8--- ? set for fixate/unlock/eureka, attack/chain (but not warlock spells), enemy AOE (but not player AOE)
+
+  0000 traps, status effect chain abilities, defence abilities
+  0001 buffs, heals, items
+  0011 debuffs, analyze, drain mind
+  0110 player AOE attack spells
+  0111 natural weapons, single-hit attack spells both player and enemy
+  1000 exorcism/banish
+  1001 fixate
+  1010 unlock
+  1100 enemy AOE attacks
+  1101 eureka
+  1110 attack, damaging chain abilities
+}
+]]
+
 -- "type" field in hit. 0 means either "as weapon" or "untyped" depending on skill type.
 local attacktypes = { [0] = 'untyped', 'blunt', 'edged', 'piercing' }
 -- "affinity" field in hit.
@@ -190,9 +212,10 @@ end
 function print_skills(skills, getaddr)
   for _,skill in ipairs(skills) do
     skill.name = decode(skill.name)
-    printf('%3d $%08X [%2d]\x1B[1m%7s\x1B[0m %s\n',
+    printf('%3d $%08X [%2d]\x1B[1m%7s\x1B[0m %s (%X)\n',
       skill.id, getaddr(skill.id), skill.cost,
-      skilltypes[skill.type] or tostring(skill.type), skill.name)
+      skilltypes[skill.type] or tostring(skill.type), skill.name,
+      skill.targeting)
     hitinfo(1, skill.hit1)
     hitinfo(2, skill.hit2)
   end
