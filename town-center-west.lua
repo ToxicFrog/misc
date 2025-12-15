@@ -75,8 +75,8 @@ region "Town Center West" {
   room "Villeport Way" {
     e "Dinas Walk"; dx=-1;
     se "Rue Sant D'alsa";
-    -- exit "In Wait of the Foe"; -- One-way from City Walls South
     n "The Bread Peddler's Way"; -- to Undercity West
+    -- s "In Wait of the Foe"; -- One-way from City Walls South
     enemy "Crimson Blade";
   };
 }

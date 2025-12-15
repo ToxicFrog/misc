@@ -10,6 +10,8 @@ require 'town-center-west'
 require 'city-walls-west'
 require 'abandoned-mines-b1'
 require 'undercity-west'
+require 'snowfly-forest'
+require 'city-walls-south'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
