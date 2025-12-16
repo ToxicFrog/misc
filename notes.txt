@@ -1,0 +1,43 @@
+# Overall game flow
+
+This is the intended route to beat the game, based on how keys and stuff
+are positioned, at a fairly high level of abstraction.
+
+A - means the area needs to be revisited later. A + means the area is now fully explored except for NG+ areas. A * means it is fully explored.
+
+* Wine Cellar
+* Catacombs
+* Sanctum
+- Town Centre West (north half)
+* City Walls West
++ Abandoned Mines B1
+* Town Centre West (south half)
+- Undercity West W
++ Snowfly Forest
++ City Walls South
++ The Keep
+- Iron Maiden B1 (to get sigil)
++ Town Centre South
++ City Walls East
+- Undercity West S
+- Abandoned Mines B2 (brief detour)
+- Undercity West E
+Optional: Abandoned Mines B2 time trial via TCS
+Optional: remainder of Iron Maiden B1
+- City Walls North
+- Town Centre East
+- Undercity East (iron key)
+! Teleport and iron key acquired, so a bunch of backtracking to earlier areas
+  to get keys and sigils and stuff
+- Limestone Quarry
+- Temple of Kiltia (silver key)
+- The Cathedral
+
+On second play, more or less the same until you have the iron and silver keys. Once you have those:
+
+- Escapeway (gold key) via UCW
+- Godhands workshop via UCW
+- Snowfly Forest East (platinum key) via CWE
+- Forgotten Pathway (steel key) via TK
+- Iron Maiden B2/B3
+- boss time trials

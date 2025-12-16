@@ -1,0 +1,68 @@
+This file documents event triggers that effectively function as keys and that,
+if pre-triggered or added to the pool, could make the game less linear. It also
+documents door latches that provide significant shortcuts once opened.
+
+## Everywhere - dummies
+
+These normally spawn only after certain events and are thus available only on
+backtracking. Pre-spawning them would make it easier for the player to tune
+weapons, if needed.
+
+## Catacombs - The Lamenting Mother
+
+Initially, the doors connecting Shrine to the Martyrs to Hall of Dying Hope, and
+Lamenting Mother to The Last Stab of Hope, are rusted shut. They do not open
+until you defeat the ghost in Lamenting Mother and exit west to Martyrs, at
+which point an earthquake opens both doors, but also replaces the original
+version of Mother with one that is split into east/west halves.
+
+If these doors started out open, it would remove the need to visit Mother to
+gain access to northwest Catacombs, and also make Mother usable as a shortcut
+to get to the east half of Catacombs slightly early.
+
+## Sanctum - Passage of the Refugees
+
+A cloudstone here grants access to the north shore of Advent Ground and thus to
+City Centre West. In normal play it is not active until the Golem is defeated in
+Hall of Sacrilege. If active most of Sanctum becomes optional.
+
+## Town Centre West - Tircolas Flow
+
+A cloudstone here connects the north and south halves of the region. It is
+inactive on first visit and activates only after reaching the south half by
+other means. I'm not sure if the exact trigger is entering Rue Bouquet, entering
+Tircolas Flow from the south, killing Ogre, or something else entirely, but if
+it started out active, the entirety of City Walls West and Abandoned Mines B1
+become optional.
+
+## Town Centre West - Villeport Way
+
+A latched door opens into In Wait of the Foe, letting you skip straight to City
+Walls South (and thus to the Keep, Town Centre South, and points beyond) without
+going through Undercity West and Snowfly Forest.
+
+## Snowfly Forest - The Yellow Wood
+
+The south exit leading to Forest River is inaccessible until the Earth Dragon in
+Return to the Land. Pretriggering this only lets us skip the Earth Dragon and
+a few rooms around it, though.
+
+## Town Centre South - Valdiman Gates
+
+Latch to The Boy's Training Room. Lets you go straight from City Walls South to
+Town Centre South without visiting The Keep, which doesn't skip very many rooms
+but *does* let you skip the first Rosencrantz fight entirely.
+
+## Undercity West - Crumbling Market
+
+Latch to Hall of Poverty. This connects the west quarter (with access to Town
+Centre West and Snowfly Forest) to the east (with access to Town Centre South,
+northeast Abandoned Mines B2, and Town Centre East), allowing you to completely
+bypass Snowfly Forest, Walls South and East, The Keep, and Town Centre South,
+going directly from TCW to TCE by cutting through UCW.
+
+## Town Centre East - The House Gilgitte
+
+Latch to Rue Crimnade. This connects Great Cathedral and Temple of Kiltia to
+the rest of TCE, allowing access to the Cathdral without going through
+Undercity East, Limestone Quarry, and Temple of Kiltia.
