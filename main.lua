@@ -16,6 +16,7 @@ require 'the-keep'
 require 'town-centre-south'
 require 'city-walls-east'
 require 'iron-maiden-b1'
+require 'abandoned-mines-b2'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
@@ -44,8 +45,11 @@ end
 
 print [[
 strict graph {
-  node [shape=box];
-  edge [len=1];
+  bgcolor=black;
+  color=white;
+  fontcolor=white;
+  node [shape=box,color=magenta,fontcolor=white];
+  edge [len=1,fontcolor=white];
 ]]
 
 local directions = {
@@ -101,7 +105,7 @@ for r,region in ipairs(REGIONS) do
   printf('  \n//// region: %s ////\n', r)
 
   for _,room in ipairs(region.children) do
-    printf('  %s [label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
+    printf('  %s [color=white,label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
     for _,exit in ipairs(room.exit or {}) do
       local to = exit.name
       local dir = ''
@@ -111,7 +115,7 @@ for r,region in ipairs(REGIONS) do
       local arrow = gv_arrow(room, to)
       if exit.dir then dir = ':'..exit.dir end
 
-      local colour = 'black'
+      local colour = 'white'
       if not region.rooms[to] then
         if gv_key then
           colour = 'purple'
