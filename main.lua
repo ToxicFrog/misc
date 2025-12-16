@@ -12,6 +12,9 @@ require 'abandoned-mines-b1'
 require 'undercity-west'
 require 'snowfly-forest'
 require 'city-walls-south'
+require 'the-keep'
+require 'town-centre-south'
+require 'city-walls-east'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))

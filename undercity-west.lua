@@ -59,7 +59,7 @@ region "Undercity West" {
   -- East branch towards Abandoned Mines and Godhands
   room "Hall of Poverty" {
     w "The Sunless Way";
-    -- e "The Crumbling Market"; -- one-way
+    -- e "The Crumbling Market"; -- latch
     s "The Washing-Woman's Way";
     enemy "Zombie Knight";
     enemy "Ghast";

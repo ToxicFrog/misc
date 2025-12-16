@@ -3,7 +3,7 @@ region "Snowfly Forest" {
   -- West side area, path to first boss.
   room "The Faerie Circle" {
     "Entrance. Cutscenes with Grissom.";
-    n "Where the Hunter Climbed"; dx=3; dy=-2; -- to Undercity West
+    n "Where the Hunter Climbed"; dx=-1.5; dy=-5.5; -- to Undercity West
     s "The Hunt Begins";
   };
   room "The Hunt Begins" {

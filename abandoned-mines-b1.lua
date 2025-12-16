@@ -44,7 +44,7 @@ region "Abandoned Mines B1" {
     n "The End of the Line";
     e "Coal Mine Storage";
     s "The Passion of Lovers" "Hyacinth Sigil";
-    -- exit "The Fruits of Friendship"; -- one-way
+    -- w "The Fruits of Friendship"; -- latch
     enemy "Stirge";
     trap "Eruption";
   };
