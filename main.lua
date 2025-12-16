@@ -17,6 +17,8 @@ require 'town-centre-south'
 require 'city-walls-east'
 require 'iron-maiden-b1'
 require 'abandoned-mines-b2'
+require 'town-centre-east'
+require 'snowfly-forest-east'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
@@ -42,15 +44,6 @@ function gv_label(room)
   append_children(buf, room)
   return table.concat(buf, '\\l')..'\\l'
 end
-
-print [[
-strict graph {
-  bgcolor=black;
-  color=white;
-  fontcolor=white;
-  node [shape=box,color=magenta,fontcolor=white];
-  edge [len=1,fontcolor=white];
-]]
 
 local directions = {
   nw = {-1,1};  n = {0,1};  ne = {1,1};
@@ -101,9 +94,33 @@ function gv_key(room, exit)
   return nil
 end
 
-for r,region in ipairs(REGIONS) do
-  printf('  \n//// region: %s ////\n', r)
+print [[
+strict graph {
+  bgcolor=black;
+  color=white;
+  fontcolor=white;
+  node [shape=box,color=magenta,fontcolor=white];
+  edge [fontcolor=white,penwidth=3];
+]]
 
+for r,region in ipairs(REGIONS) do
+
+  -- Define a cluster for the region and place all nodes within it
+  printf([[
+ //// region: %s ////
+ subgraph cluster_%s {
+  label = "%s";
+  labeljust = l;
+  pad=2; margin=2;
+]],
+  region.name, gv_name(region.name), region.name)
+
+  for _,room in ipairs(region.children) do
+    printf('  %s [color=white,label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
+  end
+  print(' }')
+
+  -- Now define all edges outside the region
   for _,room in ipairs(region.children) do
     printf('  %s [color=white,label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
     for _,exit in ipairs(room.exit or {}) do
@@ -115,12 +132,14 @@ for r,region in ipairs(REGIONS) do
       local arrow = gv_arrow(room, to)
       if exit.dir then dir = ':'..exit.dir end
 
-      local colour = 'white'
-      if not region.rooms[to] then
+      local colour = 'white,penwidth=2'
+      if not ROOMS[to] then
+        colour = 'magenta'
+      elseif not region.rooms[to] then
         if gv_key then
-          colour = 'purple'
+          colour = 'red,style=dashed'
         else
-          colour = 'blue'
+          colour = 'blue,style=dashed'
         end
       elseif gv_key then
         colour = 'red'
