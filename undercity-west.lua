@@ -78,28 +78,47 @@ region "Undercity West" {
   room "Nameless Dark Oblivion" {
     w "The Washing-Woman's Way" "Silver Key";
     s "Sinner's Corner";
+    enemy "Dark Skeleton";
+    enemy "Dark Eye";
   };
   room "Sinner's Corner" {
     n "Nameless Dark Oblivion";
     w "The Children's Hideout";
     e "Corner of Prayers";
     s "Fear of the Fall";
+    enemy "Skeleton";
+    enemy "Dark Skeleton";
+    enemy "Dark Eye";
   };
   room "Fear of the Fall" {
     n "Sinner's Corner";
-    --s "The Cornered Savage"; -- to City Walls East
+    s "The Cornered Savage"; -- to City Walls East
+    enemy "Dark Elemental" {
+      boss = true;
+      "Cattleya Sigil", "Grimoire Meteore"
+    }
   };
   room "The Children's Hideout" {
     e "Sinner's Corner";
+    enemy "Gargoyle";
+    enemy "Dark Eye";
+    chest {
+      "Sweet Death:Shamshir.S/Knuckle Guard", "Spiked Shield/White Queen",
+      "Footman's Mace 1H.H", "Steel Bolt", "Sallet.H", "Undine Bracelet",
+      "Speedster", "Grimoire Dissiper"
+    };
   };
   room "Corner of Prayers" {
     w "Sinner's Corner";
     n "Hope Obstructed";
     e "Salvation for the Mother" "Gold Key";
+    enemy "Dark Skeleton";
+    enemy "Dark Eye";
   };
   room "Hope Obstructed" {
     s "Corner of Prayers";
-    --n "Work, Then Die"; -- to Abandoned Mines B2
+    n "Work, Then Die"; -- to Abandoned Mines B2
+    enemy "Gargoyle";
   };
   -- North area accessible only with Silver Key and Rood Inverse
   -- TODO
@@ -145,7 +164,7 @@ region "Undercity West" {
   -- Area reachable by going through Mines B2
   -- TODO
   room "The Crumbling Market" {
-    w "Hall of Poverty";
+    w "Hall of Poverty"; -- latch to
     e "Tears from Empty Sockets";
     n "Where Flood Waters Ran";
   };
