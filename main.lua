@@ -15,6 +15,7 @@ require 'city-walls-south'
 require 'the-keep'
 require 'town-centre-south'
 require 'city-walls-east'
+require 'iron-maiden-b1'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
@@ -87,6 +88,15 @@ function gv_arrow(room, to)
   end
 end
 
+function gv_key(room, exit)
+  if exit.key then return exit.key end
+  local dest = ROOMS[exit.name]
+  if dest and dest.exit and dest.exit[room.name] and dest.exit[room.name].key then
+    return dest.exit[room.name].key
+  end
+  return nil
+end
+
 for r,region in ipairs(REGIONS) do
   printf('  \n//// region: %s ////\n', r)
 
@@ -97,18 +107,27 @@ for r,region in ipairs(REGIONS) do
       local dir = ''
       local gv_to = gv_name(to)
       local gv_room = gv_name(room.name)
+      local gv_key = gv_key(room, exit)
       local arrow = gv_arrow(room, to)
       if exit.dir then dir = ':'..exit.dir end
 
-      if exit.key then
-        printf('    %s%s -- %s [color=red,label="%s"%s];\n',
-          gv_room, dir, gv_to, exit.key, arrow)
-      elseif not region.rooms[to] then
-        printf('    %s%s -- %s [color=blue%s];\n',
-          gv_room, dir, gv_to, arrow)
+      local colour = 'black'
+      if not region.rooms[to] then
+        if gv_key then
+          colour = 'purple'
+        else
+          colour = 'blue'
+        end
+      elseif gv_key then
+        colour = 'red'
+      end
+
+      if gv_key then
+        printf('    %s%s -- %s [color=%s,label="%s"%s];\n',
+          gv_room, dir, gv_to, colour, gv_key, arrow)
       else
-        printf('    %s%s -- %s [color=black%s];\n',
-          gv_room, dir, gv_to, arrow)
+        printf('    %s%s -- %s [color=%s%s];\n',
+          gv_room, dir, gv_to, colour, arrow)
       end
     end
   end
