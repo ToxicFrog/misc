@@ -1,24 +1,24 @@
 region "Town Centre South" {
   "Another piece of connective tissue, joining the Keep, the South and East Walls, and Abandoned Mines B2 together.";
-  room "Valdiman Gates" {
-    s "The Boy's Training Room"; dx=-1; dy=1;
-    e "Forcas Rise";
-    save_point = true;
-  };
   room "Forcas Rise" {
+    s "The Warrior's Rest"; dx=-3; dy=0.5; -- to The Keep
     w "Valdiman Gates";
-    s "The Warrior's Rest"; -- to The Keep
     e "Rue Aliano";
-    ne "Rue Faltes";
+    n "Rue Faltes";
     enemy "Crimson Blade";
   };
+  room "Valdiman Gates" {
+    e "Forcas Rise";
+    s "The Boy's Training Room";
+    save_point = true;
+  };
   room "Rue Aliano" {
-    nw "Forcas Rise";
-    n "The House Khazabas" "Mandrake Sigil";
+    w "Forcas Rise";
+    e "The House Khazabas" "Mandrake Sigil";
     enemy "Crimson Blade";
   };
   room "The House Khazabas" {
-    s "Rue Aliano" "Mandrake Sigil";
+    w "Rue Aliano" "Mandrake Sigil";
     n "Zebel's Walk";
     chest {
       warded = true;
@@ -26,22 +26,22 @@ region "Town Centre South" {
     };
   };
   room "Zebel's Walk" {
-    s "The House Khazabas"; dx=1;
+    s "The House Khazabas";
     e "Rue Volnac";
   };
   room "Rue Volnac" {
     w "Zebel's Walk";
-    -- se -- to City Walls East
-    -- e -- to City Walls East
+    se "Train and Grow Strong"; -- to City Walls East
+    -- ne "The Invaders are Found"; -- latch from City Walls East
     -- nw -- technically connects to Rue Faltes, but it's a dead end
     enemy "Crimson Blade";
   };
   room "Rue Faltes" {
-    sw "Forcas Rise";
-    n "Rue Morgue";
+    s "Forcas Rise";
+    e "Rue Morgue";
   };
   room "Rue Morgue" {
-    s "Rue Faltes";
+    w "Rue Faltes";
     n "Corridor of Shade"; -- to Abandoned Mines B2
     enemy "Crimson Blade";
   };

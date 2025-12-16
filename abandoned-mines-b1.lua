@@ -1,7 +1,7 @@
 region "Abandoned Mines B1" {
   room "Dreamers' Entrance" {
     "First encounter with Stirges, bloodsucking bats";
-    n "Where the Master Fell"; dy = -7; -- to City Walls West
+    n "Where the Master Fell"; dx=-5.5; dy = -4.5; -- to City Walls West
     s "The Crossing";
     enemy "Stirge";
   };

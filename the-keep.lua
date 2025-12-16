@@ -72,8 +72,9 @@ region "The Keep" {
     enemy "Asura";
   };
   room "The Warrior's Rest" {
+    "Fight against Rosencrantz and conversation about Ashley's history.";
     w "Wiping Blood from Blades";
-    e "Workshop 'Keane's Crafts'";
+    s "Workshop 'Keane's Crafts'";
     n "Forcas Rise"; -- to Town Center South
     save_point = true;
     enemy "Rosencrantz" { miniboss = true };
@@ -84,7 +85,7 @@ region "The Keep" {
     };
   };
   room "Workshop 'Keane's Crafts'" {
-    w "The Warrior's Rest";
+    n "The Warrior's Rest";
     save_point = true;
     container = true;
     workshop = { "B", "I", "H" };

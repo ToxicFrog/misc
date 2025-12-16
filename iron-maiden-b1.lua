@@ -1,7 +1,7 @@
 region 'Iron Maiden B1' {
   'Most of this area is inaccessible until you have the Tearose Sigil.';
   room 'The Cage' {
-    n 'The Soldier\'s Bedding'; -- to The Keep
+    n 'The Soldier\'s Bedding'; dx=7; dy=-1; -- to The Keep
     s 'The Cauldron';
   };
   room 'The Cauldron' {

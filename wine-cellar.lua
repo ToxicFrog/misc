@@ -50,7 +50,7 @@ region "Wine Cellar" {
   room "Smokebarrel Stair" {
     "Cutscene with Crimson Blades talking about the sigil-locked door.";
     sw "Hall of Struggle";
-    se "Wine Guild Hall";
+    s "Wine Guild Hall";
     n "Room of Cheap Red Wine" "Chamomile Sigil";
     trap "Heal Panel";
   };
@@ -106,14 +106,14 @@ region "Wine Cellar" {
   };
   room "The Rich Drown in Wine" {
     "Lever-controlled timed door.";
-    s "A Laborer's Thirst";
+    s "A Laborer's Thirst"; dy=-0.5;
     n "Room of Rotten Grapes";
     enemy "Bat";
     enemy "Silver Wolf";
   };
   room "Room of Rotten Grapes" {
     "First flashback to Ashley's family.";
-    s "The Rich Drown in Wine";
+    s "The Rich Drown in Wine"; dy=-0.5;
     n "Blackmarket of Wines";
     enemy "Bat";
     trap "Heal Panel"; -- before Lich
@@ -121,7 +121,7 @@ region "Wine Cellar" {
   };
   room "Blackmarket of Wines" {
     "Small room with save point and chest. Combat dummy appears once you've defeated Minotaur.";
-    s "Room of Rotten Grapes";
+    s "Room of Rotten Grapes"; dy=-0.5;
     n "The Gallows";
     save_point = true;
     chest {

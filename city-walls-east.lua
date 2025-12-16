@@ -1,7 +1,7 @@
 region "City Walls East" {
   "Small area linking Town Centre South to southwest Undercity West. In NG+ this is also the access to Snowfly Forest East.";
   room "Train and Grow Strong" {
-    nw "Rue Volnac"; -- to City Centre South
+    nw "Rue Volnac"; dx=1; dy=-2.5; -- to City Centre South
     n "The Squire's Gathering";
     s "Steady the Boar-Spears" "Rood Inverse"; -- to Snowfly Forest East
   };

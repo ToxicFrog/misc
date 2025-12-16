@@ -2,17 +2,17 @@ region "Town Center West" {
   "The first Town Center area you gain access to, but most of it is inaccessible until you activate the cloudstone at Tircolas Flow.";
   room "Rue Vermillion" {
     "East takes you to the workshop, south to a boss.";
-    sw "Stairway to the Light"; dx=3.5; dy=0.5; -- to Sanctum
-    s "Tircolas Flow (North)";
-    e "The Rene Coastroad";
+    sw "Stairway to the Light"; dx=6.5; dy=-0.5; -- to Sanctum
+    se "Tircolas Flow (North)";
+    ne "The Rene Coastroad";
     w "Students of Death" "Crimson Key"; -- to City Walls West
     save_point = true;
   };
   room "The Rene Coastroad" {
-    w "Rue Vermillion";
+    sw "Rue Vermillion";
     s 'Workshop "Magic Hammer"';
     se "Rue Mal Fallde";
-    trap "Heal Panel";
+    trap "Heal Panel"
   };
   room 'Workshop "Magic Hammer"' {
     "Second workshop, and the first place you can create Hagane items.";
@@ -23,7 +23,7 @@ region "Town Center West" {
   };
   room "Rue Mal Fallde" {
     nw "The Rene Coastroad";
-    s "Tircolas Flow (North)";
+    sw "Tircolas Flow (North)";
   };
   room "Tircolas Flow (North)" {
     "'Incomplete death' cutscene. Crossing the river requires activating the cloudstone from the south shore first.";
@@ -45,7 +45,7 @@ region "Town Center West" {
   room "Tircolas Flow (South)" {
     n "Tircolas Flow (North)";
     se "Rue Bouquet";
-    sw "Glacialdra Kirk Ruins";
+    s "Glacialdra Kirk Ruins";
     enemy "Crimson Blade";
   };
   room "Rue Bouquet" {
@@ -62,19 +62,19 @@ region "Town Center West" {
   };
   room "Rue Sant D'alsa" {
     "Cutscene in Villeport Way featuring Sydney, Guildenstern, and Samantha talking about the Gran Grimoire.";
-    n "Glacialdra Kirk Ruins"; dy = -3;
-    w "Dinas Walk";
-    sw "Villeport Way";
+    n "Glacialdra Kirk Ruins";
+    nw "Dinas Walk";
+    w "Villeport Way";
     enemy "Crimson Blade";
   };
   room "Dinas Walk" {
     "Second floor area connecting St. D'alsa to Villeport.";
-    e "Rue Sant D'alsa";
-    w "Villeport Way";
+    se "Rue Sant D'alsa";
+    sw "Villeport Way";
   };
   room "Villeport Way" {
-    e "Dinas Walk"; dx=-1;
-    se "Rue Sant D'alsa";
+    ne "Dinas Walk";
+    e "Rue Sant D'alsa";
     n "The Bread Peddler's Way"; -- to Undercity West
     -- s "In Wait of the Foe"; -- One-way from City Walls South
     enemy "Crimson Blade";
