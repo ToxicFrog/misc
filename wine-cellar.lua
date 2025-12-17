@@ -123,6 +123,7 @@ region "Wine Cellar" {
     "Small room with save point and chest. Combat dummy appears once you've defeated Minotaur.";
     s "Room of Rotten Grapes"; dy=-0.5;
     n "The Gallows";
+    nw 'The Gallows (Again)' 'Stock Sigil';
     save_point = true;
     chest {
       "Cure Potion",
@@ -140,6 +141,10 @@ region "Wine Cellar" {
       "Grimoire Debile", -- Degenerate
     };
     chest { "Pelta Shield.W", "Vera Bulb x3", "Yggdrasil's Tears x15", };
+  };
+  room "The Gallows (Again)" {
+    'Version of The Gallows that you can access using the Stock Sigil after defeating the Lich.';
+    se "Blackmarket of Wines";
     -- These spawn only after you defeat the Lich and learn Teleport.
     enemy "Minotaur Zombie" {
       miniboss = true;
