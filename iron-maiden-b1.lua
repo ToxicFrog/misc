@@ -20,6 +20,7 @@ region 'Iron Maiden B1' {
       'Mandrake Sigil', 'Grimoire Exsorcer'
     };
   };
+  -- TODO: rest of B1
   room 'Wooden Horse' {
     n 'The Cauldron';
     s 'Starvation';

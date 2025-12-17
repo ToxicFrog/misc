@@ -34,4 +34,5 @@ region 'Abandoned Mines B2' {
     n 'Bandit\'s Hollow'; -- ONE WAY. DOES NOT UNLATCH.
     s 'Hope Obstructed'; -- to Undercity West
   };
+  -- TODO: rest of Abandoned Mines B2
 }

@@ -10,5 +10,9 @@ region 'Snowfly Forest East' {
   };
   room 'Nature\'s Womb' {
     n 'The Boar\'s Revenge';
+    enemy 'Damascus Crab' {
+      miniboss = true;
+      'Platinum Key', 'Cure Tonic x3'
+    };
   };
 }
