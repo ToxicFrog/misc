@@ -1,0 +1,154 @@
+#!/usr/bin/env zsh
+#
+# Run with:
+# ./ap-notify --connect archipelago.gg:PORT --name PLAYERNAME
+
+set -e
+
+# Options, see help text below
+CONNECT=''
+NAME=''
+PASSWORD=''
+NOTIFY_EVERYONE=0
+NOTIFY_EVERYTHING=0
+COMMAND=(notify-send 'New AP item!')
+
+function parse-argv {
+  while [[ $1 ]]; do
+    case "$1" in
+      -h|--help) help; exit 0;;
+      -c|--connect) CONNECT="$2"; shift 2;;
+      -n|--name) NAME="$2"; shift 2;;
+      -p|--password) PASSWORD="$2"; shift 2;;
+      --everyone) EVERYONE=1; shift;;
+      --everything) EVERYTHING=1; shift;;
+      --)
+        shift
+        COMMAND=("$@")
+        break
+        ;;
+      *) help; exit 1;;
+    esac
+  done
+}
+
+function help {
+  cat <<EOF
+Usage: $0 --connect <host> --name <slotname> [options...] [-- notify command...]
+  --connect, --name, and --password are passed through to the AP text client.
+  Options are:
+    --help            this text
+    --connect         host and port to connect to; passed to AP text client
+    --name            slot name; passed to AP text client
+    --password        game password; passed to AP text client
+    --everyone        generate notifications for items belonging to other players
+    --everything      generate notifications for all items, not just progression
+    (notify command)  command to use to generate notifications; default is:
+                      notify-send 'New AP item!'
+                      details will be added as last argument
+EOF
+}
+
+# should-notify sender receiver item item_type
+# should return 0 (success) if this item deserves a notification and 1 (false)
+# otherwise.
+function should-notify {
+  # If --everyone was not used the receive must be us
+  if (( !EVERYONE )) && [[ $2 != $NAME ]]; then
+    return 1
+  fi
+
+  # If --everything was not used the item must be progression
+  if (( !EVERYTHING )) && [[ $4 != 'progression' ]]; then
+    return 1
+  fi
+
+  return 0
+}
+
+function main {
+  parse-argv "$@"
+  if [[ ! $NAME || ! $CONNECT ]]; then
+    >&2 echo 'You must use --name and --connect; see --help for more details.'
+    exit 1
+  fi
+
+  local client_argv=(--nogui --name "$NAME" --connect "$CONNECT")
+  if [[ $PASSWORD ]]; then
+    client_argv+=(--password "$PASSWORD")
+  fi
+
+  run-text-client "${client_argv[@]}" | notification-dispatcher "${COMMAND[@]}"
+}
+
+# Runs the text client and outputs a stream of (finder item receiver location) TSV records
+function run-text-client {
+  local connected=0
+  2>/dev/null archipelago "Text Client" -- "$@" \
+  | while read -r line; do
+    >&2 printf '>> %s\n' "$line"
+    if egrep -q "Now that you are connected" <<<$line; then
+      >&2 echo "AP connection established. Waiting for events."
+      connected=1
+    fi
+    if egrep -qi 'failed to connect|invalid slot' <<<$line; then
+      >&2 echo "Error connecting to AP, giving up."
+      kill -INT $$
+      exit 2
+    fi
+    printf '%s\n' "$line"
+  done \
+  | egrep --line-buffered $'^\e\\[3[35]m' \
+  | stdbuf -oL cut -d $'\e' -f2,4,6,8 --output-delimiter=$'\t'
+}
+
+# Consumes the output of run-text-client and uses it to invoke notify-send.
+#
+# AP messages are of the form:
+# <player> found their <item> (<location>)
+# <player> sent <item> to <player> (<location>)
+#
+# We receives these with some splitting done, so we just get either:
+#   <finder> <item> <location> ''
+#   <finder> <item> <receiver> <location>
+#
+# However, the formatting codes (absent the leading \e) are still present, and
+# we use those to figure out what kind of item it is.
+#
+# <player> is always formatted with SGR 35 if self, SGR 33 if other.
+# <location> is SGR 32.
+# <item> is one of:
+# - SGR 35 if it's a key item
+# - SGR 31 if it's a trap
+# - SGR 36 otherwise
+function notification-dispatcher {
+  while IFS=$'\t' read -r finder item receiver location; do
+    finder="${finder:4}"
+    item_type="${item:1:2}"
+    item="${item:4}"
+    if [[ ! $location ]]; then
+      # Self-delivered item.
+      location="${receiver:4}"
+      receiver="$finder"
+    else
+      location="${location:4}"
+      receiver="${receiver:4}"
+    fi
+    case $item_type in
+      35) item_type='progression' ;;
+      34) item_type='filler' ;;
+      31) item_type='trap' ;;
+      *) item_type="unknown:${item_type}" ;;
+    esac
+
+    if should-notify "$sender" "$receiver" "$item" "$item_type"; then
+      if [[ $finder == $receiver ]]; then
+        "$@" "$(printf '%s found their %s! (%s)' "$finder" "$item" "$location")"
+      else
+        "$@" "$(printf '%s sent a %s to %s! (%s)' "$finder" "$item" "$receiver" "$location")"
+      fi
+    fi
+  done
+}
+
+main "$@"
