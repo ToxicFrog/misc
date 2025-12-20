@@ -21,6 +21,8 @@ require 'abandoned-mines-b2'
 require 'town-centre-east'
 require 'city-walls-north'
 require 'undercity-east'
+require 'limestone-quarry'
+require 'temple-of-kiltia'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
@@ -101,6 +103,7 @@ strict graph {
   bgcolor=black;
   color=white;
   fontcolor=white;
+  splines=ortho;
   node [shape=box,color=magenta,fontcolor=white];
   edge [fontcolor=white,penwidth=3];
 ]]

@@ -64,7 +64,7 @@ region "Town Centre East" {
   };
   room 'Plateia Lumitar' {
     n 'Gharmes Walk';
-    s 'Exit to City Centre'; -- to Temple of Kiltia
+    s 'Exit to City Center'; -- to Temple of Kiltia
     w 'Into Holy Battle'; -- to Great Cathedral L1
     trap 'Cure Panel';
     save_point = true;
