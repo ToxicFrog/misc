@@ -75,7 +75,11 @@ end
 for _,dir in ipairs { 'n', 'nw', 'w', 'sw', 's', 'se', 'e', 'ne' } do
   _G[dir] = function(to)
     return function(key)
-      return { tag = 'exit'; name = to; key = key; dir = dir; }
+      local door = { tag = 'exit'; name = to; key = key; dir = dir; }
+      if key == false then
+        door.pos_only = true
+      end
+      return door
     end
   end
 end

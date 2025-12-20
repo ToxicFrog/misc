@@ -23,6 +23,7 @@ require 'city-walls-north'
 require 'undercity-east'
 require 'limestone-quarry'
 require 'temple-of-kiltia'
+require 'great-cathedral'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
@@ -140,6 +141,8 @@ for r,region in ipairs(REGIONS) do
       local colour = 'white,penwidth=2'
       if not ROOMS[to] then
         colour = 'magenta'
+      elseif exit.pos_only then
+        colour = 'black'
       elseif not region.rooms[to] then
         if gv_key then
           colour = 'red,style=dashed'
