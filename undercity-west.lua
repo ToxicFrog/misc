@@ -2,7 +2,7 @@ region 'Undercity West' {
   'A large area with connections to seven other regions; however, much of it is locked behind NG+ keys, and on your first visit you are basically limited to fighting a giant crab and then exiting to Snowfly Forest.';
 
   room 'The Bread Peddler\'s Way' {
-    s 'Villeport Way'; dx=0.5; dy=-7.5; -- to Town Centre West
+    s 'Villeport Way'; dx=2.5; dy=-7.5; -- to Town Centre West
     e 'Way of the Mother Lode';
   };
   room 'Way of the Mother Lode' {

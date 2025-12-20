@@ -2,7 +2,7 @@ region "Town Center West" {
   "The first Town Center area you gain access to, but most of it is inaccessible until you activate the cloudstone at Tircolas Flow.";
   room "Rue Vermillion" {
     "East takes you to the workshop, south to a boss.";
-    sw "Stairway to the Light"; dx=6.5; dy=-0.5; -- to Sanctum
+    sw "Stairway to the Light"; dx=4.5; dy=-0.5; -- to Sanctum
     se "Tircolas Flow (North)";
     ne "The Rene Coastroad";
     w "Students of Death" "Crimson Key"; -- to City Walls West

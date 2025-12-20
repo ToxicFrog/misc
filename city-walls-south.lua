@@ -1,7 +1,7 @@
 region "City Walls South" {
   "A small area interconnecting Snowfly Forest, City Walls West, Town Center South, and The Keep.";
   room "In Wait of the Foe" {
-    n "Villeport Way"; dy=-0.5; -- latch to Town Centre West
+    n "Villeport Way"; dx=2; dy=-0.5; -- latch to Town Centre West
     w "Swords for the Land";
     e "Where Weary Riders Rest";
   };
