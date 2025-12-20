@@ -23,7 +23,7 @@ region 'City Walls North' {
   room 'From Boy to Hero' {
     sw 'Kesch Bridge'; -- to Town Centre East
     s 'Destruction and Rebirth';
-    n 'A Welcome Invasion' 'Iron Key';
+    n 'A Welcome Invasion' 'Clematis Sigil';
     enemy 'Blood Lizard';
     dummy 'Phantom' { after = 'Dark Abhors Light' };
   };
