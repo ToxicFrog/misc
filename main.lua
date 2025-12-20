@@ -24,6 +24,7 @@ require 'undercity-east'
 require 'limestone-quarry'
 require 'temple-of-kiltia'
 require 'great-cathedral'
+require 'escapeway'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))

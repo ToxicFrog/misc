@@ -124,41 +124,58 @@ region 'Undercity West' {
   room 'Beggars of the Mouthharp' {
     s 'Sewer of Ravenous Rats' 'Silver Key';
     n 'Corner of the Wretched';
+    enemy 'Lich';
+    enemy 'Dullahan';
   };
   room 'Corner of the Wretched' {
     s 'Beggars of the Mouthharp';
     w 'Crossroads of Rest' 'Rood Inverse';
+    enemy 'Dark Skeleton';
+    enemy 'Lich';
   };
   room 'Crossroads of Rest' {
     e 'Corner of the Wretched' 'Rood Inverse';
     n 'Path to the Greengrocer';
     s 'Path of the Children';
+    trap 'Gust';
+    enemy 'Lich Lord';
   };
   room 'Path to the Greengrocer' {
     s 'Crossroads of Rest';
     e 'Glacialdra Kirk Ruins' 'Rood Inverse';
+    enemy 'Dullahan';
+    enemy 'Lich';
   };
   room 'Path of the Children' {
     n 'Crossroads of Rest';
-    -- s -- to Escapeway
+    s 'Shelter From the Quake';
   };
   -- Southeast area accessible only with Gold Key
-  -- TODO
   room 'Salvation for the Mother' {
     w 'Corner of Prayers' 'Gold Key';
     n 'The Body Fragile Yields' 'Gold Key';
     e 'Bite the Master\'s Wounds';
+    trap 'Diabolos';
+    trap 'Poison Panel';
+    enemy 'Lich';
+    enemy 'Lich Lord';
   };
   room 'The Body Fragile Yields' {
     n 'Tears from Empty Sockets';
     s 'Salvation for the Mother' 'Gold Key';
+    enemy 'Dullahan';
+    enemy 'Lich Lord';
   };
   room 'Bite the Master\'s Wounds' {
     w 'Salvation for the Mother';
     n 'Workshop \'Godhands\'';
+    enemy 'Death';
   };
   room 'Workshop \'Godhands\'' {
     s 'Bite the Master\'s Wounds';
+    save_point = true;
+    container = true;
+    workshop = { 'L', 'B', 'I', 'H', 'S', 'D' };
   };
   -- Area reachable by going through Mines B2
   room 'The Crumbling Market (South)' {
@@ -170,7 +187,7 @@ region 'Undercity West' {
   };
   room 'The Crumbling Market (North)' {
     n 'Where Flood Waters Ran';
-    s 'The Crumbling Market (South)'; -- TODO -- placeholder for map rendering
+    s 'The Crumbling Market (South)' (false);
     trap 'Eruption';
     trap 'Freeze';
     trap 'Gust';
@@ -182,7 +199,7 @@ region 'Undercity West' {
   };
   room 'Where Flood Waters Ran' {
     s 'The Crumbling Market (North)';
-    n 'Blood and the Beast'; -- to Escapeway
+    n 'The Darkness Drinks'; -- to Escapeway
   };
   room 'Tears from Empty Sockets' {
     s 'The Body Fragile Yields';
