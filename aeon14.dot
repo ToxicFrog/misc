@@ -1,0 +1,535 @@
+strict digraph Aeon14 {
+  labeljust = c
+  composite = true
+  node [shape=box,style=rounded]
+  graph [style="dotted,rounded"]
+  splines = line
+  newrank = true
+  // rankdir = LR
+
+  subgraph cluster_age_sentience_wars {
+    label = <<b>The Age of the Sentience Wars</b>>
+
+    subgraph cluster_sentience_wars {
+      label = "The Sentience Wars\l(ca. 2950-3010)"
+
+      "Proteus Bridge" [style="dashed,rounded"]
+      "Proteus Bridge" -> "Lyssa's Dream" [style=dotted]
+
+      "Proteus Bridge"
+      -> "Lyssa's Dream"
+      -> "Lyssa's Run"
+      -> "Lyssa's Flight"
+      -> "Lyssa's Call"
+      -> "Lyssa's Flame"
+      -> "Lyssa's Light"
+      -> "Lyssa's Return"
+      -> "Lyssa's Descent"
+      -> "Lyssa's Fury"
+      -> "Lyssa's Vengeance"
+    }
+
+    peripheries = 0
+  }
+
+
+  subgraph cluster_age_colonization {
+    label = <<b>The Second Age of Colonization</b>>
+
+    "Lyssa's Vengeance" -> "Alpha Centauri" [style=invis]
+
+    subgraph cluster_enfield_genesis {
+      label = "Enfield Genesis\l(ca. 3190-3270)"
+
+      "Alpha Centauri"
+      -> "Proxima Centauri"
+      -> "Tau Ceti"
+      -> "Epsilon Eridani"
+      -> "Sirius"
+    }
+
+    peripheries = 0
+  }
+
+
+  subgraph cluster_age_terra {
+    label = <<b>The Age of Terra</b>>
+
+    "Sirius" -> "Storming the\nNorse Wind" [style=invis]
+
+    subgraph cluster_tanis {
+      label = "Tanis Richards: Origins\l(ca. 4085)"
+
+      "Storming the\nNorse Wind" [style="dashed,rounded"]
+
+      "Storming the\nNorse Wind"
+      -> "Shore Leave"
+      -> "Masquerade"
+      -> "Blackest Night"
+      -> "Kill Shot"
+    }
+
+    subgraph cluster_intrepid {
+      label = "The Intrepid Saga\l(ca. 4120-4170)"
+
+      "Kill Shot" -> "Outsystem" [style=dashed]
+
+      "Outsystem"
+      -> "A Path in the Darkness"
+      -> "Building Victoria"
+    }
+
+    bv_link_to_lcs [label="The Lost Colony Ship\nThe Woman Without a World",shape=rarrow,style=dashed]
+    "Building Victoria" -> bv_link_to_lcs
+
+    subgraph cluster_sol_dissolution {
+      label = "The Sol Dissolution\l(ca. 4120-4180)"
+
+      "Outsystem" -> "Venusian Uprising" [style=dashed,constraint=false]
+      "Kill Shot" -> "Venusian Uprising" [style=invis,weight=0]
+
+      "Venusian Uprising"
+      -> "Assault on Sedna"
+      -> "The Hyperion War"
+      -> "The Fall of Terra"
+    }
+
+    peripheries = 0
+  }
+
+  subgraph cluster_age_ftl_wars {
+    label = <<b>The Age of the FTL Wars</b>>
+    rankdir = LR
+
+    // { bv_link_to_lcs, "The Fall of Terra" }
+    // -> { "The Daedalus Job", "Fire in the Night Sky" } [style=invis]
+    bv_link_to_lcs -> "The Daedalus Job" [style=invis]
+
+    subgraph cluster_outlaws_of_aquilia {
+      label = "Outlaws of Aquilia\l(ca. 5960)"
+
+      "The Daedalus Job"
+      -> "Maelstrom Reach"
+      -> "Marauder's Compass"
+    }
+
+    subgraph cluster_legacy_of_the_lost {
+      label = "Legacy of the Lost\l(ca. 6780)"
+
+      "Fire in the Night Sky"
+      -> "A Blight Upon the Stars"
+      -> "Spectre and an Invasion"
+    }
+
+    peripheries = 0
+  }
+
+  { "Spectre and an Invasion", "Marauder's Compass" }
+  -> empire_link_from_bv [style=invis,weight=1]
+
+  subgraph cluster_age_reconstruction {
+    label = <<b>The Age of Reconstruction</b>>
+    edge [weight=999]
+
+
+    empire_link_from_bv [shape=larrow,style=dashed,label="Building Victoria"]
+    empire_link_from_bv -> "The Woman Without a World"
+
+    subgraph cluster_warlord {
+      label = "The Warlord\l(ca. 8510)"
+
+      // TODO: this should branch off from Building Victoria,
+      // and branch back in at Orion Rising
+      "The Woman Without a World"
+      -> "The Woman who Seized an Empire"
+      -> "The Woman who Lost Everything"
+    }
+
+    empire_link_to_ow [shape=rarrow,style=dashed,label="Attack on Thebes"]
+    "The Woman who Lost Everything" -> empire_link_to_ow [style=dashed]
+
+    peripheries = 0
+  }
+
+  subgraph cluster_age_orion_war {
+    label = <<b>The Age of the Orion War</b>>
+    edge [weight=999]
+
+    lcs_link_from_bv [label="Building Victoria",shape=larrow,style=dashed]
+
+    // For positioning only; Warlord actually merges back into
+    // Orion War during Attack\non Thebes.
+    empire_link_to_ow -> lcs_link_from_bv [style=invis]
+    lcs_link_from_bv -> "The Lost\nColony Ship" [weight=999]
+
+    ow_link_from_empire [label="The Woman who\nLost Everything",shape=larrow,style=dashed]
+    ow_link_from_empire -> "Attack\non Thebes" [weight=0,style=dashed]
+    // Positioning
+    "Orion Rising" -> ow_link_from_empire [weight=0,style=invis]
+
+    subgraph cluster_orion_war {
+      label = "The Orion War\l(ca. 8930-8950)"
+
+      "The Lost\nColony Ship"
+      // spinoff: Set the Galaxy on Fire"
+      -> "New Canaan"
+      -> "Orion Rising"
+      // spinoff: Ignite the Stars
+      -> "The Scipio\nAlliance"
+      -> "Attack\non Thebes"
+      -> "War on a\nThousand Fronts"
+      -> "Precipice\nof Darkness"
+      -> "Airthan\nAscendancy"
+      -> "Orion Front"
+      -> "Starfire"
+      -> "Return to\nKapteyn's Star" // interstitial
+      -> "Race Across\nSpacetime"
+      -> "Return to Sol:\nAttack at Dawn"
+      -> "Return to Sol:\nStar Rise"
+    }
+
+    // TODO: how do I swap Building New Canaan with Perseus Gate?
+    "New Canaan" -> "Carthage" [style=dashed,weight=0]
+    subgraph cluster_new_canaan {
+      label = "Building New Canaan\l(ca. 8935)"
+
+      "Carthage" -> "Tyre" -> "Troy" -> "Athens"
+    }
+    "Athens" -> "New Canaan" [style=dashed,weight=0]
+
+    "New Canaan" -> "The Gate at the\nGrey Wolf Star" [style=dashed,weight=0,constraint=true]
+
+    subgraph cluster_perseus_gate {
+      label = "The Perseus Gate\l(ca. 8938-8948)"
+
+      "The Gate at the\nGrey Wolf Star"
+      -> "The World at the\nEdge of Space"
+      -> "The Dance on the\nMoons of Serenity"
+      -> "The Last Bastion\nof Star City"
+      -> "The Toll Road\nBetween the Stars"
+      -> "The Final Stroll\non Perseus's Arm"
+    }
+
+    "The Final Stroll\non Perseus's Arm" -> "Orion Rising" [style=dashed,weight=0,constraint=true]
+    "Orion Rising" -> "A Meeting of\nMinds and Bodies" [style=dashed,weight=0]
+
+    subgraph cluster_perseus_gate_2 {
+      label = "The Perseus Gate (Season 2)\l(ca. 8938-8948)"
+
+      "A Meeting of\nMinds and Bodies"
+      -> "A Deception and\na Promise Kept"
+      -> "A Surreptitious\nRescue"
+      -> "A Victory and a\nCrushing Defeat"
+      -> "A Trial and the\nTribulations"
+    }
+
+    "A Deception and\na Promise Kept" -> "Precipice\nof Darkness" [style=dashed,weight=0]
+
+    // Not sure where these fit in.
+    // Serenity\l(ca. 8938)
+    // Return to Ordus
+    // War of the Rosette
+
+    // }
+    "The Lost\nColony Ship" -> "Close Proximity" [style=dashed,weight=0]
+    "Decisive Action" -> "Attack\non Thebes" [style=dashed,weight=0]
+    "Attack\non Thebes" -> "Impact Imminent" [style=dashed,weight=0]
+
+    subgraph cluster_perilous_alliance {
+      label = "Perilous Alliance\l(ca. 8937-8948)"
+
+      // positioning
+      // "The Scipio Alliance" -> "Decisive Action" [style=invis,weight=0]
+      "Collision Course" -> "Decisive Action" [constraint=false]
+
+      "Escape Velocity" [style="dashed,rounded"]
+      "Decisive Action" [style="dashed,rounded"]
+      "Mr. Fizzle Pop\nRuins Everything" [style="dashed,rounded"]
+
+      "Escape Velocity"
+      -> "Close Proximity"
+      -> "Strike Vector"
+      -> "Collision Course"
+      -> "Decisive Action"
+      -> "Impact Imminent"
+      -> "Critical Inertia"
+      -> "Impulse Shock"
+      -> "Mr. Fizzle Pop\nRuins Everything"
+      -> "Terminal Velocity"
+    }
+
+    "The Scipio\nAlliance" -> "The Empress\nand the Ambassador" [style=dashed,weight=0]
+    subgraph cluster_empire {
+      label = "The Empire\l(ca. 8948-8949)"
+
+      "The Empress\nand the Ambassador"
+      -> "Consort of the\nScorpion Empress"
+      -> "By the Empress's\nCommand"
+    }
+
+    "Attack\non Thebes" -> "Whole Latte Death" [style=dashed,weight=0]
+
+    subgraph cluster_fennington {
+      label = "Fennington Station\nMurder Mysteries";
+
+      "Whole Latte Death"
+      -> "Cocoa Crush"
+    }
+
+
+    "Attack\non Thebes" -> "Rika Commander" [style=dashed,weight=0]
+
+    subgraph cluster_rika_mech {
+      label = "Rika's Marauders\l(ca. 8931-8949)"
+
+      "Rika Mechanized" [style="dashed,rounded"]
+
+      "Rika Mechanized"
+      -> "Rika Outcast"
+      -> "Rika Redeemed"
+      -> "Rika Triumphant"
+      -> "Rika Commander"
+      -> "Rika Infiltrator"
+      -> "Rika Unleashed"
+      -> "Rika Conqueror"
+    }
+
+    "Rika Commander" -> "War on a\nThousand Fronts" [style=dashed,weight=0]
+    "Rika Conqueror" -> "Rika Rising"
+
+    subgraph cluster_rika_queen {
+      label = "The Genevian Queen\l(ca. ????)"
+
+      "Rika Rising"
+      -> "Rika Coronated"
+      -> "Rika Destroyer"
+    }
+  }
+
+    // Spinoff set in New Eden
+    // 428 15/08/8948 - The Delta Team 1 - The Eden Job
+    // 452 07/03/8949 - The Delta Team 2 - The Disknee World
+    // 459 03/04/8949 - The Delta Team 3 - Rogue Planets
+
+}
+
+/*
+
+  // Not sure this overlaps with the main series at all, although
+  // Machete is briefly visited in Airthan Ascendancy
+  470 17/03/8948 - Machete System Bounty Hunter 1 - Hired Gun
+  471 02/05/8948 - Machete System Bounty Hunter 2 - Gunning for Trouble
+  472 23/05/8948 - Machete System Bounty Hunter 3 - With Guns Blazing
+
+    // Selected canonical short stories and novellas spanning the entire timeline
+    // Some by fans
+    475 --/--/---- - Repercussions 1 - Repercussions
+
+  // Mentioned briefly in Starfire
+  476 05/10/8948 - Hand's Assassin 1 - Death Dealer
+
+
+// Set between Orion and Ascension
+5000 12/01/8960 - The Mech Corps 1 - Heather's Marauders
+
+// Follow Tanis/Tangle
+5000 --/--/---- - The Ascension War 1 - Scions of Humanity
+5002 --/--/---- - The Ascension War 2 - Galactic Front
+
+  // Noir-ish stuff in Genevia
+  5003 17/08/8959 - Bitchalante 1 - Bitchilante
+  5005 --/--/---- - Bitchalante 2 - Bitchalante: Volume 2
+
+*/
+
+/*
+^([0-9]+)\n+([^\n]+)\n+([^\n]+)\n+([0-9]+)\n+([^\n]+)\n+(Yes|No)
+
+// The Sentience Wars
+100 15/04/2945 - Sentience Wars 0 - Proteus Bridge
+101 24/07/2981 - Sentience Wars 1 - Lyssa's Dream
+102 29/08/2981 - Sentience Wars 2 - Lyssa's Run
+103 23/09/2981 - Sentience Wars 3 - Lyssa's Flight
+104 05/10/2981 - Sentience Wars 4 - Lyssa's Call
+105 01/12/2981 - Sentience Wars 5 - Lyssa's Flame
+120 --/--/---- - Sentience Wars 6 - Lyssa's Light
+121 25/07/3011 - Sentience Wars 7 - Lyssa's Return
+122 10/08/3011 - Sentience Wars 8 - Lyssa's Descent
+123 --/--/---- - Sentience Wars 9 - Lyssa's Fury
+124 --/--/---- - Sentience Wars 10 - Lyssa's Vengeance
+
+// The Second Age of Colonization
+200 01/07/3189 - Enfield Genesis 1 - Alpha Centauri
+201 09/05/3191 - Enfield Genesis 2 - Proxima Centauri
+202 01/03/3192 - Enfield Genesis 3 - Tau Ceti
+203 05/03/3272 - Enfield Genesis 4 - Epsilon Eridani
+204 01/05/3272 - Enfield Genesis 5 - Sirius
+205 --/--/---- - Enfield Genesis 6 - The Complete Enfield Genesis
+
+// The Age of Terra
+300 Storming the Norse Wind Tanis Richards: Origins 0.5 08/01/4084 No
+301 14/01/4084 - Tanis Richards: Origins 1 - Tanis Richards: Shore Leave
+302 15/02/4084 - Tanis Richards: Origins 2 - Tanis Richards: Masquerade
+303 17/02/4085 - Tanis Richards: Origins 3 - Tanis Richards: Blackest Night
+304 04/03/4085 - Tanis Richards: Origins 4 - Tanis Richards: Kill Shot
+
+320 28/07/4123 - The Intrepid Saga 1 - Outsystem
+321 22/11/4123 - The Intrepid Saga 2 - A Path in the Darkness
+322 Destiny Rising The Intrepid Saga 2.1 05/05/4113 Yes Books 1 & 2 Extended Edition
+325 13/02/4168 - The Intrepid Saga 3 - Building Victoria
+326 --/--/---- - The Intrepid Saga 4 - The Complete Intrepid Saga Books 1 - 3 incl. Destiny Lost
+
+330 21/04/4124 - The Sol Dissolution 1 - Venusian Uprising
+331 22/01/4174 - The Sol Dissolution 2 - Assault on Sedna
+332 06/04/4179 - The Sol Dissolution 3 - The Hyperion War
+333 29/04/4179 - The Sol Dissolution 4 - The Fall of Terra
+
+// The FTL Wars
+350 03/10/6781 - Legacy of the Lost 1 - Fire in the Night Sky
+351 26/12/6781 - Legacy of the Lost 2 - A Blight upon the Stars
+352 13/08/6785 - Legacy of the Lost 3 - Specter and an Invasion
+
+360 07/01/5923 - Outlaws of Aquilia 1 - The Daedalus Job
+361 23/01/5923 - Outlaws of Aquilia 2 - Maelstrom Reach
+362 11/02/5923 - Outlaws of Aquilia 3 - Marauder's Compass
+
+// The Age of Reconstruction
+390 11/04/4330 - The Warlord 1 - The Woman Without a World
+391 28/12/8511 - The Warlord 2 - The Woman Who Seized an Empire
+392 01/03/8512 - The Warlord 3 - The Woman Who Lost Everything
+395 The Warlord of Midditerra The Warlord 11/04/4330 Yes Complete Trilogy
+
+// The Orion War
+401 30/06/8927 - The Orion War 1 - The Lost Colony Ship (Destiny Lost)
+402 Set the Galaxy on Fire The Orion War 1.5 29/10/8927 No
+403 29/02/8928 - The Orion War 2 - New Canaan
+
+  // Building New Canaan spinoff
+  405 07/11/8935 - Building New Canaan 1 - Carthage
+  406 10/12/8935 - Building New Canaan 2 - Tyre
+  407 01/01/8937 - Building New Canaan 3 - Troy
+  408 12/03/8942 - Building New Canaan 4 - Athens
+  409 17/11/8935 - Building New Canaan 5 - Building New Canaan: The Complete Series Books 1 - 4
+
+  // Sabrina spinoff dealing what they get up to before returning at the end of
+  // New Canaan
+  410 22/07/8938 - The Perseus Gate - Season 1 1 - The Gate at the Grey Wolf Star
+  411 23/07/8938 - The Perseus Gate - Season 1 2 - The World at the Edge of Space
+  412 14/10/8938 - The Perseus Gate - Season 1 3 - The Dance on the Moons of Serenity
+  413 The Trail Through the Stars The Perseus Gate - Season 1 3.5 Yes Episodes 1 - 3 incl. The Cook's New Crew
+  414 28/10/8938 - The Perseus Gate - Season 1 4 - The Last Bastion of Star City
+  415 24/11/8938 - The Perseus Gate - Season 1 5 - The Toll Road Between the Stars
+  416 10/03/8948 - The Perseus Gate - Season 1 6 - The Final Stroll on Perseus's Arm
+  417 The Path Amongst the Clouds The Perseus Gate - Season 1 6.5 Yes Episodes 4 - 6 incl. Date Night on Johannes Station
+
+    // No idea here. features Terry, but not I think the one infected with Myrrdan.
+    418 28/10/8938 - Serenity 1 - Return to Ordus
+    419 28/12/8938 - Serenity 2 - War of the Rosette
+
+// Return to main timeline
+420 27/03/8948 - The Orion War 3 - Orion Rising
+421 30/06/8927 - The Orion War 14 - Battle for New Canaan Books 1 - 3 incl. Set the Galaxy on Fire
+422 Ignite the Stars The Orion War 3.5 23/04/8948 No
+
+  // Not sure where this fits in, probably between season 1 and Orion Rising?
+  422 28/03/8948 - The Perseus Gate - Season 2 1 - A Meeting of Minds and Bodies
+  423 27/04/8948 - The Perseus Gate - Season 2 2 - A Deception and a Promise Kept
+  424 30/04/8948 - The Perseus Gate - Season 2 3 - A Surreptitious Rescue of Friends and Foes
+  425 A Siege and a Salvation From Enemies The Perseus Gate - Season 2 3.5 28/03/8948 Yes Episodes 1 - 3
+  426 12/05/8948 - The Perseus Gate - Season 2 4 - A Victory and a Crushing Defeat
+  430 27/06/8948 - The Perseus Gate - Season 2 5 - A Trial and the Tribulations
+
+    // Crossovers between Star-Magi, The Kurtherian Universe, and Aeon 14
+    425 --/--/---- - Quantum Legends 1 - Anomaly on Cerka
+    481 --/--/---- - Quantum Legends 3 - Aberrant Ascension
+
+    // Spinoff set in New Eden
+    428 15/08/8948 - The Delta Team 1 - The Eden Job
+    452 07/03/8949 - The Delta Team 2 - The Disknee World
+    459 03/04/8949 - The Delta Team 3 - Rogue Planets
+
+429 06/08/8948 - The Orion War 4 - The Scipio Alliance
+
+  // Spinoff set in Silstrand after Tanis sells her nanotech there
+  // read after New Canaan and before Scipio Alliance
+  431 14/03/8937 - Perilous Alliance 0 - Escape Velocity
+  432 21/08/8947 - Perilous Alliance 1 - Close Proximity
+  433 16/09/8948 - Perilous Alliance 2 - Strike Vector
+  444 24/09/8948 - Perilous Alliance 3 - Collision Course
+  448 Decisive Action Perilous Alliance 3.5 26/09/8948 No
+  // merges in at Attack\non Thebes
+
+  // I think these continue on their own timeline
+  460 29/10/8948 - Perilous Alliance 4 - Impact Imminent
+  462 08/11/8948 - Perilous Alliance 5 - Critical Inertia
+  463 18/02/8948 - Perilous Alliance 6 - Impulse Shock
+  464 Mr. Fizzle Pop Ruins Everything Perilous Alliance 6.5 25/02/8948 No
+  465 25/02/8948 - Perilous Alliance 7 - Terminal Velocity
+
+  // Spinoff in Scipio featuring Diana and Petra trying to put their relationship
+  // back together
+  446 05/10/8948 - The Empire 1 - The Empress and the Ambassador
+  447 10/01/8949 - The Empire 2 - Consort of the Scorpion Empress
+  458 12/04/8949 - The Empire 3 - By the Empress's Command
+
+      // Appears to be unconnected to the rest of the series
+      // Aah! Bob is reading these in Attack\non Thebes
+      449 --/--/---- - Fennington Station Murder Mysteries 1 - Whole Latte Death
+      450 --/--/---- - Fennington Station Murder Mysteries 2 - Cocoa Crush
+
+  // Spinoff set in the Genevian region
+  453 01/12/8941 - Rika's Marauders 0 - Rika Mechanized
+  454 22/09/8939 - Rika's Marauders 1 - Rika Outcast
+  455 14/02/8949 - Rika's Marauders 2 - Rika Redeemed
+  456 25/04/8949 - Rika's Marauders 3 - Rika Triumphant
+  461 03/08/8949 - Rika's Marauders 4 - Rika Commander
+  483 12/10/8949 - Rika's Marauders 5 - Rika Infiltrator
+  484 25/10/8949 - Rika's Marauders 6 - Rika Unleashed
+  488 25/12/8949 - Rika's Marauders 7 - Rika Conqueror
+  491 --/--/---- - Rika's Marauders 8 - The Complete Rika's Marauders Books 1 - 7 incl. Rika Mechanized & Crucible
+  // also merges back in sometime around Attack\non Thebes
+
+  // Not sure when these are set
+  492 --/--/---- - The Genevian Queen 1 - Rika Rising
+  493 --/--/---- - The Genevian Queen 2 - Rika Coronated
+  499 --/--/---- - The Genevian Queen 3 - Rika Destroyer
+  500 --/--/---- - The Genevian Queen 4 - The Genevian Queen: The Complete Series 1 - 3
+
+460 14/08/8948 - The Orion War 5 - Attack\non Thebes
+
+  // Not sure this overlaps with the main series at all, although
+  // Machete is briefly visited in Airthan Ascendancy
+  470 17/03/8948 - Machete System Bounty Hunter 1 - Hired Gun
+  471 02/05/8948 - Machete System Bounty Hunter 2 - Gunning for Trouble
+  472 23/05/8948 - Machete System Bounty Hunter 3 - With Guns Blazing
+
+    // Selected canonical short stories and novellas spanning the entire timeline
+    // Some by fans
+    475 --/--/---- - Repercussions 1 - Repercussions
+
+480 21/08/8949 - The Orion War 6 - War on a Thousand Fronts
+482 07/09/8949 - The Orion War 7 - Precipice of Darkness
+485 05/10/8949 - The Orion War 8 - Airthan Ascendancy
+486 03/10/8949 - The Orion War 9 - Orion Front
+
+  // Mentioned briefly in Starfire
+  476 05/10/8948 - Hand's Assassin 1 - Death Dealer
+
+489 22/10/8949 - The Orion War 10 - Starfire
+491 Return to Kapteyn's Star The Orion War 10.5 18/10/8949 No
+495 --/--/---- - The Orion War 11 - Race Across Space Time
+496 11/05/8950 - The Orion War 12 - Return to Sol: Attack at Dawn
+497 28/05/8950 - The Orion War 13 - Return to Sol: Star Rise
+
+// Set between Orion and Ascension
+5000 12/01/8960 - The Mech Corps 1 - Heather's Marauders
+
+// Follow Tanis/Tangle
+5000 --/--/---- - The Ascension War 1 - Scions of Humanity
+5002 --/--/---- - The Ascension War 2 - Galactic Front
+
+  // Noir-ish stuff in Genevia
+  5003 17/08/8959 - Bitchalante 1 - Bitchilante
+  5005 --/--/---- - Bitchalante 2 - Bitchalante: Volume 2
+
+*/
