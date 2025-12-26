@@ -120,7 +120,6 @@ region 'Undercity West' {
     enemy 'Gargoyle';
   };
   -- North area accessible only with Silver Key and Rood Inverse
-  -- TODO
   room 'Beggars of the Mouthharp' {
     s 'Sewer of Ravenous Rats' 'Silver Key';
     n 'Corner of the Wretched';

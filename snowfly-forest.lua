@@ -105,7 +105,7 @@ region "Snowfly Forest" {
   -- Path from river to second boss and city walls south
   room "Lamenting to the Moon" {
     s "Forest River"; dx=1.5;
-    w "The Silent Hedges";
+    w "The Wolves' Choice";
     e "Howl of the Wolf King";
     n "Running with the Wolves";
     enemy "Basilisk";
@@ -171,9 +171,9 @@ region "Snowfly Forest" {
     enemy "Ichthious";
   };
   room "Howl of the Wolf King" {
+    s "The Hollow Hills";
     w "Lamenting to the Moon";
     e "The Silent Hedges";
-    s "The Hollow Hills";
   };
   room "The Silent Hedges" {
     e "Lamenting to the Moon";
