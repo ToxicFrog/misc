@@ -85,7 +85,8 @@ local function record_diff(tree, max_depth, old_size, new_size, path)
   if old_size == nil then return end -- no size change
   tree.old_size = tree.old_size + math.abs(old_size)
   tree.new_size = tree.new_size + new_size
-  tree.delta = tree.new_size - tree.old_size
+  -- tree.delta = tree.new_size - tree.old_size
+  tree.delta = tree.new_size
   if max_depth > 0 then
     local head,tail = path:match('([^/]+/)(.+)')
     if not head then return end
