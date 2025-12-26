@@ -26,6 +26,7 @@ require 'temple-of-kiltia'
 require 'great-cathedral'
 require 'escapeway'
 require 'forgotten-pathway'
+require 'iron-maiden-b23'
 
 function gv_name(str)
   return (str:gsub('%W+', ''))
