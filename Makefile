@@ -2,4 +2,4 @@ vs.svg: vs.dot
 	<vs.dot neato -Tsvg >vs.svg
 
 vs.dot: *.lua
-	luajit main.lua > vs.dot
+	luajit graphviz.lua > vs.dot
