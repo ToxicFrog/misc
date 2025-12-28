@@ -52,6 +52,7 @@ region "Town Center West" {
     nw "Tircolas Flow (South)";
     s "Escapeway"; -- to room in Abandoned Mines B1, not the area of the same name.
     w "Glacialdra Kirk Ruins";
+    save_point = true;
   };
   room "Glacialdra Kirk Ruins" {
     "Notable primarily for containing the first 'Sealed with the Rood Inverse' door; in normal play you can't traverse this until NG+.";

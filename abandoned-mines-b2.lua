@@ -18,6 +18,7 @@ region 'Abandoned Mines B2' {
     -- s -- one-way from Work, Then Die
     e 'Delusions of Happiness' 'Iron Key';
     n 'Dining in Darkness';
+    save_point = true;
     enemy 'Blood Lizard';
     enemy 'Imp';
   };
