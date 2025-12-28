@@ -16,6 +16,10 @@
 # year:XXXX
 #   must be the first argument! equivalent to:
 #   end.after:XXXX-01-01 end.before:(XXXX+1)-01-01
+# year:all
+#   disables implicit current-calendar-year filter
+# year:past
+#   end.after:(now-365d) end.before:(today)
 #
 ### New commands:
 # books reset-config

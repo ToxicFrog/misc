@@ -57,6 +57,14 @@ function task/-parse-argv {
         TASK_ARGV+="$(task/year-filter $YEAR)"
         TASK_ARGV+="rc.context:"
         ;;
+      year:past)
+        TASK_ARGV+="$(task/year-filter past)"
+        TASK_ARGV+="rc.context:"
+        ;;
+      year:past:*)
+        TASK_ARGV+="$(task/year-filter past ${arg/year:past:/})"
+        TASK_ARGV+="rc.context:"
+        ;;
       year:*)
         TASK_ARGV+="$(task/year-filter ${arg/year:/})"
         TASK_ARGV+="rc.context:"
@@ -123,6 +131,11 @@ function task/select {
 # - is pending, and was added during or before $YEAR.
 # In effect, this means "tasks that were finished during $YEAR, or were pending
 # or in-progress for at least part of $YEAR."
+#
+# As a special case, it also accepts "past" to mean the previous 365 days (i.e.
+# a sliding 1-year window), and "past:yyyy-mm-dd" to mean such a window ending
+# at the specified date.
+# TODO: unify this with the above so you can just ask for "-yyyy-mm-dd" or similar.
 function task/year-filter {
   local start end
   case "$1" in
@@ -137,6 +150,17 @@ function task/year-filter {
     *-*)
       start="${1%-*}-01-01"
       end="$((${1#*-}+1))-01-01"
+      ;;
+    past)
+      if [[ $2 ]]; then
+        # Past year ending at $2
+        start="$(date -I -d "$2 -365 days")"
+        end="$(date -I -d "$2 +1 day")"
+      else
+        # Past year ending today
+        start="$(date -I -d '-365 days')"
+        end="$(date -I -d '+1 day')"
+      fi
       ;;
     *)
       start="$1-01-01"
