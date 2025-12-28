@@ -99,13 +99,16 @@ for r,region in ipairs(REGIONS) do
   region.name, gv_name(region.name), region.name)
 
   for _,room in ipairs(region.children) do
-    printf('  %s [color=white,label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
+    local color = 'white'
+    if room.save_point then color = 'cyan,penwidth=2' end
+    if room.workshop then color = 'orange,penwidth=2' end
+    printf('  %s [color=%s,label="%s"%s];\n', gv_name(room.name), color, gv_label(room), gv_pos(region, room))
   end
   print(' }')
 
   -- Now define all edges outside the region
   for _,room in ipairs(region.children) do
-    printf('  %s [color=white,label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
+    -- printf('  %s [color=white,label="%s"%s];\n', gv_name(room.name), gv_label(room), gv_pos(region, room))
     for _,exit in ipairs(room.exit or {}) do
       local to = exit.name
       local dir = ''
