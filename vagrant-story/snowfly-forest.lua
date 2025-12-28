@@ -5,6 +5,7 @@ region "Snowfly Forest" {
     "Entrance. Cutscenes with Grissom.";
     n "Where the Hunter Climbed"; dx=-7; dy=-2; -- to Undercity West
     s "The Hunt Begins";
+    save_point = true;
   };
   room "The Hunt Begins" {
     n "The Faerie Circle";
@@ -93,6 +94,7 @@ region "Snowfly Forest" {
     nw "Where Soft Rains Fell"; dx=0.5;
     n "The Faerie Circle";
     ne "Lamenting to the Moon";
+    save_point = true;
     trap "Cure Panel";
     enemy "Basilisk";
     enemy "Zombie Knight";
@@ -151,6 +153,7 @@ region "Snowfly Forest" {
   room "The Wood Gate" {
     s "Hewn from Nature";
     n "The Weeping Boy"; -- to City Walls South
+    save_point = true;
   };
   -- One-way paths from the east half of the woods back to the west
   room "The Wolves' Choice" {

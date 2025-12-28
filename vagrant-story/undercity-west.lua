@@ -33,6 +33,7 @@ region 'Undercity West' {
     s 'Dark Abhors Light' 'Iron Key'; -- to Limestone Quarry
     w 'Remembering Days of Yore';
     e 'Hall of Poverty';
+    save_point = true;
   };
   -- West branch towards Snowfly Forest
   room 'Remembering Days of Yore' {
@@ -85,6 +86,7 @@ region 'Undercity West' {
     w 'The Children\'s Hideout';
     e 'Corner of Prayers';
     s 'Fear of the Fall';
+    save_point = true;
     enemy 'Skeleton';
     enemy 'Dark Skeleton';
     enemy 'Dark Eye';

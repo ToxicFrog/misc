@@ -2,6 +2,37 @@ This file documents event triggers that effectively function as keys and that,
 if pre-triggered or added to the pool, could make the game less linear. It also
 documents door latches that provide significant shortcuts once opened.
 
+## Critical path without pretriggering
+
+This assumes that the player has received all keys via AP but none of the events
+described below are pretriggered.
+
+The start of the game is linear as vanilla: Wine Cellar, Catacombs, Sanctum,
+Centre West, Walls West, Mines B1, Centre West again. Parts of the Mines are
+skippable, but that's it.
+
+However, having keys opens things wide open at this point. All of Undercity West
+is immediately accessible, which gives the player *relatively* short paths to
+the rest of the game:
+-> Escapeway
+-> Snowfly Forest
+-> Mines B2 (east)
+-> Centre East (south) -> Walls North -> Undercity East
+-> Limestone Quarry -> Temple -> Centre East (north) -> Cathedral
+-> Walls East -> Snowfly Forest East
+              -> Centre South -> Walls South
+                              -> Mines B2 (west)
+                              -> The Keep -> Iron Maiden
+                                          -> Forgotten Pathway
+
+The branch through the Keep is longest, but all the areas passed through to
+reach Mines B2 or Iron Maiden are very small, so it's actually quite fast,
+much faster than Snowfly Forest.
+
+This means that with keys being issued by AP, the longest linear parts of the
+game are that initial run to get from Wine Cellar to Undercity West, and then
+the final run from Limestone Quarry to the Cathedral.
+
 ## Everywhere - dummies
 
 These normally spawn only after certain events and are thus available only on
