@@ -1,4 +1,8 @@
-require 'util'
+
+function printf(...) return io.write(string.format(...)) end
+function eprintf(...) return io.stderr:write(string.format(...)) end
+table.unpack = table.unpack or unpack
+
 require 'nodes'
 
 require 'wine-cellar'
