@@ -9,9 +9,9 @@ set -e
 CONNECT=''
 NAME=''
 PASSWORD=''
-NOTIFY_EVERYONE=0
 NOTIFY_EVERYTHING=0
 COMMAND=(notify-send 'New AP item!')
+PLAYERS=''
 
 function parse-argv {
   while [[ $1 ]]; do
@@ -20,7 +20,11 @@ function parse-argv {
       -c|--connect) CONNECT="$2"; shift 2;;
       -n|--name) NAME="$2"; shift 2;;
       -p|--password) PASSWORD="$2"; shift 2;;
-      --everyone) EVERYONE=1; shift;;
+      -q|--quiet) QUIET=1; shift;;
+      -r|--raw) RAW=1; shift;;
+      -p|--players) PLAYERS="$2"; shift 2;;
+      --outgoing) OUTGOING=1; shift;;
+      --everyone) PLAYERS='.*'; shift;;
       --everything) EVERYTHING=1; shift;;
       --)
         shift
@@ -32,6 +36,9 @@ function parse-argv {
   done
 }
 
+# If --players isn't specified, default to our slot name.
+if [[ ! $PLAYERS ]]; then PLAYERS="$NAME"; fi
+
 function help {
   cat <<EOF
 Usage: $0 --connect <host> --name <slotname> [options...] [-- notify command...]
@@ -41,8 +48,12 @@ Usage: $0 --connect <host> --name <slotname> [options...] [-- notify command...]
     --connect         host and port to connect to; passed to AP text client
     --name            slot name; passed to AP text client
     --password        game password; passed to AP text client
-    --everyone        generate notifications for items belonging to other players
+    --outgoing        generate notifications for items sent as well as received
+    --players         notify for items belonging to these players (regex)
+    --everyone        notify no matter who the item belongs to
     --everything      generate notifications for all items, not just progression
+    --quiet           generate less output on the tty
+    --raw             use original AP message as notification message
     (notify command)  command to use to generate notifications; default is:
                       notify-send 'New AP item!'
                       details will be added as last argument
@@ -53,17 +64,25 @@ EOF
 # should return 0 (success) if this item deserves a notification and 1 (false)
 # otherwise.
 function should-notify {
-  # If --everyone was not used the receive must be us
-  if (( !EVERYONE )) && [[ $2 != $NAME ]]; then
-    return 1
-  fi
-
   # If --everything was not used the item must be progression
   if (( !EVERYTHING )) && [[ $4 != 'progression' ]]; then
     return 1
   fi
 
-  return 0
+  # The receiving player should match --players
+  if egrep -q "$PLAYERS" <<<"$2"; then
+    return 0
+  fi
+
+  # If --outgoing was used, also allow if the sending player matches --players
+  if (( OUTGOING )); then
+    if egrep -q "$PLAYERS" <<<"$1"; then
+      return 0
+    fi
+  fi
+
+  # Otherwise this doesn't match any slot we're watching and we shouldn't notify.
+  return 1
 }
 
 function main {
@@ -86,7 +105,7 @@ function run-text-client {
   local connected=0
   2>/dev/null archipelago "Text Client" -- "$@" \
   | while read -r line; do
-    >&2 printf '>> %s\n' "$line"
+    (( QUIET )) || >&2 printf '>> %s\n' "$line"
     if egrep -q "Now that you are connected" <<<$line; then
       >&2 echo "AP connection established. Waiting for events."
       connected=1
@@ -98,8 +117,7 @@ function run-text-client {
     fi
     printf '%s\n' "$line"
   done \
-  | egrep --line-buffered $'^\e\\[3[35]m' \
-  | stdbuf -oL cut -d $'\e' -f2,4,6,8 --output-delimiter=$'\t'
+  | egrep --line-buffered $'^\e\\[3[35]m'
 }
 
 # Consumes the output of run-text-client and uses it to invoke notify-send.
@@ -122,7 +140,8 @@ function run-text-client {
 # - SGR 31 if it's a trap
 # - SGR 36 otherwise
 function notification-dispatcher {
-  while IFS=$'\t' read -r finder item receiver location; do
+  while read -r original; do
+    <<<$original cut -d $'\e' -f2,4,6,8 --output-delimiter=$'\t' | IFS=$'\t' read -r finder item receiver location
     finder="${finder:4}"
     item_type="${item:1:2}"
     item="${item:4}"
@@ -141,12 +160,18 @@ function notification-dispatcher {
       *) item_type="unknown:${item_type}" ;;
     esac
 
-    if should-notify "$sender" "$receiver" "$item" "$item_type"; then
+    if ((RAW)); then
+      local msg=$original
+    else
       if [[ $finder == $receiver ]]; then
         "$@" "$(printf '%s found their %s! (%s)' "$finder" "$item" "$location")"
       else
         "$@" "$(printf '%s sent a %s to %s! (%s)' "$finder" "$item" "$receiver" "$location")"
       fi
+    fi
+
+    if should-notify "$finder" "$receiver" "$item" "$item_type"; then
+      "$@" $msg
     fi
   done
 }
