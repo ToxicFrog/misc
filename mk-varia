@@ -1,0 +1,165 @@
+#!/usr/bin/env zsh
+#
+# Simple command line interface to VARIA randomizer web service.
+# By default, will generate a regular/hard game.
+#
+# To change settings, either edit SETTINGS below, or use command line flags,
+# e.g. mk-varia --suitsRestriction=on --startLocation=vanilla
+#
+# No validation is performed whatsoever, apart from a warning if you add a
+# setting it doesn't recognize; what you set is what gets passed to VARIA.
+#
+# If generation succeeds, you'll get back a bit of JSON with information about
+# the generated game, including a link to the customizer. If it fails you'll get
+# whatever error message VARIA provided.
+
+declare -A SETTINGS=(
+  # BIG SWITCHES
+  complexity medium
+  logic vanilla # either "vanilla" or "mirror" or "random"
+  logicMultiSelect 'vanilla,mirror'
+  preset regular
+  raceMode off
+  wantsCustomize true
+
+  # RANDOMIZER PARAMETERS
+  seed 0
+  randoPreset ''
+  tourian Vanilla # Fast Disabled
+  startLocation random
+  startLocationMultiSelect 'Ceres,Landing Site,Gauntlet Top,Green Brinstar Elevator,Big Pink,Etecoons Supers,Wrecked Ship Main,Firefleas Top,Business Center,Bubble Mountain,Mama Turtle,Watering Hole,Aqueduct,Red Brinstar Elevator,Golden Four'
+  majorsSplit Full
+  maxDifficulty hard
+  progressionSpeed medium
+  progressionDifficulty normal
+  morphPlacement early
+  suitsRestriction off
+  hideItems off
+
+  # TOURIAN ACCESS
+  objectiveRandom false
+  objective 'kill all G4'
+  nbObjective 4
+  nbObjectivesRequired off
+  scavRandomized off
+  hiddenObjectives off
+  distributeObjectives off
+  scavNumLocs 10
+
+  # AMMO AND ENERGY
+  minorQty 100
+  energyQty vanilla
+  missileQty 3
+  superQty 2
+  powerBombQty 1
+  strictMinors off
+
+  # AREA RANDO
+  areaRandomization off
+  areaLayout off
+  areaLayoutCustom ''
+
+  # DOOR RANDO
+  doorsColorsRando off
+  allowGreyDoors off
+
+  # BOSS RANDO
+  bossRandomization off
+  minimizer off
+  minimizerQty 45
+
+  # ESCAPE RANDO
+  escapeRando off
+  removeEscapeEnemies off
+
+  # FUN TIMES
+  funCombat off
+  funMovement off
+  funSuits off
+
+  # PATCHES - RANDOMIZER ADAPTATIONS
+  layoutPatches on
+  layoutCustom 'door_indicators_plms,dachora,early_super_bridge,high_jump,moat,spospo_save,nova_boost_platform,red_tower,spazer,climb_supers,brinstar_map_room,kraid_save,mission_impossible'
+  variaTweaks on
+  variaTweaksCustom 'bomb_torizo,WS_Etank,LN_Chozo'
+  nerfedCharge off
+  relaxed_round_robin_cf off
+  gravityBehaviour Balanced # Vanilla Progressive
+
+  # PATCHES - GAME COMFORT
+  itemsounds on
+  fast_doors on
+  elevators_speed on
+  spinjumprestart off
+  rando_speed off
+  Infinite_Space_Jump off
+  refill_before_save on
+  hud on
+  revealMap off
+  better_reserves on
+
+  # PATCHES - MISC
+  animals off
+  No_Music off
+  random_music off
+)
+DRY_RUN=0
+
+while [[ $1 ]]; do
+  case $1 in
+    -h|--help)
+      echo "Usage: mk-varia [--dry-run] [--setting=value...]"
+      echo "By default, generates a game and gives you the customizer link. With --dry-run, shows you the settings it would use."
+      exit 0
+      ;;
+    -n|--dryrun|--dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --*)
+      arg=${1:2}
+      key=${arg%%=*}
+      value=${arg##*=}
+      if ! [[ ${(k)SETTINGS[$key]} ]]; then
+        echo "Warning: unrecognized setting '$key', VARIA may reject or ignore it."
+      fi
+      SETTINGS[$key]=$value
+      shift
+      ;;
+    *)
+      echo "Unrecognized flag: $1"
+      ;;
+  esac
+done
+
+if (( DRY_RUN )); then
+  echo "Settings:"
+  printf '%s\n' "${(k)SETTINGS[@]}" | sort | while read key; do
+    printf "%24s '%s'\n" $key ${SETTINGS[$key]}
+  done
+  exit 0
+fi
+
+echo "Loading preset data..."
+presetParams="$(curl -s https://randommetroidsolver.pythonanywhere.com/presetWebService --data preset=${SETTINGS[preset]})"
+
+declare -a argv=(
+  --data-urlencode "paramsFileTarget=$presetParams"
+)
+for k v in "${(kv)SETTINGS[@]}"; do
+  argv+=(--data-urlencode "$k=$v")
+done
+
+echo "Generating..."
+curl -s https://varia.run/randomizerWebService "${argv[@]}" \
+| jq -r '(. + { "customizer": "http://varia.run/customizer/"+.seedKey })? // ("Error: " + .)'
+
+# Basic flow is:
+# First, POST preset=whatever to /presetWebService to get a JSON object containing
+# the speedtech data for the given preset.
+# Then, POST /randomizerWebService with url-encoded params corresponding to the
+# SETTINGS above, plus paramsFileTarget set to the url-encoded form of the JSON
+# you got from /presetWebService.
+# The response will be JSON, either a single string containing an error message,
+# or a JSON object containing information about the generated game, of which
+# seedKey is UUID that lets us access the customizer.
