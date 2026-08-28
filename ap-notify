@@ -34,10 +34,10 @@ function parse-argv {
       *) help; exit 1;;
     esac
   done
-}
 
-# If --players isn't specified, default to our slot name.
-if [[ ! $PLAYERS ]]; then PLAYERS="$NAME"; fi
+  # If --players isn't specified, default to our slot name.
+  if [[ ! $PLAYERS ]]; then PLAYERS="$NAME"; fi
+}
 
 function help {
   cat <<EOF
