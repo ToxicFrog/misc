@@ -27,6 +27,7 @@ function ffmpeg_convert() {
     -q:a 0 -codec:a libmp3lame \
     "$output" \
   || printf '\x1B[1;91m[FAIL] %s\x1B[0m\n' $input
+  #mp3gain -k -a -q -s i $output >/dev/null || printf '\x1B[1;91m[FAIL] %s\x1B[0m\n' $input
 }
 
 NTHREADS=8
@@ -40,7 +41,12 @@ function spawn() {
 }
 
 # Keep a list of converted files here so we can find ones that are stale later.
+# This is somewhat misnamed -- it also includes files that did not need updating
+# and still correspond to their backing files.
 printf '' > /tmp/$$.new
+
+# Keep a list of touched dirs so we know what to re-replaygain.
+printf '' > /tmp/$$.updated
 
 echo "Creating mp3s..."
 mkdir -p $MP3_DIR
@@ -83,16 +89,15 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
 
   # Now we process files that exist in the source but not the destination.
   case "$(echo "$src" | tr '[:upper:]' '[:lower:]')" in
-    # All formats supported by both mstream and gonic (taglib).
-    # Turns out some of these aren't supported by the phone?
-    # *.mp3|*.mp4|*.flac|*.m4a|*.ogg|*.opus|*.aac)
-    # *.mp3|*.flac|*.ogg|*.opus|*.aac)
+    # mp3 is the "canonical format" for the songserver, since it's supported by
+    # all client devices. For files already in mp3 we used to symlink them, but
+    # not all clients support replaygain, so instead, we copy them and then use
+    # mp3gain to burn the replaygain information in.
     *.mp3)
-      # TODO: can we convert *everything*, and burn in the replaygain information
-      # as we do so?
-      ln -sf "$src" "$dst"
+      cp "$src" "$dst"
       echo "$dst" >> /tmp/$$.new
-      printf "\x1B[92m[LINK]\x1B[0m %s\n" $src
+      echo "$dst" >> /tmp/$$.updated
+      printf "\x1B[92m[COPY]\x1B[0m %s\n" $src
       ;;
     # Non-audio metadata like covers
     */cover.*|*.jpg|*.jpeg|*.png|*.bmp|*.gif|*.m3u)
@@ -104,7 +109,7 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
     *.ahx)
       ;&
     # Things we always want to skip
-    *.torrent|*.download*|*.backup|*.txt)
+    *.torrent|*.download*|*.backup|*.txt|*.vtt|*.zip|.NOBACKUP)
       ;;
     # Recognized formats that we need to convert
     *.dbm|*.gdm|*.hvl|*.imf|*.it|*.mo3|*.mod|*.mptm|*.mtm|*.s3m|*.umx|*.vgm|*.vgz|*.xm)
@@ -112,6 +117,7 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
     *.mpc|*.aif|*.aiff|*.wma|*.wav|*.mid|*.midi|*.opus|*.m4a|*.ogg|*.flac)
       spawn ffmpeg_convert "$src" "$dst_mp3"
       echo "$dst_mp3" >> /tmp/$$.new
+      echo "$dst" >> /tmp/$$.updated
       printf "\x1B[93m[CONV]\x1B[0m %s\n" $src
       ;;
     # Unrecognized format. See if ffprobe understands it.
@@ -122,6 +128,7 @@ find "$MUSIC_DIR/" -path "$MP3_DIR" -prune -o -print | while read -r src; do
       if probe-music "$src"; then
         spawn ffmpeg_convert "$src" "$dst_mp3"
         echo "$dst_mp3" >> /tmp/$$.new
+        echo "$dst" >> /tmp/$$.updated
         printf "\x1B[93m[CONV]\x1B[0m %s\n" $src
       else
         # File is not recognized.
@@ -150,6 +157,10 @@ cat /tmp/$$.new /tmp/$$.all | sort | uniq -u \
 echo "Cleaning up empty directories..."
 find "$MP3_DIR" -depth \( -type d -empty \) -print -delete
 
-rm /tmp/$$.new /tmp/$$.all
+# Apply mp3rgain to changed directories.
+cat /tmp/$$.updated | xargs -d\\n dirname | sort -u \
+  | xargs -d\\n -n1 mp3rgain -Rakp --r128
+
+rm /tmp/$$.new /tmp/$$.all /tmp/$$.updated
 touch $MP3_DIR/.NOBACKUP
 echo "Done!"
