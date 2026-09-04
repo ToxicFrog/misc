@@ -46,30 +46,45 @@ function task/map-arg { echo -E "$@" }
 # user specifies a year: filter it also disables the context.
 # See task/year-filter for details on the filter meaning.
 function task/-parse-argv {
+  local MONTH="$(date +%m)"
   while [[ $1 ]]; do
     local arg="$(task/map-arg "$1")"
     case "$1" in
       year:all)
-        TASK_ARGV+="$(task/year-filter 1970-)"
+        TASK_ARGV+="$(task/date-filter 1970--)"
         TASK_ARGV+="rc.context:"
         ;;
       year:now)
-        TASK_ARGV+="$(task/year-filter $YEAR)"
+        TASK_ARGV+="$(task/date-filter $YEAR)"
         TASK_ARGV+="rc.context:"
         ;;
       year:past)
-        TASK_ARGV+="$(task/year-filter past)"
+        TASK_ARGV+="$(task/date-filter past)"
         TASK_ARGV+="rc.context:"
         ;;
       year:past:*)
-        TASK_ARGV+="$(task/year-filter past ${arg/year:past:/})"
+        TASK_ARGV+="$(task/date-filter past ${arg/year:past:/})"
         TASK_ARGV+="rc.context:"
         ;;
       year:*)
-        TASK_ARGV+="$(task/year-filter ${arg/year:/})"
+        TASK_ARGV+="$(task/date-filter ${arg/year:/})"
         TASK_ARGV+="rc.context:"
         ;;
-      *) TASK_ARGV+="$arg" ;;
+      month:now)
+        TASK_ARGV+="$(task/date-filter $YEAR-$(date +%m))"
+        TASK_ARGV+="rc.context:"
+        ;;
+      month:past)
+        TASK_ARGV+="$(task/date-filter $(date +%Y-%m -d 'now - 1 month'))"
+        TASK_ARGV+="rc.context:"
+        ;;
+      date:*)
+        TASK_ARGV+="$(task/date-filter ${arg/date:/})"
+        TASK_ARGV+="rc.context:"
+        ;;
+      *)
+        TASK_ARGV+="$arg"
+        ;;
     esac
     shift
   done
@@ -117,13 +132,13 @@ function task/select {
     "$@" list
 }
 
-# year-filter <year range>
+# date-filter <date range>
 # returns a taskwarrior filter clause that shows only tasks from the given year
 # range. A range can be any of:
-#  2014         tasks from 2014 only
-#  2014-2016    tasks from 2014, 2015, or 2016
-#  2014-        tasks from 2014 to the present
-#      -2016    tasks from the beginning of time to the end of 2016
+#  2014          tasks from 2014 only
+#  2014--2016    tasks from 2014, 2015, or 2016
+#  2014--        tasks from 2014 to the present
+#      --2016    tasks from the beginning of time to the end of 2016
 #
 # "from $YEAR", in practice, means:
 # - is finished, and was finished during $YEAR, OR
@@ -132,41 +147,56 @@ function task/select {
 # In effect, this means "tasks that were finished during $YEAR, or were pending
 # or in-progress for at least part of $YEAR."
 #
+# You can also specify more precise dates, e.g. 2014-09--2015--08.
+#
 # As a special case, it also accepts "past" to mean the previous 365 days (i.e.
-# a sliding 1-year window), and "past:yyyy-mm-dd" to mean such a window ending
+# a sliding 1-year window), and "past yyyy-mm-dd" to mean such a window ending
 # at the specified date.
 # TODO: unify this with the above so you can just ask for "-yyyy-mm-dd" or similar.
-function task/year-filter {
+function canonicalize-date {
+  case "$1" in
+    *-*-*) echo -n "$1" ;;
+    *-*) echo -n "$1-01" ;;
+    *) echo -n "$1-01-01" ;;
+ esac
+}
+function task/date-filter {
   local start end
   case "$1" in
-    *-)
-      start="${1%-}-01-01"
+    *--)
+      start="$(canonicalize-date ${1%--})"
       end="2099-01-01"
       ;;
-    -*)
+    --*)
       start="1970-01-01"
-      end="$((${1#-}+1))-01-01"
+      end="$(canonicalize-date ${1#--})"
       ;;
-    *-*)
-      start="${1%-*}-01-01"
-      end="$((${1#*-}+1))-01-01"
+    *--*)
+      start="$(canonicalize-date ${1%--*})"
+      end="$(canonicalize-date ${1#*--})"
       ;;
     past)
       if [[ $2 ]]; then
         # Past year ending at $2
         start="$(date -I -d "$2 -365 days")"
-        end="$(date -I -d "$2 +1 day")"
+        end="$(date -I -d "$2")"
       else
         # Past year ending today
         start="$(date -I -d '-365 days')"
-        end="$(date -I -d '+1 day')"
+        end="$(date -I)"
       fi
       ;;
+    # User specified a single year or month
+    *-*)
+      start="$(canonicalize-date $1)"
+      end="$(date -I -d "$start + 1 month - 1 day")"
+      ;;
     *)
-      start="$1-01-01"
-      end="$(($1+1))-01-01"
+      start="$(canonicalize-date $1)"
+      end="$(date -I -d "$start + 1 year - 1 day")"
       ;;
   esac
+  end="$(date -I -d "$end + 1 day")"
   # Items that were completed within the given date range.
   local isfinished="( +COMPLETED and end.after:$start and end.before:$end )"
   # Items that are active, and were active during the given date range.

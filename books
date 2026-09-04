@@ -20,6 +20,8 @@
 #   disables implicit current-calendar-year filter
 # year:past
 #   end.after:(now-365d) end.before:(today)
+# month:YYYY-MM
+#   as year:YYYY but month-scoped
 #
 ### New commands:
 # books reset-config
@@ -52,7 +54,7 @@ function main {
   local isfinished="( +COMPLETED and end.after:$YEAR-01-01 and end.before:$((YEAR+1))-01-01 )"
   local isreading="( +ACTIVE and start.before:$((YEAR+1))-01-01 )"
   task/init-config books.defaults \
-    "context.$YEAR=$(task/year-filter $YEAR)" \
+    "context.$YEAR=$(task/date-filter $YEAR)" \
     "context=$YEAR"
   task/dispatch "$@"
 }
@@ -70,7 +72,7 @@ command.
 "current year" only affects what books are displayed by default.)
 EOF
 function books/new-year {
-  \task context define $YEAR "$(task/year-filter $YEAR)"
+  \task context define $YEAR "$(task/date-filter $YEAR)"
   \task context delete ${YEAR}.write
   \task context $YEAR
 }
