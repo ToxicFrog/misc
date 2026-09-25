@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+function csi { printf '\x1B[%s' "${@//,/;}"; }
+function stripe {
+  csi 38:5:${1}m 48:5:${2}m
+  printf "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀%s" '' '' '' '' '' '' '' ''
+}
+
+# turn off wrapping, clear screen to white
+csi '?7l' 38:5:15,48:5:15m 2J 97,90m
+
+# Disability flag stripes, horizontal
+csi 999,1H 9A
+stripe 238 204
+csi 1B 1G; stripe 221 15
+csi 1B 1G; stripe 15 80
+csi 1B 1G; stripe 36 238
+
+# Pride flag stripes, vertical
+col=10
+for colour in 0 94 117 218 15 160 208 220 40 33 91; do
+  csi 0,${col}H 48:5:${colour}m
+  for row in {1..256}; do
+    printf ' '
+    csi 1D 1B
+  done
+  ((++col))
+done
+
+# Intersex flag ring
+csi 38:5:220,48:5:55m
+csi 999,5H 12A
+printf '█▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█'
+csi 1B 5G
+printf '█ ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ █'
+csi 1B 5G
+printf '█ █\x1B[15C█ █'
+csi 5B 5G
+printf '█ █\x1B[15C█ █'
+csi 1B 5G
+printf '█ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀ █'
+csi 1B 5G
+printf '█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█'
+
+# Text
+csi 999,27H 14A 30,107m
+printf "It's not over till we"
+csi 999,27H 13A
+printf "\x1B[4mall\x1B[24m have equal rights"
+
+csi 999,1H '?7h' 0,0m
+# read -r
